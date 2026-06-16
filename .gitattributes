@@ -1,8 +1,4 @@
 * text=auto
-*.cs text eol=crlf
-*.xaml text eol=crlf
-*.md text eol=lf
-*.yml text eol=lf
-*.yaml text eol=lf
-*.html text eol=lf
-*.css text eol=lf
+*.png binary
+*.ico binary
+*.dat binary

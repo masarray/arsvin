@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>ARSVIN</AssemblyName>
+    <RootNamespace>ARSVIN</RootNamespace>
+    <ApplicationIcon>Assets\arsvin.ico</ApplicationIcon>
+    <Company>Ari Sulistiono</Company>
+    <Authors>Ari Sulistiono</Authors>
+    <Product>ARSVIN - SV Injector</Product>
+    <Description>Open IEC 61850 Sampled Values injector with multi-stream SV publishing, lab PTP, and COMTRADE replay.</Description>
+    <Copyright>Copyright © Ari Sulistiono</Copyright>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/masarray/arsvin</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageTags>IEC 61850;Sampled Values;SV;COMTRADE;process bus;digital substation;relay testing</PackageTags>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpPcap" Version="6.3.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\arsvin.ico" />
+    <Content Include="Assets\arsvin.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

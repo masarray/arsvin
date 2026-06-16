@@ -1,5 +1,3 @@
 # Code of Conduct
 
-Be respectful, precise, and safety-aware.
-
-This project is used in power-system engineering contexts. Discussions should stay professional, evidence-based, and focused on improving the tool.
+Be respectful, technical, and constructive. This project is built for engineers, researchers, students, and maintainers working with digital substations and IEC 61850 tooling.

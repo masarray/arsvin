@@ -1,14 +1,12 @@
 # Support
 
-For bugs, include:
+Use GitHub Issues for reproducible bugs, feature requests, and documentation improvements.
 
-- ARSVIN version or commit,
-- Windows version,
-- .NET SDK version,
-- adapter and Npcap version,
-- SCL file type,
-- SV stream identity,
-- whether PTP was present,
-- screenshot or packet capture notes.
+Please include:
 
-Do not attach confidential substation files to public issues.
+- ARSVIN version
+- Windows version
+- .NET version if building from source
+- Npcap version
+- SCL/COMTRADE sample if it can be shared
+- screenshots or Wireshark notes when relevant

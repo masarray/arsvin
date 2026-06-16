@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="180" viewBox="0 0 640 180" role="img" aria-label="ARSVIN logo">
+  <defs><linearGradient id="g" x1="0" x2="1"><stop offset="0" stop-color="#22d3ee"/><stop offset="1" stop-color="#2563eb"/></linearGradient></defs>
+  <rect width="180" height="180" rx="42" fill="#061226"/>
+  <rect x="16" y="16" width="148" height="148" rx="32" fill="none" stroke="url(#g)" stroke-width="6"/>
+  <text x="90" y="87" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="56" font-weight="800" fill="white">SV</text>
+  <text x="90" y="124" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" font-weight="800" fill="#bae6fd">61850</text>
+  <text x="220" y="78" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="56" font-weight="800" fill="#0f172a">ARSVIN</text>
+  <text x="224" y="120" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="22" font-weight="600" fill="#2563eb">IEC 61850 Sampled Values Injector</text>
+</svg>

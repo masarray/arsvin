@@ -1,19 +1,21 @@
-param([string]$Configuration = "Release")
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = 'Stop'
 
-if (-not (Test-Path ".\extern\ARIEC61850\.git")) {
-  if (Test-Path ".\extern\ARIEC61850") {
-    Remove-Item ".\extern\ARIEC61850" -Recurse -Force
-  }
-  git clone https://github.com/masarray/ARIEC61850.git .\extern\ARIEC61850
-} else {
-  git -C .\extern\ARIEC61850 pull --ff-only
-}
+$out = Join-Path $PSScriptRoot 'artifacts\ARSVIN-win-x64'
+if (Test-Path $out) { Remove-Item $out -Recurse -Force }
+New-Item -ItemType Directory -Path $out | Out-Null
 
-dotnet publish .\src\ARSVIN.App\ARSVIN.App.csproj `
-  -c $Configuration `
+dotnet publish .\src\ARSVIN\ARSVIN.csproj `
+  -c Release `
   -r win-x64 `
   --self-contained true `
   -p:PublishSingleFile=true `
+  -p:IncludeNativeLibrariesForSelfExtract=true `
   -p:EnableCompressionInSingleFile=true `
-  -o .\artifacts\ARSVIN-win-x64
+  -p:DebugType=None `
+  -p:DebugSymbols=false `
+  -o $out
+
+Copy-Item .\README.md (Join-Path $out 'README.txt') -Force
+Copy-Item .\LICENSE (Join-Path $out 'LICENSE.txt') -Force
+Compress-Archive -Path (Join-Path $out '*') -DestinationPath .\artifacts\ARSVIN-win-x64-portable.zip -Force
+Write-Host "Created artifacts\ARSVIN-win-x64-portable.zip"

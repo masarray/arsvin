@@ -1,12 +1,12 @@
-name: Pages
+name: Deploy GitHub Pages
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
     paths:
-      - "site/**"
-      - "docs/**"
-      - ".github/workflows/pages.yml"
+      - 'site/**'
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -16,27 +16,32 @@ permissions:
 
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
     environment:
       name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Copy docs into site
+      - name: Prepare site
         run: |
           mkdir -p site/docs
           cp -R docs/* site/docs/
+          touch site/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: site
 
-      - name: Deploy to GitHub Pages
+      - name: Deploy
+        id: deployment
         uses: actions/deploy-pages@v4

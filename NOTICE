@@ -1,8 +1,6 @@
-ARSVIN - SV Injector
-Copyright © Mas Ari
+ARSVIN - IEC 61850 Sampled Values Injector
+Copyright 2026 Ari Sulistiono
 
-This product uses the ARIEC61850 protocol stack as a source dependency.
-This product is not affiliated with, endorsed by, or certified by any protection relay or test-set vendor.
-
-ARSVIN is intended for isolated laboratory and engineering test networks.
-Do not inject Sampled Values into production protection networks unless the test plan, isolation, and authorization are explicitly approved.
+Licensed under the Apache License, Version 2.0.
+Author: Ari Sulistiono
+GitHub: https://github.com/masarray

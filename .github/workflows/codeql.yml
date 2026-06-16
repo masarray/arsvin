@@ -2,11 +2,11 @@ name: CodeQL
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
   schedule:
-    - cron: "24 3 * * 1"
+    - cron: '21 3 * * 1'
 
 permissions:
   security-events: write
@@ -16,24 +16,25 @@ jobs:
   analyze:
     name: Analyze C#
     runs-on: windows-latest
-
     steps:
-      - name: Checkout ARSVIN
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Checkout ARIEC61850 stack
-        uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
         with:
-          repository: masarray/ARIEC61850
-          path: extern/ARIEC61850
+          dotnet-version: 8.0.x
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
           languages: csharp
+          build-mode: manual
 
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@v3
+      - name: Build
+        run: |
+          dotnet restore src/ARSVIN/ARSVIN.csproj
+          dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

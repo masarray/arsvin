@@ -1,0 +1,15 @@
+{
+  "name": "ARSVIN - IEC 61850 Sampled Values Injector",
+  "short_name": "ARSVIN",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f6f9ff",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "assets/arsvin.png",
+      "sizes": "256x256",
+      "type": "image/png"
+    }
+  ]
+}

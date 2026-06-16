@@ -1,28 +1,29 @@
 # Quick Start
 
-## Clone
+## 1. Install prerequisites
 
-```powershell
-git clone --recurse-submodules https://github.com/masarray/arsvin.git
-cd arsvin
-```
+- Windows 10/11
+- Npcap for live Ethernet injection
+- Administrator rights for live packet transmission
 
-## Build
+## 2. Start ARSVIN
 
-```powershell
-dotnet build .\src\ARSVIN.App\ARSVIN.App.csproj -c Release
-```
+Run `ARSVIN.exe`. For live injection, launch it as Administrator.
 
-## Run
+## 3. Open SCL
 
-```powershell
-dotnet run --project .\src\ARSVIN.App\ARSVIN.App.csproj -c Debug
-```
+Use **Config** to open an SCL file and select an SV stream.
 
-## Configure SV
+## 4. Configure publishers
 
-1. Click **Config**.
-2. Open the SCL file.
-3. Select the SV stream.
-4. Select the NIC adapter.
-5. Verify APPID, destination MAC, VLAN, sample rate, dataset, and mapped entries.
+Use the Publisher selector to switch between:
+
+- Publisher 1
+- Publisher 2
+- Publisher 3
+
+Each publisher can have its own stream, APPID, MAC, VLAN, sample rate, and values.
+
+## 5. Inject
+
+Use **Start** for live injection or dry run for validation without transmitting.

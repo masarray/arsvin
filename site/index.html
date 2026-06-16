@@ -1,60 +1,86 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ARSVIN - SV Injector</title>
-  <meta name="description" content="ARSVIN is an IEC 61850 Sampled Values injector with Manual, Ramp, State Sequencer, SCL configuration, and PTP-aware roadmap.">
-  <link rel="stylesheet" href="styles.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ARSVIN — Open IEC 61850 Sampled Values Injector</title>
+  <meta name="description" content="ARSVIN is an open IEC 61850 Sampled Values injector with multi-stream SV publishing, COMTRADE replay, lab PTP, and portable Windows releases for digital substation R&D." />
+  <meta name="keywords" content="IEC 61850, Sampled Values, SV injector, COMTRADE replay, digital substation, process bus, relay testing, PTP, merging unit simulator" />
+  <meta name="author" content="Ari Sulistiono" />
+  <meta property="og:title" content="ARSVIN — Open IEC 61850 Sampled Values Injector" />
+  <meta property="og:description" content="Multi-stream SV injection, COMTRADE replay, and lab PTP for digital substation R&D." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://masarray.github.io/arsvin/" />
+  <meta property="og:image" content="https://masarray.github.io/arsvin/assets/arsvin.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" href="assets/arsvin.png" />
+  <link rel="manifest" href="site.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ARSVIN",
+    "applicationCategory": "EngineeringApplication",
+    "operatingSystem": "Windows",
+    "softwareVersion": "0.1.0",
+    "license": "https://www.apache.org/licenses/LICENSE-2.0",
+    "author": { "@type": "Person", "name": "Ari Sulistiono", "url": "https://github.com/masarray" },
+    "description": "Open IEC 61850 Sampled Values injector with multi-stream SV publishing, COMTRADE replay, and lab PTP."
+  }
+  </script>
 </head>
 <body>
-  <header class="hero">
-    <nav class="nav">
-      <div class="brand"><span class="logo">A</span><span>ARSVIN</span></div>
-      <div class="nav-links">
-        <a href="#features">Features</a>
-        <a href="#sync">PTP</a>
-        <a href="#safety">Safety</a>
-        <a href="docs/quick-start.md">Docs</a>
-      </div>
-    </nav>
-    <section class="hero-content">
-      <div class="eyebrow">IEC 61850 Sampled Values Injection</div>
-      <h1>ARSVIN - SV Injector</h1>
-      <p class="lead">A modern Manual, Ramp, and State Sequencer workspace for process-bus labs and relay engineering.</p>
-      <div class="cta-row">
-        <a class="button primary" href="https://github.com/masarray/arsvin">View on GitHub</a>
-        <a class="button secondary" href="docs/quick-start.md">Quick Start</a>
-      </div>
-    </section>
+  <header class="nav">
+    <a class="brand" href="#top"><img src="assets/arsvin.png" alt="" /> <span>ARSVIN</span></a>
+    <nav><a href="#features">Features</a><a href="#workflow">Workflow</a><a href="#download">Download</a><a href="https://github.com/masarray/arsvin">GitHub</a></nav>
   </header>
-  <main>
+
+  <main id="top">
+    <section class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">Open IEC 61850 Sampled Values Injector</p>
+        <h1>Multi-stream SV injection and COMTRADE replay for digital substation R&amp;D.</h1>
+        <p class="lead">ARSVIN simulates up to three Sampled Values publishers from SCL, replays transient COMTRADE records, and generates lab PTP traffic for process-bus experiments.</p>
+        <div class="actions"><a class="button primary" href="https://github.com/masarray/arsvin/releases">Download portable EXE</a><a class="button" href="https://github.com/masarray/arsvin">View source</a></div>
+        <p class="note">Apache-2.0. Built by Ari Sulistiono. For lab and R&amp;D use; not a certified protection test set.</p>
+      </div>
+      <div class="hero-card">
+        <div class="screen">
+          <div class="bar"><span></span><span></span><span></span></div>
+          <div class="grid">
+            <div class="metric"><b>3</b><span>SV publishers</span></div>
+            <div class="metric"><b>PTP</b><span>lab sync</span></div>
+            <div class="metric"><b>CFG/DAT</b><span>COMTRADE</span></div>
+            <div class="metric"><b>88BA</b><span>SV Ethernet</span></div>
+          </div>
+          <div class="wave"></div>
+        </div>
+      </div>
+    </section>
+
     <section id="features" class="section">
-      <span class="eyebrow">Workspaces</span>
-      <h2>Designed for fast test workflow</h2>
-      <div class="grid">
-        <article class="card"><h3>Manual</h3><p>Edit voltage, current, angle, and frequency with keyboard-first controls.</p></article>
-        <article class="card"><h3>Ramp</h3><p>Build time-based ramp profiles for selected SV signals.</p></article>
-        <article class="card"><h3>State Sequencer</h3><p>Create multi-state test quantities with clear phasor and time-signal preview.</p></article>
+      <h2>Focused on injection, not dashboard noise.</h2>
+      <div class="cards">
+        <article><h3>Multi-stream SV</h3><p>Simulate up to three independent merging units with independent values, APPID, MAC, VLAN, svID, dataset, dLSB, and sample counter.</p></article>
+        <article><h3>COMTRADE Replay</h3><p>Replay analog COMTRADE records as Sampled Values. ASCII, BINARY, BINARY32, and FLOAT32 DAT types are supported.</p></article>
+        <article><h3>SCL Setup</h3><p>Select SV streams directly from SCL and avoid manual network field mistakes during lab setup.</p></article>
+        <article><h3>Lab PTP</h3><p>Generate synthetic PTP and monitor timing visibility for process-bus experiments without claiming calibrated timing.</p></article>
       </div>
     </section>
-    <section id="sync" class="section split">
-      <div>
-        <span class="eyebrow">PTP-aware roadmap</span>
-        <h2>SV acceptance depends on timing</h2>
-        <p>Some relays reject SV streams when PTP and smpSynch state are not valid. ARSVIN separates reusable PTP protocol work into ARIEC61850 and exposes practical sync diagnostics in the product UI.</p>
-      </div>
-      <div class="status-card">
-        <div><b>PTP</b><span>External GM / domain / health</span></div>
-        <div><b>SV</b><span>smpCnt / smpSynch / stream ID</span></div>
-        <div><b>Adapter</b><span>Dedicated test NIC visibility</span></div>
-      </div>
+
+    <section id="workflow" class="section split">
+      <div><h2>Designed like a digital SV test tool.</h2><p>Choose a publisher, select an SCL stream, set manual values or import COMTRADE, then start SV injection. The workflow stays narrow so the tool remains fast, understandable, and useful in R&amp;D labs.</p></div>
+      <ol class="steps"><li>Open SCL</li><li>Select Publisher 1–3</li><li>Set values or import COMTRADE</li><li>Start SV injection</li><li>Verify traffic in relay lab</li></ol>
     </section>
-    <section id="safety" class="section warning">
-      <h2>Safety first</h2>
-      <p>ARSVIN is intended for isolated laboratory networks. Live Sampled Values injection must not be connected to production protection networks without an approved test plan.</p>
+
+    <section id="download" class="section cta">
+      <h2>Release-ready Windows package.</h2>
+      <p>GitHub Actions builds a self-contained win-x64 portable package from tagged releases.</p>
+      <a class="button primary" href="https://github.com/masarray/arsvin/releases">Get ARSVIN</a>
     </section>
   </main>
-  <footer><span>Apache-2.0</span><span>ARSVIN - SV Injector</span></footer>
+
+  <footer>© Ari Sulistiono · Apache-2.0 · <a href="https://github.com/masarray/arsvin">github.com/masarray/arsvin</a></footer>
 </body>
 </html>
