@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-windows:
+    name: Publish Windows portable
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout ARSVIN
+        uses: actions/checkout@v4
+
+      - name: Checkout ARIEC61850 stack
+        uses: actions/checkout@v4
+        with:
+          repository: masarray/ARIEC61850
+          path: extern/ARIEC61850
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Publish win-x64
+        run: >
+          dotnet publish .\src\ARSVIN.App\ARSVIN.App.csproj
+          -c Release
+          -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -o .\artifacts\ARSVIN-win-x64
+
+      - name: Archive
+        shell: pwsh
+        run: Compress-Archive -Path .\artifacts\ARSVIN-win-x64\* -DestinationPath .\artifacts\ARSVIN-win-x64.zip -Force
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ARSVIN-win-x64
+          path: .\artifacts\ARSVIN-win-x64.zip
+
+      - name: Create GitHub release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: .\artifacts\ARSVIN-win-x64.zip
+          generate_release_notes: true

@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build ARSVIN
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout ARSVIN
+        uses: actions/checkout@v4
+
+      - name: Checkout ARIEC61850 stack
+        uses: actions/checkout@v4
+        with:
+          repository: masarray/ARIEC61850
+          path: extern/ARIEC61850
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Restore
+        run: dotnet restore .\src\ARSVIN.App\ARSVIN.App.csproj
+
+      - name: Build
+        run: dotnet build .\src\ARSVIN.App\ARSVIN.App.csproj -c Release --no-restore

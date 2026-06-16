@@ -1,0 +1,276 @@
+using System.Globalization;
+
+namespace ARSVIN.App.ViewModels;
+
+public sealed class ManualOutputRowViewModel : ObservableObject
+{
+    public const string MagnitudePropertyName = nameof(Magnitude);
+    public const string AngleDegreesPropertyName = nameof(AngleDegrees);
+    public const string FrequencyHzPropertyName = nameof(FrequencyHz);
+
+    private const string NumericFormat = "0.000";
+    private readonly Action<ManualOutputRowViewModel, string> _onChanged;
+    private bool _isEnabled = true;
+    private string _name;
+    private double _magnitude;
+    private double _angleDegrees;
+    private double _frequencyHz;
+    private string _magnitudeText = string.Empty;
+    private string _angleDegreesText = string.Empty;
+    private string _frequencyHzText = string.Empty;
+
+    public ManualOutputRowViewModel(
+        string key,
+        string name,
+        string kind,
+        string unit,
+        double magnitude,
+        double angleDegrees,
+        double frequencyHz,
+        bool isEnabled,
+        Action<ManualOutputRowViewModel, string> onChanged)
+    {
+        Key = key;
+        _name = name;
+        Kind = kind;
+        Unit = unit;
+        _magnitude = CoerceMagnitude(magnitude);
+        _angleDegrees = NormalizeDegrees(angleDegrees);
+        _frequencyHz = CoerceFrequency(frequencyHz);
+        _isEnabled = isEnabled;
+        _onChanged = onChanged;
+        RefreshTexts();
+    }
+
+    public string Key { get; }
+
+    public string Name
+    {
+        get => _name;
+        set => SetProperty(ref _name, value);
+    }
+
+    public string Kind { get; }
+    public string Unit { get; }
+
+    public bool IsEnabled
+    {
+        get => _isEnabled;
+        set
+        {
+            if (SetProperty(ref _isEnabled, value))
+                _onChanged(this, nameof(IsEnabled));
+        }
+    }
+
+    public double Magnitude
+    {
+        get => _magnitude;
+        set
+        {
+            var coerced = CoerceMagnitude(value);
+            if (SetProperty(ref _magnitude, coerced))
+            {
+                MagnitudeText = FormatMagnitude(coerced);
+                _onChanged(this, nameof(Magnitude));
+            }
+            else
+            {
+                MagnitudeText = FormatMagnitude(coerced);
+            }
+        }
+    }
+
+    public double AngleDegrees
+    {
+        get => _angleDegrees;
+        set
+        {
+            var coerced = NormalizeDegrees(value);
+            if (SetProperty(ref _angleDegrees, coerced))
+            {
+                AngleDegreesText = FormatAngle(coerced);
+                _onChanged(this, nameof(AngleDegrees));
+            }
+            else
+            {
+                AngleDegreesText = FormatAngle(coerced);
+            }
+        }
+    }
+
+    public double FrequencyHz
+    {
+        get => _frequencyHz;
+        set
+        {
+            var coerced = CoerceFrequency(value);
+            if (SetProperty(ref _frequencyHz, coerced))
+            {
+                FrequencyHzText = FormatFrequency(coerced);
+                _onChanged(this, nameof(FrequencyHz));
+            }
+            else
+            {
+                FrequencyHzText = FormatFrequency(coerced);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Display text after commit. The editor accepts either plain numbers or values with units
+    /// such as "57.740 V", "1.000 A", "50.000 Hz", and "-120.000 °".
+    /// </summary>
+    public string MagnitudeText
+    {
+        get => _magnitudeText;
+        set => SetProperty(ref _magnitudeText, value);
+    }
+
+    public string AngleDegreesText
+    {
+        get => _angleDegreesText;
+        set => SetProperty(ref _angleDegreesText, value);
+    }
+
+    public string FrequencyHzText
+    {
+        get => _frequencyHzText;
+        set => SetProperty(ref _frequencyHzText, value);
+    }
+
+    public bool CommitText(string propertyName, out string warning)
+    {
+        warning = string.Empty;
+        return propertyName switch
+        {
+            MagnitudePropertyName => CommitMagnitude(out warning),
+            AngleDegreesPropertyName => CommitAngle(out warning),
+            FrequencyHzPropertyName => CommitFrequency(out warning),
+            _ => true
+        };
+    }
+
+    public void RejectText(string propertyName)
+    {
+        switch (propertyName)
+        {
+            case MagnitudePropertyName:
+                MagnitudeText = FormatMagnitude(Magnitude);
+                break;
+            case AngleDegreesPropertyName:
+                AngleDegreesText = FormatAngle(AngleDegrees);
+                break;
+            case FrequencyHzPropertyName:
+                FrequencyHzText = FormatFrequency(FrequencyHz);
+                break;
+        }
+    }
+
+    public void RefreshTexts()
+    {
+        MagnitudeText = FormatMagnitude(Magnitude);
+        AngleDegreesText = FormatAngle(AngleDegrees);
+        FrequencyHzText = FormatFrequency(FrequencyHz);
+    }
+
+    private bool CommitMagnitude(out string warning)
+    {
+        warning = string.Empty;
+        if (!TryParseOperatorNumber(MagnitudeText, Unit, out var value) || !IsFinite(value) || value < 0 || value > 1_000_000_000)
+        {
+            warning = $"Invalid value for {Name}. Magnitude must be a numeric value from 0 to 1,000,000,000 {Unit}.";
+            RejectText(MagnitudePropertyName);
+            return false;
+        }
+
+        Magnitude = value;
+        return true;
+    }
+
+    private bool CommitAngle(out string warning)
+    {
+        warning = string.Empty;
+        if (!TryParseOperatorNumber(AngleDegreesText, "°", out var value) || !IsFinite(value) || Math.Abs(value) > 360_000)
+        {
+            warning = $"Invalid angle for {Name}. Angle must be a numeric value within ±360,000 degrees.";
+            RejectText(AngleDegreesPropertyName);
+            return false;
+        }
+
+        AngleDegrees = value;
+        return true;
+    }
+
+    private bool CommitFrequency(out string warning)
+    {
+        warning = string.Empty;
+        if (!TryParseOperatorNumber(FrequencyHzText, "Hz", out var value) || !IsFinite(value) || value < 0 || value > 5_000)
+        {
+            warning = $"Invalid frequency for {Name}. Frequency must be a numeric value from 0 to 5000 Hz. Use 0 Hz for DC.";
+            RejectText(FrequencyHzPropertyName);
+            return false;
+        }
+
+        FrequencyHz = value;
+        return true;
+    }
+
+    private static bool TryParseOperatorNumber(string text, string unit, out double value)
+    {
+        var input = NormalizeOperatorInput(text, unit);
+        if (double.TryParse(input, NumberStyles.Float, CultureInfo.CurrentCulture, out value))
+            return true;
+
+        return double.TryParse(input, NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+    }
+
+    private static string NormalizeOperatorInput(string text, string unit)
+    {
+        var input = (text ?? string.Empty).Trim();
+        input = input.Replace(" ", string.Empty, StringComparison.Ordinal);
+        input = input.Replace("deg", string.Empty, StringComparison.OrdinalIgnoreCase);
+        input = input.Replace("degree", string.Empty, StringComparison.OrdinalIgnoreCase);
+        input = input.Replace("degrees", string.Empty, StringComparison.OrdinalIgnoreCase);
+        input = input.Replace("°", string.Empty, StringComparison.Ordinal);
+        input = input.Replace("Hz", string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrWhiteSpace(unit))
+            input = input.Replace(unit, string.Empty, StringComparison.OrdinalIgnoreCase);
+
+        return input.Trim();
+    }
+
+    private static bool IsFinite(double value)
+        => !double.IsNaN(value) && !double.IsInfinity(value);
+
+    private static double CoerceMagnitude(double value)
+        => IsFinite(value) ? Math.Clamp(value, 0, 1_000_000_000) : 0;
+
+    private static double CoerceFrequency(double value)
+        => IsFinite(value) && value >= 0 ? Math.Min(value, 5_000) : 50;
+
+    private static double NormalizeDegrees(double degrees)
+    {
+        if (!IsFinite(degrees))
+            return 0;
+
+        while (degrees > 180)
+            degrees -= 360;
+        while (degrees <= -180)
+            degrees += 360;
+        return Math.Round(degrees, 6);
+    }
+
+    private string FormatMagnitude(double value)
+        => $"{FormatNumber(value)} {Unit}";
+
+    private static string FormatAngle(double value)
+        => $"{FormatNumber(value)} °";
+
+    private static string FormatFrequency(double value)
+        => $"{FormatNumber(value)} Hz";
+
+    private static string FormatNumber(double value)
+        => value.ToString(NumericFormat, CultureInfo.InvariantCulture);
+}

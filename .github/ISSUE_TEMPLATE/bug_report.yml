@@ -1,0 +1,26 @@
+name: Bug report
+description: Report a reproducible issue in ARSVIN
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Windows, .NET SDK, adapter, Npcap, relay/IED if relevant.
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs, screenshots, or packet captures

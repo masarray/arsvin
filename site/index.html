@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARSVIN - SV Injector</title>
+  <meta name="description" content="ARSVIN is an IEC 61850 Sampled Values injector with Manual, Ramp, State Sequencer, SCL configuration, and PTP-aware roadmap.">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="hero">
+    <nav class="nav">
+      <div class="brand"><span class="logo">A</span><span>ARSVIN</span></div>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#sync">PTP</a>
+        <a href="#safety">Safety</a>
+        <a href="docs/quick-start.md">Docs</a>
+      </div>
+    </nav>
+    <section class="hero-content">
+      <div class="eyebrow">IEC 61850 Sampled Values Injection</div>
+      <h1>ARSVIN - SV Injector</h1>
+      <p class="lead">A modern Manual, Ramp, and State Sequencer workspace for process-bus labs and relay engineering.</p>
+      <div class="cta-row">
+        <a class="button primary" href="https://github.com/masarray/arsvin">View on GitHub</a>
+        <a class="button secondary" href="docs/quick-start.md">Quick Start</a>
+      </div>
+    </section>
+  </header>
+  <main>
+    <section id="features" class="section">
+      <span class="eyebrow">Workspaces</span>
+      <h2>Designed for fast test workflow</h2>
+      <div class="grid">
+        <article class="card"><h3>Manual</h3><p>Edit voltage, current, angle, and frequency with keyboard-first controls.</p></article>
+        <article class="card"><h3>Ramp</h3><p>Build time-based ramp profiles for selected SV signals.</p></article>
+        <article class="card"><h3>State Sequencer</h3><p>Create multi-state test quantities with clear phasor and time-signal preview.</p></article>
+      </div>
+    </section>
+    <section id="sync" class="section split">
+      <div>
+        <span class="eyebrow">PTP-aware roadmap</span>
+        <h2>SV acceptance depends on timing</h2>
+        <p>Some relays reject SV streams when PTP and smpSynch state are not valid. ARSVIN separates reusable PTP protocol work into ARIEC61850 and exposes practical sync diagnostics in the product UI.</p>
+      </div>
+      <div class="status-card">
+        <div><b>PTP</b><span>External GM / domain / health</span></div>
+        <div><b>SV</b><span>smpCnt / smpSynch / stream ID</span></div>
+        <div><b>Adapter</b><span>Dedicated test NIC visibility</span></div>
+      </div>
+    </section>
+    <section id="safety" class="section warning">
+      <h2>Safety first</h2>
+      <p>ARSVIN is intended for isolated laboratory networks. Live Sampled Values injection must not be connected to production protection networks without an approved test plan.</p>
+    </section>
+  </main>
+  <footer><span>Apache-2.0</span><span>ARSVIN - SV Injector</span></footer>
+</body>
+</html>
