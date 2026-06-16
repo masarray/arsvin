@@ -52,7 +52,7 @@ Requirements:
 
 ```powershell
 cd arsvin
-.\build.ps1
+.uild.ps1
 ```
 
 Create a portable package:

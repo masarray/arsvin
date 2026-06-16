@@ -1,4 +1,5 @@
 using System.Buffers.Binary;
+using System.IO;
 
 namespace AR.Iec61850.Capture;
 
