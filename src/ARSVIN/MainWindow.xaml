@@ -12,6 +12,7 @@
         MinWidth="1220"
         MinHeight="720"
         WindowStartupLocation="CenterScreen"
+        PreviewMouseDown="Window_PreviewMouseDown"
         FontFamily="Segoe UI Variable, Segoe UI"
         FontSize="13"
         Background="#F3F7FD">
@@ -755,14 +756,25 @@
 
             <Button Grid.Column="9" Command="{Binding ImportComtradeCommand}" Style="{StaticResource RibbonButton}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Path Data="M5 4h9l5 5v11H5z" Stroke="#334155" StrokeThickness="1.8" Fill="Transparent" StrokeLineJoin="Round"/><Path Data="M14 4v5h5" Stroke="#334155" StrokeThickness="1.8" Fill="Transparent" StrokeLineJoin="Round"/><Path Data="M7 15c2-4 4 4 6 0s4 4 6 0" Stroke="#2563EB" StrokeThickness="1.8" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/></Canvas></Viewbox>
+                    <Viewbox Width="24" Height="24">
+                        <Canvas Width="24" Height="24">
+                            <Path Data="M6 22 A2 2 0 0 1 4 20 V4 A2 2 0 0 1 6 2 H14 A2.4 2.4 0 0 1 15.704 2.706 L19.292 6.294 A2.4 2.4 0 0 1 20 8 V20 A2 2 0 0 1 18 22 Z" Stroke="#334155" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            <Path Data="M14 2 V7 A1 1 0 0 0 15 8 H20" Stroke="#334155" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            <Path Data="M15.033 13.44 A0.647 0.647 0 0 1 15.033 14.56 L10.968 16.912 A0.645 0.645 0 0 1 10 16.352 V11.648 A0.645 0.645 0 0 1 10.967 11.088 Z" Stroke="#2563EB" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                        </Canvas>
+                    </Viewbox>
                     <TextBlock Text="Comtrade" Style="{StaticResource RibbonCaption}" />
                 </StackPanel>
             </Button>
 
             <Button Grid.Column="10" Click="CheckPreflight_Click" Style="{StaticResource RibbonButton}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Path Data="M4 12l4 4 12-12" Stroke="#334155" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><Ellipse Canvas.Left="3" Canvas.Top="3" Width="18" Height="18" Stroke="#2563EB" StrokeThickness="1.7" Fill="Transparent"/></Canvas></Viewbox>
+                    <Viewbox Width="24" Height="24">
+                        <Canvas Width="24" Height="24">
+                            <Path Data="M21.801 10 A10 10 0 1 1 17 3.335" Stroke="#2563EB" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            <Path Data="M9 11 L12 14 L22 4" Stroke="#334155" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                        </Canvas>
+                    </Viewbox>
                     <TextBlock Text="Check" Style="{StaticResource RibbonCaption}" />
                 </StackPanel>
             </Button>

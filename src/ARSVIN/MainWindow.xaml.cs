@@ -18,6 +18,26 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
     }
 
+
+    private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+    {
+        if (Keyboard.FocusedElement is not TextBox focused || !IsManualNumericTextBox(focused))
+            return;
+
+        if (IsSameOrDescendant(e.OriginalSource as DependencyObject, focused))
+            return;
+
+        var grid = FindVisualParent<DataGrid>(focused) ?? ManualOutputsGrid;
+        if (!CommitManualTextBox(focused))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        grid.CommitEdit(DataGridEditingUnit.Cell, true);
+        grid.CommitEdit(DataGridEditingUnit.Row, true);
+    }
+
     private void OpenConfig_Click(object sender, RoutedEventArgs e)
     {
         new SvConfigWindow
@@ -257,6 +277,26 @@ public partial class MainWindow : Window
                 textBox.SelectAll();
             }
         }));
+    }
+
+
+    private static bool IsSameOrDescendant(DependencyObject? source, DependencyObject target)
+    {
+        for (var current = source; current is not null; current = GetVisualOrLogicalParent(current))
+        {
+            if (ReferenceEquals(current, target))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static DependencyObject? GetVisualOrLogicalParent(DependencyObject current)
+    {
+        if (current is Visual)
+            return VisualTreeHelper.GetParent(current);
+
+        return LogicalTreeHelper.GetParent(current);
     }
 
     private static bool IsManualNumericColumn(DataGridColumn column)
