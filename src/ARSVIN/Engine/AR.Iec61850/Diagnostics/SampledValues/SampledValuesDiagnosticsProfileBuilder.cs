@@ -275,7 +275,7 @@ public sealed class SampledValuesDiagnosticsProfileBuilder
             findings.Add(CreateFinding("High", "SV_PAYLOAD_LENGTH_CHANGED", expected.ControlBlockReference, $"Observed {observed.PayloadLengthChangeCount} payload length change(s) inside one stream.", "A stable SV stream should not change payload size during one capture; check publisher configuration or malformed frames."));
 
         if (observed.SampleSynchronizationIssueCount > 0)
-            findings.Add(CreateFinding("Warning", "SV_SAMPLE_SYNCHRONIZATION_ISSUE", expected.ControlBlockReference, $"Observed {observed.SampleSynchronizationIssueCount} frame(s) with smpSynch not equal to synchronized value 2.", "Verify PTP/time synchronization and publisher smpSynch behavior before using phasor/process-bus evidence."));
+            findings.Add(CreateFinding("Warning", "SV_SAMPLE_SYNCHRONIZATION_ISSUE", expected.ControlBlockReference, $"Observed {observed.SampleSynchronizationIssueCount} frame(s) with smpSynch not equal to global value 2.", "Verify that the observed smpSynch value matches the intended compatibility mode or external PTP policy before using phasor/process-bus evidence."));
     }
 
     private static void AddFrameDiagnostics(SclSampledValuesStream expected, ProcessBusStreamSummary observed, ICollection<SampledValuesDiagnosticsFinding> findings)

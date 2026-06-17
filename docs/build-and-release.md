@@ -3,7 +3,7 @@
 ## Build
 
 ```powershell
-.uild.ps1
+.\build.ps1
 ```
 
 ## Publish portable win-x64 package

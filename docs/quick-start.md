@@ -3,18 +3,23 @@
 ## 1. Install prerequisites
 
 - Windows 10/11
-- Npcap for live Ethernet injection
+- Npcap for live Ethernet publishing
 - Administrator rights for live packet transmission
+- A lab network or isolated point-to-point setup when using live publish mode
 
 ## 2. Start ARSVIN
 
-Run `ARSVIN.exe`. For live injection, launch it as Administrator.
+Run `ARSVIN.exe`.
+
+For live packet publishing, launch it as **Administrator**.
 
 ## 3. Open SCL
 
 Use **Config** to open an SCL file and select an SV stream.
 
-## 4. Configure publishers
+The imported stream can provide APPID, VLAN, destination MAC, `svID`, dataset reference, and other network details.
+
+## 4. Select a publisher slot
 
 Use the Publisher selector to switch between:
 
@@ -24,6 +29,44 @@ Use the Publisher selector to switch between:
 
 Each publisher can have its own stream, APPID, MAC, VLAN, sample rate, and values.
 
-## 5. Inject
+## 5. Choose a publishing workflow
 
-Use **Start** for live injection or dry run for validation without transmitting.
+ARSVIN supports several practical lab workflows:
+
+- **Manual Continue** — continuous steady-state publishing until stopped
+- **Ramp** — state-based magnitude / angle changes using the configured ramp timing
+- **Sequencer** — timed state sequence publishing using the configured state durations
+- **COMTRADE Replay** — replay analog records as Sampled Values
+
+## 6. Review network settings
+
+Before using live mode, confirm:
+
+- selected adapter
+- destination MAC
+- source MAC
+- APPID
+- VLAN ID and priority
+- sample rate / `smpCnt` progression expectation
+- selected `smpSynch` behavior / compatibility mode
+
+## 7. Publish
+
+Use **Start** for live publishing or run a dry test for validation without transmitting on the network.
+
+## 8. Verify
+
+Use Wireshark and the relay / subscriber status to confirm the stream is visible and readable.
+
+Useful checks include:
+
+- Ethernet type `0x88BA`
+- correct destination multicast MAC
+- correct APPID
+- correct VLAN tag
+- expected `svID`
+- expected `smpSynch` behavior, especially whether the relay requires global compatibility mode
+
+## Sync compatibility note
+
+For point-to-point relay readability checks, **Global compatibility — smpSynch=2** is usually the most practical starting point. It helps strict subscribers accept the SV stream, but it does not prove real PTP timing accuracy.

@@ -3,17 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ARSVIN — Open IEC 61850 Sampled Values Injector</title>
-  <meta name="description" content="ARSVIN is an open IEC 61850 Sampled Values injector with multi-stream SV publishing, COMTRADE replay, lab PTP, and portable Windows releases for digital substation R&D." />
-  <meta name="keywords" content="IEC 61850, Sampled Values, SV injector, COMTRADE replay, digital substation, process bus, relay testing, PTP, merging unit simulator" />
+  <title>ARSVIN — IEC 61850 Sampled Values Publisher & Process Bus Traffic Tester</title>
+  <meta name="description" content="ARSVIN is a lightweight IEC 61850 Sampled Values publisher simulator for lab publishing, SCL-based stream setup, COMTRADE replay, relay readability checks, and process-bus traffic experiments." />
+  <meta name="keywords" content="IEC 61850, Sampled Values, SV publisher, SV injector, COMTRADE replay, digital substation, process bus, relay readability, PTP traffic tester" />
   <meta name="author" content="Ari Sulistiono" />
-  <meta property="og:title" content="ARSVIN — Open IEC 61850 Sampled Values Injector" />
-  <meta property="og:description" content="Multi-stream SV injection, COMTRADE replay, and lab PTP for digital substation R&D." />
+  <meta property="og:title" content="ARSVIN — IEC 61850 Sampled Values Publisher & Process Bus Traffic Tester" />
+  <meta property="og:description" content="A focused Windows tool for Sampled Values publishing, SCL-based stream setup, COMTRADE replay, and lab PTP traffic and explicit smpSynch compatibility modes." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://masarray.github.io/arsvin/" />
   <meta property="og:image" content="https://masarray.github.io/arsvin/assets/arsvin.png" />
   <meta name="twitter:card" content="summary_large_image" />
-  <link rel="icon" href="assets/arsvin.png" />
+  <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
   <script type="application/ld+json">
@@ -26,33 +27,33 @@
     "softwareVersion": "0.1.0",
     "license": "https://www.apache.org/licenses/LICENSE-2.0",
     "author": { "@type": "Person", "name": "Ari Sulistiono", "url": "https://github.com/masarray" },
-    "description": "Open IEC 61850 Sampled Values injector with multi-stream SV publishing, COMTRADE replay, and lab PTP."
+    "description": "Lightweight IEC 61850 Sampled Values publisher simulator with SCL-based setup, manual or sequenced publishing, COMTRADE replay, and lab PTP traffic and explicit smpSynch compatibility modes."
   }
   </script>
 </head>
 <body>
   <header class="nav">
-    <a class="brand" href="#top"><img src="assets/arsvin.png" alt="" /> <span>ARSVIN</span></a>
+    <a class="brand" href="#top"><img src="assets/arsvin.png" alt="ARSVIN icon" /> <span>ARSVIN</span></a>
     <nav><a href="#features">Features</a><a href="#workflow">Workflow</a><a href="#download">Download</a><a href="https://github.com/masarray/arsvin">GitHub</a></nav>
   </header>
 
   <main id="top">
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">Open IEC 61850 Sampled Values Injector</p>
-        <h1>Multi-stream SV injection and COMTRADE replay for digital substation R&amp;D.</h1>
-        <p class="lead">ARSVIN simulates up to three Sampled Values publishers from SCL, replays transient COMTRADE records, and generates lab PTP traffic for process-bus experiments.</p>
+        <p class="eyebrow">IEC 61850 Sampled Values Publisher &amp; Process Bus Traffic Tester</p>
+        <h1>Publish SV traffic, replay COMTRADE, and check relay readability in isolated lab setups.</h1>
+        <p class="lead">ARSVIN is a focused Windows tool for engineers who need SCL-based Sampled Values publishing, manual / ramp / sequencer workflows, lab PTP traffic, and explicit <code>smpSynch</code> compatibility modes.</p>
         <div class="actions"><a class="button primary" href="https://github.com/masarray/arsvin/releases">Download portable EXE</a><a class="button" href="https://github.com/masarray/arsvin">View source</a></div>
-        <p class="note">Apache-2.0. Built by Ari Sulistiono. For lab and R&amp;D use; not a certified protection test set.</p>
+        <p class="note">Apache-2.0. Built by Ari Sulistiono. For lab and engineering use. Not a certified protection test set.</p>
       </div>
       <div class="hero-card">
         <div class="screen">
           <div class="bar"><span></span><span></span><span></span></div>
           <div class="grid">
             <div class="metric"><b>3</b><span>SV publishers</span></div>
-            <div class="metric"><b>PTP</b><span>lab sync</span></div>
+            <div class="metric"><b>SCL</b><span>stream setup</span></div>
             <div class="metric"><b>CFG/DAT</b><span>COMTRADE</span></div>
-            <div class="metric"><b>88BA</b><span>SV Ethernet</span></div>
+            <div class="metric"><b>PTP</b><span>lab traffic</span></div>
           </div>
           <div class="wave"></div>
         </div>
@@ -60,23 +61,35 @@
     </section>
 
     <section id="features" class="section">
-      <h2>Focused on injection, not dashboard noise.</h2>
+      <h2>Small scope. Sharp purpose.</h2>
       <div class="cards">
-        <article><h3>Multi-stream SV</h3><p>Simulate up to three independent merging units with independent values, APPID, MAC, VLAN, svID, dataset, dLSB, and sample counter.</p></article>
-        <article><h3>COMTRADE Replay</h3><p>Replay analog COMTRADE records as Sampled Values. ASCII, BINARY, BINARY32, and FLOAT32 DAT types are supported.</p></article>
-        <article><h3>SCL Setup</h3><p>Select SV streams directly from SCL and avoid manual network field mistakes during lab setup.</p></article>
-        <article><h3>Lab PTP</h3><p>Generate synthetic PTP and monitor timing visibility for process-bus experiments without claiming calibrated timing.</p></article>
+        <article><h3>SV Publishing</h3><p>Publish Sampled Values traffic from a Windows workstation for process-bus experiments and relay subscription checks.</p></article>
+        <article><h3>SCL-Based Setup</h3><p>Load SCL and reuse APPID, MAC, VLAN, <code>svID</code>, and dataset information instead of typing everything manually.</p></article>
+        <article><h3>Manual, Ramp, Sequencer</h3><p>Run continuous publishing, time-based ramps, or state sequences depending on the lab scenario you want to simulate.</p></article>
+        <article><h3>COMTRADE Replay</h3><p>Replay analog COMTRADE records as Sampled Values for transient-style experiments and stream validation.</p></article>
+        <article><h3>PTP / smpSynch Compatibility</h3><p>Keep lab PTP traffic separate from explicit smpSynch compatibility modes so relay readability checks stay practical and honest.</p></article>
+        <article><h3>Portable Windows Delivery</h3><p>Build or download a self-contained win-x64 package for easy deployment on engineering laptops.</p></article>
       </div>
     </section>
 
     <section id="workflow" class="section split">
-      <div><h2>Designed like a digital SV test tool.</h2><p>Choose a publisher, select an SCL stream, set manual values or import COMTRADE, then start SV injection. The workflow stays narrow so the tool remains fast, understandable, and useful in R&amp;D labs.</p></div>
-      <ol class="steps"><li>Open SCL</li><li>Select Publisher 1–3</li><li>Set values or import COMTRADE</li><li>Start SV injection</li><li>Verify traffic in relay lab</li></ol>
+      <div>
+        <h2>Built for readable lab workflow.</h2>
+        <p>Open SCL, choose a publisher slot, configure values or replay a COMTRADE record, then publish the stream and verify it in Wireshark or on the target relay. The workflow stays intentionally narrow so the tool remains useful, fast, and maintainable.</p>
+      </div>
+      <ol class="steps">
+        <li>Open SCL</li>
+        <li>Select Publisher 1–3</li>
+        <li>Choose manual, ramp, sequencer, or COMTRADE</li>
+        <li>Review APPID, MAC, VLAN, and smpSynch mode</li>
+        <li>Start dry run or live publish</li>
+        <li>Verify traffic and relay subscription</li>
+      </ol>
     </section>
 
     <section id="download" class="section cta">
-      <h2>Release-ready Windows package.</h2>
-      <p>GitHub Actions builds a self-contained win-x64 portable package from tagged releases.</p>
+      <h2>Portable Windows package for lab use.</h2>
+      <p>GitHub Actions builds a self-contained win-x64 release package from tagged releases.</p>
       <a class="button primary" href="https://github.com/masarray/arsvin/releases">Get ARSVIN</a>
     </section>
   </main>

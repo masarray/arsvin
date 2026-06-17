@@ -5,5 +5,5 @@
   <text x="90" y="87" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="56" font-weight="800" fill="white">SV</text>
   <text x="90" y="124" text-anchor="middle" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="24" font-weight="800" fill="#bae6fd">61850</text>
   <text x="220" y="78" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="56" font-weight="800" fill="#0f172a">ARSVIN</text>
-  <text x="224" y="120" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="22" font-weight="600" fill="#2563eb">IEC 61850 Sampled Values Injector</text>
+  <text x="224" y="120" font-family="Inter,Segoe UI,Arial,sans-serif" font-size="22" font-weight="600" fill="#2563eb">IEC 61850 Sampled Values Publisher</text>
 </svg>

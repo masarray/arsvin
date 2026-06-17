@@ -6,7 +6,7 @@
         xmlns:controls="clr-namespace:AR.Iec61850.SvPublisher.Controls"
         xmlns:conv="clr-namespace:AR.Iec61850.SvPublisher.Converters"
         mc:Ignorable="d"
-        Title="ARSVIN - SV Injector"
+        Title="ARSVIN - Sampled Values Publisher"
         Width="1460"
         Height="860"
         MinWidth="1220"
@@ -850,8 +850,8 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Set Mode" Style="{StaticResource LabelText}" />
                                 <ComboBox Grid.Column="1" ItemsSource="{Binding ManualSetModes}" SelectedItem="{Binding ManualSetMode}" />
-                                <TextBlock Grid.Column="2" Text="Duration" Style="{StaticResource LabelText}" Margin="10,0,0,0" />
-                                <TextBox Grid.Column="3" Text="{Binding DurationSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Grid.Column="2" Text="Run" Style="{StaticResource LabelText}" Margin="10,0,0,0" />
+                                <TextBlock Grid.Column="3" Text="Continue" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                             </Grid>
 
                             <Grid>
@@ -959,7 +959,7 @@
                 <Border Grid.Column="2" Style="{StaticResource PanelShell}">
                     <DockPanel>
                         <Border DockPanel.Dock="Top" Style="{StaticResource PanelHeader}">
-                            <TextBlock Text="Waveform / Injection Monitor" Foreground="White" FontWeight="SemiBold" />
+                            <TextBlock Text="Waveform / Publish Monitor" Foreground="White" FontWeight="SemiBold" />
                         </Border>
                         <Grid Margin="12">
                             <Grid.RowDefinitions>

@@ -81,7 +81,7 @@ public sealed class ProcessBusStreamMonitor
                 diagnostics.Add($"SV frame contains {frame.Pdu.Asdus.Count} ASDU(s); current analyzer evaluates the first ASDU.");
 
             if (asdu.SampleSynchronization != 2)
-                diagnostics.Add($"SV smpSynch is {asdu.SampleSynchronization}; expected synchronized value 2 for normal process-bus evidence.");
+                diagnostics.Add($"SV smpSynch is {asdu.SampleSynchronization}; confirm this matches the selected compatibility mode or external PTP policy.");
         }
 
         if (profile is not null && asdu is not null)

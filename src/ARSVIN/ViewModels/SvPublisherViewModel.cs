@@ -67,12 +67,13 @@ public sealed class SvPublisherViewModel : ObservableObject
     private double _voltageDlsb = 0.01;
     private double _durationSeconds = 1;
     private bool _continuous = true;
-    private bool _loopSequence = true;
+    private bool _loopSequence;
     private bool _isLiveArmed;
     private bool _isPublishing;
     private bool _autoApplyWhileRunning = true;
     private bool _linkFrequencies = true;
-    private SvSyncPolicyMode _syncPolicyMode = SvSyncPolicyMode.AutoPtp;
+    private SvSyncPolicyMode _syncPolicyMode = SvSyncPolicyMode.GlobalCompatibility;
+    private SvSyncPolicyChoice? _selectedSyncPolicyChoice;
     private int _expectedPtpDomain;
     private bool _ptpAllowLocalFallback = true;
     private PtpPublisherMode _ptpPublisherMode = AR.Iec61850.SvPublisher.Models.PtpPublisherMode.MonitorOnly;
@@ -81,8 +82,8 @@ public sealed class SvPublisherViewModel : ObservableObject
     private int _ptpSyncIntervalMs = 250;
     private bool _ptpRespondToPeerDelay = true;
     private string _ptpPublisherStatusText = "PTP TX: off";
-    private string _ptpStatusText = "PTP: idle";
-    private string _smpSynchStatusText = "smpSynch: Auto PTP";
+    private string _ptpStatusText = "PTP RX: idle";
+    private string _smpSynchStatusText = "smpSynch=2 compatibility";
     private bool _isUpdatingManualRows;
     private ManualOutputRowViewModel? _contextManualRow;
     private string _contextColumnHeader = string.Empty;
@@ -145,6 +146,8 @@ public sealed class SvPublisherViewModel : ObservableObject
         SelectedSequenceState = SequenceStates.FirstOrDefault();
         SelectedSampleRatePreset = SampleRatePresets.FirstOrDefault(preset => preset.Key == "9-2LE-80-50");
         SelectedPublisherSlot = PublisherSlots.FirstOrDefault();
+        _selectedSyncPolicyChoice = ResolveSyncPolicyChoice(_syncPolicyMode);
+        SmpSynchStatusText = FormatSmpSynchStatus(ResolveSampleSynchronization(null));
 
         OpenSclCommand = new AsyncRelayCommand(OpenSclAsync, () => !IsPublishing);
         ImportComtradeCommand = new AsyncRelayCommand(ImportComtradeAsync, () => !IsPublishing && SelectedPublisherSlot is not null);
@@ -238,12 +241,36 @@ public sealed class SvPublisherViewModel : ObservableObject
         SymmetricalSetMode
     ];
 
-    public IReadOnlyList<SvSyncPolicyMode> SyncPolicyModes { get; } =
+    public IReadOnlyList<SvSyncPolicyChoice> SyncPolicyChoices { get; } =
     [
-        SvSyncPolicyMode.AutoPtp,
-        SvSyncPolicyMode.ForceUnsynchronized,
-        SvSyncPolicyMode.ForceLocal,
-        SvSyncPolicyMode.ForceGlobal
+        new()
+        {
+            Mode = SvSyncPolicyMode.GlobalCompatibility,
+            Label = "Global compatibility — smpSynch=2",
+            ShortLabel = "global compatibility",
+            HelpText = "Makes the SV stream report smpSynch=2 so stricter subscribers can accept point-to-point lab traffic. This is compatibility behavior, not proof of real PTP accuracy."
+        },
+        new()
+        {
+            Mode = SvSyncPolicyMode.LocalCompatibility,
+            Label = "Local compatibility — smpSynch=1",
+            ShortLabel = "local compatibility",
+            HelpText = "Makes the SV stream report smpSynch=1 for subscribers that accept locally synchronized lab traffic."
+        },
+        new()
+        {
+            Mode = SvSyncPolicyMode.HonestUnsynchronized,
+            Label = "Honest unsynchronized — smpSynch=0",
+            ShortLabel = "honest unsync",
+            HelpText = "Publishes smpSynch=0. Use this when you want the SV stream to declare that timing is not synchronized."
+        },
+        new()
+        {
+            Mode = SvSyncPolicyMode.ExternalPtpAuto,
+            Label = "External PTP auto — monitor based",
+            ShortLabel = "external PTP auto",
+            HelpText = "Derives smpSynch from observed external PTP health. If no valid PTP evidence is visible, the stream does not claim global synchronization."
+        }
     ];
 
     public IReadOnlyList<PublisherSignalSource> SignalSources { get; } =
@@ -630,19 +657,37 @@ public sealed class SvPublisherViewModel : ObservableObject
         get => _syncPolicyMode;
         set
         {
-            if (SetProperty(ref _syncPolicyMode, value))
+            var normalized = NormalizeSyncPolicyMode(value);
+            if (SetProperty(ref _syncPolicyMode, normalized))
             {
-                SmpSynchStatusText = value switch
-                {
-                    SvSyncPolicyMode.ForceUnsynchronized => "smpSynch=0 forced",
-                    SvSyncPolicyMode.ForceLocal => "smpSynch=1 forced",
-                    SvSyncPolicyMode.ForceGlobal => "smpSynch=2 forced",
-                    _ => "smpSynch: Auto PTP"
-                };
-                AppendEvent($"Sync policy changed to {value}.");
+                _selectedSyncPolicyChoice = ResolveSyncPolicyChoice(normalized);
+                OnPropertyChanged(nameof(SelectedSyncPolicyChoice));
+                OnPropertyChanged(nameof(SyncPolicyHelpText));
+                OnPropertyChanged(nameof(SyncPolicyShortLabel));
+                OnPropertyChanged(nameof(IsCompatibilitySyncMode));
+                SmpSynchStatusText = FormatSmpSynchStatus(ResolveSampleSynchronization(null));
+                AppendEvent($"smpSynch behavior changed to {_selectedSyncPolicyChoice.Label}.");
             }
         }
     }
+
+    public SvSyncPolicyChoice SelectedSyncPolicyChoice
+    {
+        get => _selectedSyncPolicyChoice ?? ResolveSyncPolicyChoice(SyncPolicyMode);
+        set
+        {
+            if (value is null)
+                return;
+
+            SyncPolicyMode = value.Mode;
+        }
+    }
+
+    public string SyncPolicyHelpText => ResolveSyncPolicyChoice(SyncPolicyMode).HelpText;
+
+    public string SyncPolicyShortLabel => ResolveSyncPolicyChoice(SyncPolicyMode).ShortLabel;
+
+    public bool IsCompatibilitySyncMode => SyncPolicyMode is SvSyncPolicyMode.GlobalCompatibility or SvSyncPolicyMode.LocalCompatibility;
 
     public int ExpectedPtpDomain
     {
@@ -663,8 +708,8 @@ public sealed class SvPublisherViewModel : ObservableObject
         {
             if (SetProperty(ref _ptpPublisherMode, value))
             {
-                PtpPublisherStatusText = value == AR.Iec61850.SvPublisher.Models.PtpPublisherMode.LabPublisher ? "PTP TX: lab publisher armed" : "PTP TX: off";
-                AppendEvent($"PTP mode changed to {value}.");
+                PtpPublisherStatusText = value == AR.Iec61850.SvPublisher.Models.PtpPublisherMode.LabPublisher ? "PTP TX: lab traffic armed" : "PTP TX: off";
+                AppendEvent($"PTP traffic mode changed to {value}.");
             }
         }
     }
@@ -1152,9 +1197,9 @@ public sealed class SvPublisherViewModel : ObservableObject
     {
         var dialog = new SaveFileDialog
         {
-            Title = "Save ARSVIN Injection Plan",
+            Title = "Save ARSVIN Publish Plan",
             Filter = "SV publisher plan (*.svpub.json)|*.svpub.json|JSON files (*.json)|*.json|All files (*.*)|*.*",
-            FileName = "arsvin-injection-plan.svpub.json"
+            FileName = "arsvin-publish-plan.svpub.json"
         };
 
         if (dialog.ShowDialog() != true)
@@ -1184,18 +1229,18 @@ public sealed class SvPublisherViewModel : ObservableObject
             using var stop = new CancellationTokenSource();
             _publisherStop = stop;
             IsPublishing = true;
-            StatusText = live ? "START INJECTION - live NIC." : "START INJECTION - dry run.";
+            var planPreview = BuildPublisherSessionPlan();
+            StatusText = live ? "START PUBLISH - live NIC." : "START PUBLISH - dry run.";
             AutoApplyWhileRunning = true;
-            Continuous = true;
-            LiveApplyText = "RUN: table edits are applied to the next SV frames.";
-            AppendEvent(live ? "Start Injection: live NIC publisher started." : "Start Injection: dry-run publisher started.");
+            LiveApplyText = planPreview.LiveApplyText;
+            AppendEvent(live ? $"Start Publish: live NIC {planPreview.DisplayName}." : $"Start Publish: dry-run {planPreview.DisplayName}.");
 
             await Task.Run(async () => await PublishLoopAsync(live, stop.Token).ConfigureAwait(false)).ConfigureAwait(true);
         }
         catch (OperationCanceledException)
         {
-            StatusText = "STOP INJECTION.";
-            AppendEvent("Stop Injection requested by operator.");
+            StatusText = "STOP PUBLISH.";
+            AppendEvent("Stop Publish requested by operator.");
         }
         catch (Exception ex)
         {
@@ -1221,13 +1266,11 @@ public sealed class SvPublisherViewModel : ObservableObject
         if (publisherStates.Length == 0)
             throw new InvalidOperationException("Enable at least one IED / MU publisher slot with a selected SV stream.");
 
+        var sessionPlan = BuildPublisherSessionPlan();
         var primary = publisherStates[0];
         var source = primary.Source;
         var vlan = primary.Vlan;
-        var runDurationSeconds = Mode == InjectionMode.Ramp ? RampTotalTimeSeconds : DurationSeconds;
-        Dictionary<int, long>? frameLimitPerPublisher = Continuous
-            ? null
-            : publisherStates.ToDictionary(s => s.SlotIndex, s => Math.Max(1, (long)Math.Round(s.SampleRateHz * runDurationSeconds)));
+        var frameLimitPerPublisher = publisherStates.ToDictionary(s => s.SlotIndex, s => sessionPlan.ResolveFrameLimit(s.SampleRateHz));
         var startedTicks = Stopwatch.GetTimestamp();
         var startedAt = DateTimeOffset.UtcNow;
         var nextUiTicks = startedTicks;
@@ -1267,10 +1310,15 @@ public sealed class SvPublisherViewModel : ObservableObject
         var lastPayloadBytes = 0;
         bool IsActive(PublisherRuntimeState state)
         {
-            if (state.SignalSource == PublisherSignalSource.ComtradeReplay && state.ComtradeDataset is { } dataset && !state.ComtradeLoop)
-                return state.Sent < dataset.SampleCount;
+            var sessionLimit = frameLimitPerPublisher[state.SlotIndex];
+            long? sourceLimit = state.SignalSource == PublisherSignalSource.ComtradeReplay &&
+                                state.ComtradeDataset is { } dataset &&
+                                !state.ComtradeLoop
+                ? dataset.SampleCount
+                : null;
 
-            return frameLimitPerPublisher is null || state.Sent < frameLimitPerPublisher[state.SlotIndex];
+            var effectiveLimit = MinLimit(sessionLimit, sourceLimit);
+            return effectiveLimit is null || state.Sent < effectiveLimit.Value;
         }
 
         try
@@ -1279,8 +1327,8 @@ public sealed class SvPublisherViewModel : ObservableObject
             {
                 PtpStatusText = live ? $"PTP: listening domain {ExpectedPtpDomain}" : "PTP: dry-run monitor inactive";
                 UpdatePtpPublisherStatus(labPtpPublisher);
-                SmpSynchStatusText = live ? "smpSynch: waiting for policy" : FormatSmpSynchStatus(ResolveSampleSynchronization(null));
-                PublishText = $"Prepared {publisherStates.Length} SV publisher(s): {string.Join(", ", publisherStates.Select(s => $"P{s.SlotIndex}@{s.SampleRateHz:0.#}fps"))}";
+                SmpSynchStatusText = live ? $"smpSynch: waiting ({SyncPolicyShortLabel})" : FormatSmpSynchStatus(ResolveSampleSynchronization(null));
+                PublishText = $"Prepared {publisherStates.Length} SV publisher(s), {sessionPlan.DisplayName}: {string.Join(", ", publisherStates.Select(s => $"P{s.SlotIndex}@{s.SampleRateHz:0.#}fps"))}";
             });
 
             while (publisherStates.Any(IsActive))
@@ -1313,9 +1361,12 @@ public sealed class SvPublisherViewModel : ObservableObject
                     else
                     {
                         var baseChannels = state.IsSelectedSlot && AutoApplyWhileRunning
-                            ? CaptureEffectiveChannels(elapsedSeconds)
+                            ? CaptureBaseEffectiveChannels()
                             : state.FrozenChannels;
-                        var phasedChannels = ApplyOscillatorPhases(baseChannels, state.OscillatorStates, state.SampleRateHz);
+                        var effectiveChannels = state.IsSelectedSlot
+                            ? sessionPlan.ResolveChannels(baseChannels, elapsedSeconds)
+                            : baseChannels;
+                        var phasedChannels = ApplyOscillatorPhases(effectiveChannels, state.OscillatorStates, state.SampleRateHz);
                         payload = BuildSamplePayload(state.Stream, sampleTime, phasedChannels, state.CurrentDlsb, state.VoltageDlsb);
                     }
                     var smpSynch = ResolveSampleSynchronization(latestPtpReport);
@@ -1360,7 +1411,7 @@ public sealed class SvPublisherViewModel : ObservableObject
                     var elapsed = Stopwatch.GetElapsedTime(startedTicks);
                     var effectiveRate = totalSent / Math.Max(elapsed.TotalSeconds, 0.001);
                     var perPublisher = string.Join("  ", publisherStates.Select(s => $"P{s.SlotIndex}:{s.Sent} smpCnt={s.SampleCount}"));
-                    var message = $"{(live ? "LIVE" : "DRY")} publishers={publisherStates.Length} frames={totalSent} rate={effectiveRate:0.0} fps smpSynch={(byte)smpSynch} payload={lastPayloadBytes}B frame={lastFrameBytes}B  {perPublisher}";
+                    var message = $"{(live ? "LIVE" : "DRY")} {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} rate={effectiveRate:0.0} fps smpSynch={(byte)smpSynch} ({SyncPolicyShortLabel}) payload={lastPayloadBytes}B frame={lastFrameBytes}B  {perPublisher}";
                     Dispatch(() =>
                     {
                         PayloadBytes = lastPayloadBytes;
@@ -1395,7 +1446,7 @@ public sealed class SvPublisherViewModel : ObservableObject
         var rate = totalSent / Math.Max(totalElapsed.TotalSeconds, 0.001);
         Dispatch(() =>
         {
-            PublishText = $"Complete publishers={publisherStates.Length} frames={totalSent} elapsed={totalElapsed.TotalSeconds:0.000}s rate={rate:0.0} fps lastFrame={lastFrameBytes}B";
+            PublishText = $"Complete {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} elapsed={totalElapsed.TotalSeconds:0.000}s rate={rate:0.0} fps lastFrame={lastFrameBytes}B";
             StatusText = "Publisher complete.";
             AppendEvent(PublishText);
         });
@@ -1571,30 +1622,29 @@ private PtpPublisherOptions BuildLabPtpOptions(MacAddress sourceMac, VlanTag? vl
     };
 
 private SmpSynchValue ResolveSampleSynchronization(PtpTimingHealthReport? report)
-    => SyncPolicyMode switch
+    => NormalizeSyncPolicyMode(SyncPolicyMode) switch
     {
-        SvSyncPolicyMode.ForceUnsynchronized => SmpSynchValue.NotSynchronized,
-        SvSyncPolicyMode.ForceLocal => SmpSynchValue.LocalSynchronized,
-        SvSyncPolicyMode.ForceGlobal => SmpSynchValue.GlobalSynchronized,
-        _ => PtpPublisherMode == AR.Iec61850.SvPublisher.Models.PtpPublisherMode.LabPublisher
-            ? SmpSynchValue.GlobalSynchronized
-            : report is null
-                ? SmpSynchValue.NotSynchronized
-                : PtpSmpSynchPolicy.Resolve(report, PtpAllowLocalFallback)
+        SvSyncPolicyMode.HonestUnsynchronized => SmpSynchValue.NotSynchronized,
+        SvSyncPolicyMode.LocalCompatibility => SmpSynchValue.LocalSynchronized,
+        SvSyncPolicyMode.GlobalCompatibility => SmpSynchValue.GlobalSynchronized,
+        SvSyncPolicyMode.ExternalPtpAuto => report is null
+            ? SmpSynchValue.NotSynchronized
+            : PtpSmpSynchPolicy.Resolve(report, PtpAllowLocalFallback),
+        _ => SmpSynchValue.NotSynchronized
     };
 
 private void UpdatePtpStatus(PtpTimingHealthReport? report, SmpSynchValue smpSynch, bool live)
 {
     if (!live)
     {
-        PtpStatusText = "PTP: dry-run";
+        PtpStatusText = "PTP RX: dry-run";
         SmpSynchStatusText = FormatSmpSynchStatus(smpSynch);
         return;
     }
 
     if (report is null)
     {
-        PtpStatusText = "PTP: waiting";
+        PtpStatusText = "PTP RX: waiting";
         SmpSynchStatusText = FormatSmpSynchStatus(smpSynch);
         return;
     }
@@ -1609,13 +1659,13 @@ private void UpdatePtpStatus(PtpTimingHealthReport? report, SmpSynchValue smpSyn
     if (source is null)
     {
         PtpStatusText = report.Severity == PtpHealthSeverity.Fail
-            ? "PTP: not detected"
-            : $"PTP: {report.Severity}";
+            ? "PTP RX: not detected"
+            : $"PTP RX: {report.Severity}";
     }
     else
     {
         var age = Math.Max(0, (snapshot.CapturedAt - source.LastSeenAt).TotalSeconds);
-        PtpStatusText = $"PTP: {report.Severity} d={source.DomainNumber} src={source.SourcePortIdentity.ClockIdentity} age={age:0.0}s";
+        PtpStatusText = $"PTP RX: {report.Severity} d={source.DomainNumber} src={source.SourcePortIdentity.ClockIdentity} age={age:0.0}s";
     }
 
     SmpSynchStatusText = FormatSmpSynchStatus(smpSynch);
@@ -1636,15 +1686,42 @@ private void UpdatePtpPublisherStatus(PtpPublisherRuntime? publisher)
         return;
     }
 
-    PtpPublisherStatusText = $"PTP TX: {(status.IsRunning ? "lab" : "stopped")} A={status.AnnounceSent} S={status.SyncSent} FU={status.FollowUpSent} PD={status.PeerDelayResponsesSent}";
+    PtpPublisherStatusText = $"PTP TX: {(status.IsRunning ? "lab traffic" : "stopped")} A={status.AnnounceSent} S={status.SyncSent} FU={status.FollowUpSent} PD={status.PeerDelayResponsesSent}";
 }
 
-private static string FormatSmpSynchStatus(SmpSynchValue value)
-    => value switch
+private string FormatSmpSynchStatus(SmpSynchValue value)
+{
+    var valueText = value switch
     {
-        SmpSynchValue.GlobalSynchronized => "smpSynch=2 global",
-        SmpSynchValue.LocalSynchronized => "smpSynch=1 local",
-        _ => "smpSynch=0 unsync"
+        SmpSynchValue.GlobalSynchronized => "smpSynch=2",
+        SmpSynchValue.LocalSynchronized => "smpSynch=1",
+        _ => "smpSynch=0"
+    };
+
+    return NormalizeSyncPolicyMode(SyncPolicyMode) switch
+    {
+        SvSyncPolicyMode.GlobalCompatibility => $"{valueText} global compatibility",
+        SvSyncPolicyMode.LocalCompatibility => $"{valueText} local compatibility",
+        SvSyncPolicyMode.HonestUnsynchronized => $"{valueText} honest unsync",
+        SvSyncPolicyMode.ExternalPtpAuto => $"{valueText} external PTP auto",
+        _ => valueText
+    };
+}
+
+private SvSyncPolicyChoice ResolveSyncPolicyChoice(SvSyncPolicyMode mode)
+{
+    var normalized = NormalizeSyncPolicyMode(mode);
+    return SyncPolicyChoices.FirstOrDefault(choice => choice.Mode == normalized) ?? SyncPolicyChoices[0];
+}
+
+private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
+    => mode switch
+    {
+        SvSyncPolicyMode.ExternalPtpAuto => SvSyncPolicyMode.ExternalPtpAuto,
+        SvSyncPolicyMode.HonestUnsynchronized => SvSyncPolicyMode.HonestUnsynchronized,
+        SvSyncPolicyMode.LocalCompatibility => SvSyncPolicyMode.LocalCompatibility,
+        SvSyncPolicyMode.GlobalCompatibility => SvSyncPolicyMode.GlobalCompatibility,
+        _ => SvSyncPolicyMode.GlobalCompatibility
     };
 
 
@@ -1815,61 +1892,82 @@ private static string FormatSmpSynchStatus(SmpSynchValue value)
             _ => MmsDataValue.Integer(0)
         };
 
-    private IReadOnlyDictionary<string, EffectiveChannel> CaptureEffectiveChannels(double elapsedSeconds)
+    private IReadOnlyDictionary<string, EffectiveChannel> CaptureBaseEffectiveChannels()
     {
         var channels = new Dictionary<string, EffectiveChannel>(StringComparer.OrdinalIgnoreCase);
         foreach (var channel in Channels)
-            channels[channel.Key] = ResolveEffectiveChannel(channel, elapsedSeconds);
+        {
+            var frequency = channel.FrequencyHz >= 0 ? channel.FrequencyHz : NominalFrequencyHz;
+            channels[channel.Key] = new EffectiveChannel(
+                channel.Kind,
+                channel.IsEnabled,
+                channel.Magnitude,
+                channel.AngleDegrees,
+                frequency,
+                channel.AngleDegrees * Math.PI / 180.0);
+        }
 
         return channels;
     }
 
-    private EffectiveChannel ResolveEffectiveChannel(
-        SignalChannelViewModel channel,
-        double elapsedSeconds)
+    private PublisherSessionPlan BuildPublisherSessionPlan()
     {
-        var magnitude = channel.Magnitude;
-        var angle = channel.AngleDegrees;
-        var frequency = channel.FrequencyHz >= 0 ? channel.FrequencyHz : NominalFrequencyHz;
-
-        if (Mode == InjectionMode.Ramp && ResolveRampState(elapsedSeconds) is { State: var ramp, LocalElapsedSeconds: var localElapsed } &&
-            ramp.AppliesToChannel(channel.Key))
+        return Mode switch
         {
-            var duration = Math.Max(0.001, ramp.TimeSeconds);
-            var position = Math.Clamp(localElapsed / duration, 0.0, 1.0);
-            magnitude = ramp.From + ((ramp.To - ramp.From) * position);
-        }
-        else if (Mode == InjectionMode.Sequencer && ResolveSequenceState(elapsedSeconds) is { } state)
-        {
-            magnitude = string.Equals(channel.Kind, "I", StringComparison.OrdinalIgnoreCase)
-                ? state.CurrentScale
-                : NominalVoltageLn * Math.Max(0, state.VoltageScale);
-            angle = state.AngleShiftDegrees + PhaseOffsetForChannel(channel.Key);
-            frequency = state.FrequencyHz > 0 ? state.FrequencyHz : frequency;
-        }
-
-        return new EffectiveChannel(channel.Kind, channel.IsEnabled, magnitude, angle, frequency, angle * Math.PI / 180.0);
+            InjectionMode.Ramp => BuildRampSessionPlan(),
+            InjectionMode.Sequencer => BuildSequencerSessionPlan(),
+            _ => PublisherSessionPlan.ManualContinue()
+        };
     }
 
-    private (RampStateViewModel State, double LocalElapsedSeconds)? ResolveRampState(double elapsedSeconds)
+    private PublisherSessionPlan BuildRampSessionPlan()
     {
-        var states = RampStates.Where(s => s.TimeSeconds > 0).ToArray();
-        if (states.Length == 0)
-            return null;
+        var segments = RampStates
+            .Where(state => state.TimeSeconds > 0)
+            .Select(state => new RampSessionSegment(
+                state.Name,
+                state.SignalKeys.ToArray(),
+                state.From,
+                state.To,
+                Math.Max(0.001, state.TimeSeconds)))
+            .ToArray();
 
-        var total = states.Sum(s => Math.Max(0.001, s.TimeSeconds));
-        var cursor = Math.Min(Math.Max(0, elapsedSeconds), Math.Max(0, total - 0.000001));
+        if (segments.Length == 0)
+            throw new InvalidOperationException("Ramp mode needs at least one ramp state with duration greater than 0 s.");
 
-        foreach (var state in states)
-        {
-            var duration = Math.Max(0.001, state.TimeSeconds);
-            if (cursor <= duration)
-                return (state, cursor);
+        return PublisherSessionPlan.RampOnce(segments);
+    }
 
-            cursor -= duration;
-        }
+    private PublisherSessionPlan BuildSequencerSessionPlan()
+    {
+        var segments = SequenceStates
+            .Where(state => state.DurationSeconds > 0)
+            .Select(state => new SequencerSessionSegment(
+                state.Name,
+                Math.Max(0.001, state.DurationSeconds),
+                state.CurrentScale,
+                NominalVoltageLn * Math.Max(0, state.VoltageScale),
+                state.AngleShiftDegrees,
+                state.FrequencyHz))
+            .ToArray();
 
-        return (states[^1], Math.Max(0.001, states[^1].TimeSeconds));
+        if (segments.Length == 0)
+            throw new InvalidOperationException("Sequencer mode needs at least one state with duration greater than 0 s.");
+
+        return LoopSequence
+            ? PublisherSessionPlan.SequencerLoop(segments)
+            : PublisherSessionPlan.SequencerOnce(segments);
+    }
+
+    private static long? MinLimit(long? first, long? second)
+    {
+        if (first is null)
+            return second;
+
+        if (second is null)
+            return first;
+
+        return Math.Min(first.Value, second.Value);
     }
 
     private static double PhaseOffsetForChannel(string channelKey)
@@ -1883,26 +1981,6 @@ private static string FormatSmpSynchStatus(SmpSynchValue value)
             return 120;
 
         return 0;
-    }
-
-    private SequenceStateViewModel? ResolveSequenceState(double elapsedSeconds)
-    {
-        var states = SequenceStates.Where(s => s.DurationSeconds > 0).ToArray();
-        if (states.Length == 0)
-            return null;
-
-        var total = states.Sum(s => s.DurationSeconds);
-        var cursor = LoopSequence ? elapsedSeconds % total : Math.Min(elapsedSeconds, Math.Max(0, total - 0.000001));
-
-        foreach (var state in states)
-        {
-            if (cursor <= state.DurationSeconds)
-                return state;
-
-            cursor -= state.DurationSeconds;
-        }
-
-        return states[^1];
     }
 
     private void ApplyStreamMetadataToSlot(SvPublisherSlotViewModel slot, SvStreamChoice? choice)
@@ -2089,7 +2167,7 @@ private static string FormatSmpSynchStatus(SmpSynchValue value)
         MappedSignalCount = stream.Entries.Count(e => !e.IsQuality && !e.IsTimestamp && ResolveSignalKey(e) is not null);
         PayloadBytes = EstimatePayloadBytes(stream.Entries);
         AppendEvent($"Selected SV stream #{choice.Index}: {stream.ControlBlockReference}");
-        AppendEvent($"DataSet entries={DataSetEntryCount}, mapped injection signals={MappedSignalCount}, payload={PayloadBytes} bytes.");
+        AppendEvent($"DataSet entries={DataSetEntryCount}, mapped SV signals={MappedSignalCount}, payload={PayloadBytes} bytes.");
     }
 
     private VlanTag? ResolveVlanTag()
@@ -3211,6 +3289,7 @@ private static string FormatSmpSynchStatus(SmpSynchValue value)
             VoltageDlsb = VoltageDlsb,
             DurationSeconds = DurationSeconds,
             Continuous = Continuous,
+            LoopSequence = LoopSequence,
             Mode = Mode,
             ManualSetMode = ManualSetMode,
             Publishers = PublisherSlots.Select(slot => new SvPublisherSlotConfigSnapshot
@@ -3312,6 +3391,215 @@ private static string FormatSmpSynchStatus(SmpSynchValue value)
         radians %= twoPi;
         return radians < -Math.PI ? radians + twoPi : radians > Math.PI ? radians - twoPi : radians;
     }
+
+    private sealed class PublisherSessionPlan
+    {
+        private readonly IReadOnlyList<RampSessionSegment> _rampSegments;
+        private readonly IReadOnlyList<SequencerSessionSegment> _sequencerSegments;
+
+        private PublisherSessionPlan(
+            InjectionMode mode,
+            string shortName,
+            string displayName,
+            string liveApplyText,
+            double? durationSeconds,
+            bool loop,
+            IReadOnlyList<RampSessionSegment>? rampSegments = null,
+            IReadOnlyList<SequencerSessionSegment>? sequencerSegments = null)
+        {
+            Mode = mode;
+            ShortName = shortName;
+            DisplayName = displayName;
+            LiveApplyText = liveApplyText;
+            DurationSeconds = durationSeconds;
+            Loop = loop;
+            _rampSegments = rampSegments ?? Array.Empty<RampSessionSegment>();
+            _sequencerSegments = sequencerSegments ?? Array.Empty<SequencerSessionSegment>();
+        }
+
+        public InjectionMode Mode { get; }
+        public string ShortName { get; }
+        public string DisplayName { get; }
+        public string LiveApplyText { get; }
+        public double? DurationSeconds { get; }
+        public bool Loop { get; }
+
+        public static PublisherSessionPlan ManualContinue()
+            => new(
+                InjectionMode.Manual,
+                "manual-continuous",
+                "Manual Continue session",
+                "RUN: manual values are applied continuously to the next SV frames.",
+                durationSeconds: null,
+                loop: true);
+
+        public static PublisherSessionPlan RampOnce(IReadOnlyList<RampSessionSegment> segments)
+        {
+            var duration = segments.Sum(segment => segment.DurationSeconds);
+            return new PublisherSessionPlan(
+                InjectionMode.Ramp,
+                "ramp",
+                $"Ramp session {duration:0.000}s",
+                "RUN: ramp timing is locked from the configured ramp states.",
+                duration,
+                loop: false,
+                rampSegments: segments);
+        }
+
+        public static PublisherSessionPlan SequencerOnce(IReadOnlyList<SequencerSessionSegment> segments)
+        {
+            var duration = segments.Sum(segment => segment.DurationSeconds);
+            return new PublisherSessionPlan(
+                InjectionMode.Sequencer,
+                "sequencer",
+                $"Sequencer session {duration:0.000}s",
+                "RUN: sequencer timing is locked from the configured state durations.",
+                duration,
+                loop: false,
+                sequencerSegments: segments);
+        }
+
+        public static PublisherSessionPlan SequencerLoop(IReadOnlyList<SequencerSessionSegment> segments)
+        {
+            var duration = segments.Sum(segment => segment.DurationSeconds);
+            return new PublisherSessionPlan(
+                InjectionMode.Sequencer,
+                "sequencer-loop",
+                $"Sequencer loop session cycle={duration:0.000}s",
+                "RUN: sequencer cycles continuously using the configured state durations.",
+                durationSeconds: null,
+                loop: true,
+                sequencerSegments: segments);
+        }
+
+        public long? ResolveFrameLimit(double sampleRateHz)
+        {
+            if (DurationSeconds is not { } duration)
+                return null;
+
+            return Math.Max(1, (long)Math.Ceiling(Math.Max(0.001, duration) * Math.Max(1, sampleRateHz)));
+        }
+
+        public IReadOnlyDictionary<string, EffectiveChannel> ResolveChannels(
+            IReadOnlyDictionary<string, EffectiveChannel> baseChannels,
+            double elapsedSeconds)
+        {
+            return Mode switch
+            {
+                InjectionMode.Ramp => ResolveRampChannels(baseChannels, elapsedSeconds),
+                InjectionMode.Sequencer => ResolveSequencerChannels(baseChannels, elapsedSeconds),
+                _ => baseChannels
+            };
+        }
+
+        private IReadOnlyDictionary<string, EffectiveChannel> ResolveRampChannels(
+            IReadOnlyDictionary<string, EffectiveChannel> baseChannels,
+            double elapsedSeconds)
+        {
+            if (_rampSegments.Count == 0 || ResolveRampSegment(elapsedSeconds) is not { } active)
+                return baseChannels;
+
+            var (segment, localElapsed) = active;
+            var position = Math.Clamp(localElapsed / Math.Max(0.001, segment.DurationSeconds), 0.0, 1.0);
+            var magnitude = segment.From + ((segment.To - segment.From) * position);
+            var result = new Dictionary<string, EffectiveChannel>(baseChannels.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in baseChannels)
+            {
+                result[pair.Key] = segment.AppliesTo(pair.Key)
+                    ? pair.Value with { MagnitudeRms = magnitude }
+                    : pair.Value;
+            }
+
+            return result;
+        }
+
+        private (RampSessionSegment Segment, double LocalElapsedSeconds)? ResolveRampSegment(double elapsedSeconds)
+        {
+            var total = _rampSegments.Sum(segment => segment.DurationSeconds);
+            if (total <= 0)
+                return null;
+
+            var cursor = Math.Min(Math.Max(0, elapsedSeconds), Math.Max(0, total - 0.000001));
+            foreach (var segment in _rampSegments)
+            {
+                if (cursor <= segment.DurationSeconds)
+                    return (segment, cursor);
+
+                cursor -= segment.DurationSeconds;
+            }
+
+            var last = _rampSegments[^1];
+            return (last, last.DurationSeconds);
+        }
+
+        private IReadOnlyDictionary<string, EffectiveChannel> ResolveSequencerChannels(
+            IReadOnlyDictionary<string, EffectiveChannel> baseChannels,
+            double elapsedSeconds)
+        {
+            if (_sequencerSegments.Count == 0 || ResolveSequencerSegment(elapsedSeconds) is not { } state)
+                return baseChannels;
+
+            var result = new Dictionary<string, EffectiveChannel>(baseChannels.Count, StringComparer.OrdinalIgnoreCase);
+            foreach (var pair in baseChannels)
+            {
+                var channel = pair.Value;
+                var magnitude = string.Equals(channel.Kind, "I", StringComparison.OrdinalIgnoreCase)
+                    ? state.CurrentMagnitude
+                    : state.VoltageMagnitude;
+                var angle = state.AngleShiftDegrees + PhaseOffsetForChannel(pair.Key);
+                var frequency = state.FrequencyHz > 0 ? state.FrequencyHz : channel.FrequencyHz;
+                result[pair.Key] = channel with
+                {
+                    MagnitudeRms = magnitude,
+                    AngleDegrees = angle,
+                    FrequencyHz = frequency,
+                    PhaseRadians = angle * Math.PI / 180.0
+                };
+            }
+
+            return result;
+        }
+
+        private SequencerSessionSegment? ResolveSequencerSegment(double elapsedSeconds)
+        {
+            var total = _sequencerSegments.Sum(segment => segment.DurationSeconds);
+            if (total <= 0)
+                return null;
+
+            var cursor = Loop
+                ? elapsedSeconds % total
+                : Math.Min(Math.Max(0, elapsedSeconds), Math.Max(0, total - 0.000001));
+
+            foreach (var state in _sequencerSegments)
+            {
+                if (cursor <= state.DurationSeconds)
+                    return state;
+
+                cursor -= state.DurationSeconds;
+            }
+
+            return _sequencerSegments[^1];
+        }
+    }
+
+    private sealed record RampSessionSegment(
+        string Name,
+        IReadOnlyList<string> SignalKeys,
+        double From,
+        double To,
+        double DurationSeconds)
+    {
+        public bool AppliesTo(string channelKey)
+            => SignalKeys.Any(key => string.Equals(key, channelKey, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private sealed record SequencerSessionSegment(
+        string Name,
+        double DurationSeconds,
+        double CurrentMagnitude,
+        double VoltageMagnitude,
+        double AngleShiftDegrees,
+        double FrequencyHz);
 
     private sealed class OscillatorState
     {

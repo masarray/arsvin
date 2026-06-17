@@ -11,13 +11,13 @@
     <ApplicationIcon>Assets\arsvin.ico</ApplicationIcon>
     <Company>Ari Sulistiono</Company>
     <Authors>Ari Sulistiono</Authors>
-    <Product>ARSVIN - SV Injector</Product>
-    <Description>Open IEC 61850 Sampled Values injector with multi-stream SV publishing, lab PTP, and COMTRADE replay.</Description>
+    <Product>ARSVIN - Sampled Values Publisher</Product>
+    <Description>Lightweight IEC 61850 Sampled Values publisher simulator with SCL-based setup, lab PTP compatibility traffic, and COMTRADE replay.</Description>
     <Copyright>Copyright © Ari Sulistiono</Copyright>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <RepositoryUrl>https://github.com/masarray/arsvin</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
-    <PackageTags>IEC 61850;Sampled Values;SV;COMTRADE;process bus;digital substation;relay testing</PackageTags>
+    <PackageTags>IEC 61850;Sampled Values;SV publisher;SV injector;COMTRADE;process bus;digital substation;relay testing</PackageTags>
     <Version>0.1.0</Version>
   </PropertyGroup>
 

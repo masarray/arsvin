@@ -257,10 +257,11 @@
                             <Run Text="{Binding MappedSignalCount, Mode=OneWay}" />
                         </TextBlock>
 
-                        <TextBlock Grid.Row="6" Text="Sync policy" Style="{StaticResource LabelText}" />
+                        <TextBlock Grid.Row="6" Text="smpSynch" Style="{StaticResource LabelText}" />
                         <ComboBox Grid.Row="6" Grid.Column="1"
-                                  ItemsSource="{Binding SyncPolicyModes}"
-                                  SelectedItem="{Binding SyncPolicyMode}"
+                                  ItemsSource="{Binding SyncPolicyChoices}"
+                                  SelectedItem="{Binding SelectedSyncPolicyChoice}"
+                                  DisplayMemberPath="Label"
                                   Margin="0,4,0,0" />
                         <TextBlock Grid.Row="6" Grid.Column="2" Text="PTP domain" Style="{StaticResource LabelText}" Margin="14,4,0,0" />
                         <StackPanel Grid.Row="6" Grid.Column="3" Orientation="Horizontal" Margin="0,4,0,0">
@@ -278,7 +279,7 @@
                         <TextBlock Grid.Row="8" Grid.Column="2" Text="COMTRADE" Style="{StaticResource LabelText}" Margin="14,0,0,0" />
                         <TextBlock Grid.Row="8" Grid.Column="3" Text="{Binding SelectedPublisherSlot.ComtradeSummary}" Foreground="#334155" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
 
-                        <TextBlock Grid.Row="9" Text="PTP Publisher" Style="{StaticResource LabelText}" />
+                        <TextBlock Grid.Row="9" Text="PTP traffic" Style="{StaticResource LabelText}" />
                         <ComboBox Grid.Row="9" Grid.Column="1"
                                   ItemsSource="{Binding PtpPublisherModes}"
                                   SelectedItem="{Binding PtpPublisherMode}"
@@ -298,6 +299,14 @@
                         <TextBlock Grid.Row="10" Grid.Column="2" Text="Peer delay" Style="{StaticResource LabelText}" Margin="14,4,0,0" />
                         <CheckBox Grid.Row="10" Grid.Column="3" Content="Respond to Pdelay_Req" IsChecked="{Binding PtpRespondToPeerDelay}" VerticalAlignment="Center" Margin="0,4,0,0" />
                     </Grid>
+
+                    <Border Background="#FFF7ED" BorderBrush="#FDBA74" BorderThickness="1" CornerRadius="10" Padding="10,8" Margin="0,12,0,0">
+                        <TextBlock Text="{Binding SyncPolicyHelpText}"
+                                   TextWrapping="Wrap"
+                                   Foreground="#7C2D12"
+                                   FontSize="12"
+                                   LineHeight="17" />
+                    </Border>
 
                     <TextBlock Text="Evidence" FontSize="12" FontWeight="SemiBold" Foreground="#334155" Margin="0,16,0,8" />
                     <TextBox Text="{Binding EvidenceText, Mode=OneWay}"

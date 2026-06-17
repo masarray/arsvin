@@ -11,10 +11,26 @@ public enum InjectionMode
 
 public enum SvSyncPolicyMode
 {
-    AutoPtp,
-    ForceUnsynchronized,
-    ForceLocal,
-    ForceGlobal
+    ExternalPtpAuto = 0,
+    HonestUnsynchronized = 1,
+    LocalCompatibility = 2,
+    GlobalCompatibility = 3,
+
+    // Legacy aliases retained so older saved plans and older code references keep the same numeric meaning.
+    AutoPtp = ExternalPtpAuto,
+    ForceUnsynchronized = HonestUnsynchronized,
+    ForceLocal = LocalCompatibility,
+    ForceGlobal = GlobalCompatibility
+}
+
+public sealed class SvSyncPolicyChoice
+{
+    public required SvSyncPolicyMode Mode { get; init; }
+    public required string Label { get; init; }
+    public required string ShortLabel { get; init; }
+    public required string HelpText { get; init; }
+
+    public override string ToString() => Label;
 }
 
 public enum PtpPublisherMode
@@ -125,12 +141,13 @@ public sealed class SvPublisherConfigSnapshot
     public double VoltageDlsb { get; init; }
     public double DurationSeconds { get; init; }
     public bool Continuous { get; init; }
+    public bool LoopSequence { get; init; }
     public InjectionMode Mode { get; init; }
     public string ManualSetMode { get; init; } = "Direct";
     public IReadOnlyList<SvPublisherSlotConfigSnapshot> Publishers { get; init; } = Array.Empty<SvPublisherSlotConfigSnapshot>();
     public bool AutoApplyWhileRunning { get; init; } = true;
     public bool LinkFrequencies { get; init; } = true;
-    public SvSyncPolicyMode SyncPolicyMode { get; init; } = SvSyncPolicyMode.AutoPtp;
+    public SvSyncPolicyMode SyncPolicyMode { get; init; } = SvSyncPolicyMode.GlobalCompatibility;
     public int ExpectedPtpDomain { get; init; }
     public bool PtpAllowLocalFallback { get; init; } = true;
     public PtpPublisherMode PtpPublisherMode { get; init; } = PtpPublisherMode.MonitorOnly;
