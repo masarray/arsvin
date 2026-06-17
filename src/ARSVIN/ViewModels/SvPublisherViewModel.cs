@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Numerics;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using System.Windows;
@@ -51,6 +52,7 @@ public sealed class SvPublisherViewModel : ObservableObject
     private string _publishText = "No active publisher.";
     private string _evidenceText = string.Empty;
     private string _liveApplyText = "Auto apply ready.";
+    private string _livePreflightSummaryText = "Looptest quick mode: preflight not run.";
     private string _streamId = string.Empty;
     private string _streamControlBlock = string.Empty;
     private string _dataSetReference = string.Empty;
@@ -153,6 +155,7 @@ public sealed class SvPublisherViewModel : ObservableObject
         ImportComtradeCommand = new AsyncRelayCommand(ImportComtradeAsync, () => !IsPublishing && SelectedPublisherSlot is not null);
         ClearComtradeCommand = new RelayCommand(ClearComtrade, () => !IsPublishing && SelectedPublisherSlot is not null);
         RefreshAdaptersCommand = new RelayCommand(RefreshAdapters, () => !IsPublishing);
+        RunPreflightCommand = new RelayCommand(RunLivePreflight, () => !IsPublishing);
         SaveProfileCommand = new AsyncRelayCommand(SaveProfileAsync, () => !IsPublishing);
         RunDryCommand = new AsyncRelayCommand(() => RunPublishAsync(live: false), () => !IsPublishing);
         RunLiveCommand = new AsyncRelayCommand(() => RunPublishAsync(live: true), () => !IsPublishing);
@@ -221,6 +224,7 @@ public sealed class SvPublisherViewModel : ObservableObject
     public string RampTotalTimeText => $"{RampTotalTimeSeconds:0.000} s";
     public ObservableCollection<SvStreamChoice> Streams { get; } = new();
     public ObservableCollection<AdapterChoice> Adapters { get; } = new();
+    public ObservableCollection<LivePreflightDiagnostic> LivePreflightDiagnostics { get; } = new();
 
     public IReadOnlyList<SampleRatePreset> SampleRatePresets { get; } =
     [
@@ -296,6 +300,7 @@ public sealed class SvPublisherViewModel : ObservableObject
     public ICommand ImportComtradeCommand { get; }
     public ICommand ClearComtradeCommand { get; }
     public ICommand RefreshAdaptersCommand { get; }
+    public ICommand RunPreflightCommand { get; }
     public ICommand SaveProfileCommand { get; }
     public ICommand RunDryCommand { get; }
     public ICommand RunLiveCommand { get; }
@@ -398,6 +403,25 @@ public sealed class SvPublisherViewModel : ObservableObject
         get => _liveApplyText;
         private set => SetProperty(ref _liveApplyText, value);
     }
+
+    public string LivePreflightSummaryText
+    {
+        get => _livePreflightSummaryText;
+        private set
+        {
+            if (SetProperty(ref _livePreflightSummaryText, value))
+                OnPropertyChanged(nameof(LiveSafetyStatusText));
+        }
+    }
+
+    public bool HasLivePreflightErrors => LivePreflightDiagnostics.Any(diagnostic => diagnostic.Severity == LivePreflightSeverity.Error);
+    public bool HasLivePreflightWarnings => LivePreflightDiagnostics.Any(diagnostic => diagnostic.Severity == LivePreflightSeverity.Warning);
+
+    public string LiveSafetyStatusText => HasLivePreflightErrors
+        ? $"LIVE CHECK: FATAL · {LivePreflightSummaryText}"
+        : HasLivePreflightWarnings
+            ? $"LIVE CHECK: OK WITH WARNING · {LivePreflightSummaryText}"
+            : $"LIVE CHECK: QUICK LOOPTEST · {LivePreflightSummaryText}";
 
     public SvPublisherSlotViewModel? SelectedPublisherSlot
     {
@@ -1193,6 +1217,259 @@ public sealed class SvPublisherViewModel : ObservableObject
         }
     }
 
+    private void RunLivePreflight()
+    {
+        var report = RefreshLivePreflight();
+        AppendPreflightReport(report, includeInfo: true);
+        StatusText = report.HasErrors ? "Live check has fatal errors." : "Live check ready.";
+    }
+
+    private LivePreflightReport RefreshLivePreflight()
+    {
+        var report = BuildLivePreflightReport();
+        LivePreflightDiagnostics.Clear();
+        foreach (var diagnostic in report.Diagnostics)
+            LivePreflightDiagnostics.Add(diagnostic);
+
+        LivePreflightSummaryText = report.SummaryText;
+        OnPropertyChanged(nameof(HasLivePreflightErrors));
+        OnPropertyChanged(nameof(HasLivePreflightWarnings));
+        OnPropertyChanged(nameof(LiveSafetyStatusText));
+        return report;
+    }
+
+    private void AppendPreflightReport(LivePreflightReport report, bool includeInfo)
+    {
+        AppendEvent(report.SummaryText);
+        foreach (var diagnostic in report.Diagnostics)
+        {
+            if (!includeInfo && diagnostic.Severity == LivePreflightSeverity.Info)
+                continue;
+
+            AppendEvent(diagnostic.ToString());
+        }
+    }
+
+    private LivePreflightReport BuildLivePreflightReport()
+    {
+        SaveCurrentPublisherSlot();
+        var diagnostics = new List<LivePreflightDiagnostic>();
+        void Add(LivePreflightSeverity severity, string area, string message, string detail = "")
+            => diagnostics.Add(new LivePreflightDiagnostic
+            {
+                Severity = severity,
+                Area = area,
+                Message = message,
+                Detail = detail
+            });
+
+        var activeSlots = PublisherSlots.Where(slot => slot.IsEnabled).ToArray();
+        if (activeSlots.Length == 0)
+        {
+            Add(LivePreflightSeverity.Error, "Publishers", "No enabled publisher slot.", "Enable at least one IED / MU publisher before live publishing.");
+            return new LivePreflightReport(diagnostics);
+        }
+
+        Add(LivePreflightSeverity.Info, "Mode", "KM Looptest friendly preflight.", "Warnings do not block live publish. Only fatal configuration errors are blocked.");
+
+        if (SelectedAdapter is null)
+            Add(LivePreflightSeverity.Error, "Adapter", "No NIC adapter selected.", "Select the adapter connected to KM Looptest / relay point-to-point port.");
+        else
+        {
+            Add(LivePreflightSeverity.Info, "Adapter", "Selected adapter", SelectedAdapter.DisplayName);
+            if (string.IsNullOrWhiteSpace(SelectedAdapter.MacAddress))
+                Add(LivePreflightSeverity.Warning, "Adapter", "Adapter MAC address is not visible.", "Live publish can still be attempted if Npcap can open the adapter.");
+            if (SelectedAdapter.DisplayName.Contains("loopback", StringComparison.OrdinalIgnoreCase))
+                Add(LivePreflightSeverity.Warning, "Adapter", "Adapter looks like loopback.", "For KM Looptest, normally select the physical Ethernet adapter.");
+        }
+
+        if (Adapters.Count == 0)
+            Add(LivePreflightSeverity.Warning, "Adapter", "Adapter list is empty.", "Install Npcap and restart ARSVIN if no live adapter is available.");
+
+        if (!IsRunningElevated())
+            Add(LivePreflightSeverity.Warning, "Privilege", "Application may not be running as Administrator.", "Npcap live transmission may require elevated privileges on Windows.");
+
+        var appIds = new List<(ushort AppId, SvPublisherSlotViewModel Slot)>();
+        var destinations = new List<(string Mac, SvPublisherSlotViewModel Slot)>();
+        var signatures = new List<(string Signature, SvPublisherSlotViewModel Slot)>();
+
+        foreach (var slot in activeSlots)
+        {
+            if (slot.SelectedStream?.Stream is not { } stream)
+            {
+                Add(LivePreflightSeverity.Error, slot.Header, "No SV stream selected.", "Open SCL and select an SV stream. ARSVIN still needs an SV dataset layout before it can build frames.");
+                continue;
+            }
+
+            if (slot.SampleRateHz <= 0)
+                Add(LivePreflightSeverity.Error, slot.Header, "Sample rate must be greater than 0.", $"Current value: {slot.SampleRateHz:0.###} fps.");
+            else if (slot.SampleRateHz > 4800)
+                Add(LivePreflightSeverity.Warning, slot.Header, "High sample rate selected.", $"{slot.SampleRateHz:0.#} fps can increase Windows jitter. KM Looptest is easier at 4000/4800 fps.");
+
+            if (slot.NominalFrequencyHz <= 0)
+                Add(LivePreflightSeverity.Error, slot.Header, "Nominal frequency must be greater than 0.");
+
+            if (!MacAddress.TryParse(slot.SourceMac, out var sourceMac))
+                Add(LivePreflightSeverity.Error, slot.Header, "Source MAC is invalid.", slot.SourceMac);
+            else
+            {
+                WarnForSourceMac(sourceMac, slot.Header, Add);
+                if (SelectedAdapter is not null
+                    && !string.IsNullOrWhiteSpace(SelectedAdapter.MacAddress)
+                    && !string.Equals(slot.SourceMac.Replace('-', ':'), SelectedAdapter.MacAddress.Replace('-', ':'), StringComparison.OrdinalIgnoreCase))
+                    Add(LivePreflightSeverity.Warning, slot.Header, "Source MAC differs from selected adapter MAC.", $"slot={sourceMac}, adapter={SelectedAdapter.MacAddress}");
+            }
+
+            if (!MacAddress.TryParse(slot.DestinationMac, out var destinationMac))
+                Add(LivePreflightSeverity.Error, slot.Header, "Destination MAC is invalid.", slot.DestinationMac);
+            else
+            {
+                WarnForDestinationMac(destinationMac, slot.Header, Add);
+                destinations.Add((destinationMac.ToString(), slot));
+            }
+
+            ushort appId = 0;
+            try
+            {
+                appId = ParseAppId(slot.AppIdText);
+                appIds.Add((appId, slot));
+                if (appId == 0)
+                    Add(LivePreflightSeverity.Warning, slot.Header, "APPID is 0x0000.", "Use the APPID expected by KM Looptest / relay configuration unless this is intentional.");
+                else
+                    Add(LivePreflightSeverity.Info, slot.Header, "APPID accepted.", $"{slot.AppIdText} -> 0x{appId:X4}.");
+            }
+            catch (Exception ex)
+            {
+                Add(LivePreflightSeverity.Error, slot.Header, "APPID is invalid.", ex.Message);
+            }
+
+            try
+            {
+                _ = ResolveVlanTag(slot.UseVlan, slot.VlanId, slot.VlanPriority);
+                if (!slot.UseVlan)
+                    Add(LivePreflightSeverity.Warning, slot.Header, "VLAN tag is disabled.", "Allowed for KM Looptest if the peer expects untagged SV traffic.");
+                else
+                    Add(LivePreflightSeverity.Info, slot.Header, "VLAN", $"VID={slot.VlanId}, PCP={slot.VlanPriority}.");
+            }
+            catch (Exception ex)
+            {
+                Add(LivePreflightSeverity.Error, slot.Header, "VLAN setting is invalid.", ex.Message);
+            }
+
+            if (slot.CurrentDlsb <= 0 || slot.VoltageDlsb <= 0)
+                Add(LivePreflightSeverity.Error, slot.Header, "Current and voltage dLSB must be greater than 0.");
+
+            if (slot.SignalSource == PublisherSignalSource.ComtradeReplay && slot.ComtradeDataset is null)
+                Add(LivePreflightSeverity.Error, slot.Header, "COMTRADE replay selected but no COMTRADE file is loaded.");
+
+            if (stream.NoAsdu != 1)
+                Add(LivePreflightSeverity.Error, slot.Header, $"nofASDU={stream.NoAsdu} is not supported.", "This publisher currently supports exactly one ASDU per frame.");
+
+            try
+            {
+                var layout = SampledValuesPayloadLayout.FromDataSet(stream.Entries);
+                if (!layout.IsFullySupported)
+                    Add(LivePreflightSeverity.Error, slot.Header, "Unsupported SV payload layout.", string.Join("; ", layout.UnsupportedElements.Select(x => $"{x.SignalReference} bType={x.BType}")));
+                else
+                    Add(LivePreflightSeverity.Info, slot.Header, "Payload layout supported.", $"entries={stream.Entries.Count}, payload={layout.PayloadByteLength} bytes.");
+            }
+            catch (Exception ex)
+            {
+                Add(LivePreflightSeverity.Error, slot.Header, "Payload layout cannot be built.", ex.Message);
+            }
+
+            if (MacAddress.TryParse(slot.DestinationMac, out var destForSignature))
+            {
+                var vlanPart = slot.UseVlan ? $"vlan:{slot.VlanId}" : "untagged";
+                signatures.Add(($"0x{appId:X4}|{destForSignature}|{vlanPart}", slot));
+            }
+        }
+
+        foreach (var duplicate in appIds.GroupBy(item => item.AppId).Where(group => group.Count() > 1))
+            Add(LivePreflightSeverity.Warning, "APPID", $"APPID 0x{duplicate.Key:X4} is used by multiple publishers.", string.Join(", ", duplicate.Select(item => item.Slot.Header)));
+
+        foreach (var duplicate in destinations.GroupBy(item => item.Mac, StringComparer.OrdinalIgnoreCase).Where(group => group.Count() > 1))
+            Add(LivePreflightSeverity.Warning, "Destination MAC", $"Destination MAC {duplicate.Key} is shared by multiple publishers.", string.Join(", ", duplicate.Select(item => item.Slot.Header)));
+
+        foreach (var duplicate in signatures.GroupBy(item => item.Signature, StringComparer.OrdinalIgnoreCase).Where(group => group.Count() > 1))
+            Add(LivePreflightSeverity.Warning, "Stream identity", "Multiple publishers share the same APPID, destination MAC, and VLAN identity.", $"{duplicate.Key}: {string.Join(", ", duplicate.Select(item => item.Slot.Header))}");
+
+        AddSyncCompatibilityDiagnostics(Add);
+        return new LivePreflightReport(diagnostics);
+    }
+
+    private void AddSyncCompatibilityDiagnostics(Action<LivePreflightSeverity, string, string, string> add)
+    {
+        switch (NormalizeSyncPolicyMode(SyncPolicyMode))
+        {
+            case SvSyncPolicyMode.GlobalCompatibility:
+                add(LivePreflightSeverity.Warning, "smpSynch", "Global compatibility mode is selected.", "Allowed for KM Looptest / relay readability. This is not proof of real PTP accuracy.");
+                break;
+            case SvSyncPolicyMode.LocalCompatibility:
+                add(LivePreflightSeverity.Info, "smpSynch", "Local compatibility mode is selected.", "SV will publish smpSynch=1.");
+                break;
+            case SvSyncPolicyMode.HonestUnsynchronized:
+                add(LivePreflightSeverity.Warning, "smpSynch", "Honest unsynchronized mode is selected.", "Strict relays may reject SV traffic with smpSynch=0.");
+                break;
+            case SvSyncPolicyMode.ExternalPtpAuto:
+                add(LivePreflightSeverity.Info, "smpSynch", "External PTP auto mode is selected.", "SV synchronization marking depends on observed external PTP health.");
+                break;
+        }
+
+        if (PtpPublisherMode == AR.Iec61850.SvPublisher.Models.PtpPublisherMode.LabPublisher)
+            add(LivePreflightSeverity.Warning, "PTP traffic", "Lab PTP traffic generation is enabled.", "Traffic can help compatibility testing, but it does not certify clock accuracy.");
+    }
+
+    private static void WarnForSourceMac(MacAddress mac, string area, Action<LivePreflightSeverity, string, string, string> add)
+    {
+        var bytes = mac.ToArray();
+        if (bytes.All(value => value == 0x00))
+            add(LivePreflightSeverity.Error, area, "Source MAC is all zeros.", mac.ToString());
+        else if (IsBroadcastMac(bytes))
+            add(LivePreflightSeverity.Error, area, "Source MAC cannot be broadcast.", mac.ToString());
+        else if (IsMulticastMac(bytes))
+            add(LivePreflightSeverity.Error, area, "Source MAC cannot be multicast.", mac.ToString());
+    }
+
+    private static void WarnForDestinationMac(MacAddress mac, string area, Action<LivePreflightSeverity, string, string, string> add)
+    {
+        var bytes = mac.ToArray();
+        if (bytes.All(value => value == 0x00))
+            add(LivePreflightSeverity.Error, area, "Destination MAC is all zeros.", mac.ToString());
+        else if (IsBroadcastMac(bytes))
+            add(LivePreflightSeverity.Error, area, "Destination MAC should not be broadcast for SV.", mac.ToString());
+        else if (!IsMulticastMac(bytes))
+            add(LivePreflightSeverity.Warning, area, "Destination MAC is not multicast.", mac.ToString());
+        else if (!IsCommonSampledValuesMulticast(bytes))
+            add(LivePreflightSeverity.Warning, area, "Destination MAC is multicast but not in the common Sampled Values multicast range.", $"{mac}; common SV range starts with 01:0C:CD:04.");
+    }
+
+    private static bool IsMulticastMac(byte[] bytes)
+        => bytes.Length == 6 && (bytes[0] & 0x01) == 0x01;
+
+    private static bool IsBroadcastMac(byte[] bytes)
+        => bytes.Length == 6 && bytes.All(value => value == 0xFF);
+
+    private static bool IsCommonSampledValuesMulticast(byte[] bytes)
+        => bytes.Length == 6 && bytes[0] == 0x01 && bytes[1] == 0x0C && bytes[2] == 0xCD && bytes[3] == 0x04;
+
+    private static bool IsRunningElevated()
+    {
+        try
+        {
+            if (!OperatingSystem.IsWindows())
+                return true;
+
+            using var identity = WindowsIdentity.GetCurrent();
+            var principal = new WindowsPrincipal(identity);
+            return principal.IsInRole(WindowsBuiltInRole.Administrator);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     private async Task SaveProfileAsync()
     {
         var dialog = new SaveFileDialog
@@ -1224,6 +1501,14 @@ public sealed class SvPublisherViewModel : ObservableObject
     {
         try
         {
+            if (live)
+            {
+                var report = RefreshLivePreflight();
+                AppendPreflightReport(report, includeInfo: false);
+                if (report.HasErrors)
+                    throw new InvalidOperationException("Live publish blocked by fatal preflight error(s). Warnings are allowed for KM Looptest / isolated point-to-point tests.");
+            }
+
             ValidateBeforeRun(live);
 
             using var stop = new CancellationTokenSource();
@@ -1252,7 +1537,6 @@ public sealed class SvPublisherViewModel : ObservableObject
             _publisherStop?.Dispose();
             _publisherStop = null;
             IsPublishing = false;
-            IsLiveArmed = false;
             if (!PublishText.StartsWith("Complete", StringComparison.OrdinalIgnoreCase))
                 PublishText = "Publisher stopped.";
             CommandManager.InvalidateRequerySuggested();

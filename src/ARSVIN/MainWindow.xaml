@@ -628,6 +628,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -759,21 +760,28 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="10" Command="{Binding RunLiveCommand}" Style="{StaticResource StartButtonStyle}">
+            <Button Grid.Column="10" Command="{Binding RunPreflightCommand}" Style="{StaticResource RibbonButton}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Path Data="M4 12l4 4 12-12" Stroke="#334155" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><Ellipse Canvas.Left="3" Canvas.Top="3" Width="18" Height="18" Stroke="#2563EB" StrokeThickness="1.7" Fill="Transparent"/></Canvas></Viewbox>
+                    <TextBlock Text="Check" Style="{StaticResource RibbonCaption}" />
+                </StackPanel>
+            </Button>
+
+            <Button Grid.Column="11" Command="{Binding RunLiveCommand}" Style="{StaticResource StartButtonStyle}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Path Data="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" Stroke="#FFFFFF" StrokeThickness="1.9" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Canvas></Viewbox>
                     <TextBlock Text="Start" Style="{StaticResource RibbonCaption}" Foreground="#FFFFFF" />
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="11" Command="{Binding StopCommand}" Style="{StaticResource StopButtonStyle}">
+            <Button Grid.Column="12" Command="{Binding StopCommand}" Style="{StaticResource StopButtonStyle}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Rectangle Canvas.Left="3.5" Canvas.Top="3.5" Width="17" Height="17" RadiusX="2" RadiusY="2" Stroke="#FFFFFF" StrokeThickness="1.9" Fill="Transparent"/></Canvas></Viewbox>
                     <TextBlock Text="Stop" Style="{StaticResource RibbonCaption}" Foreground="#FFFFFF" />
                 </StackPanel>
             </Button>
 
-            <Border Grid.Column="12" Background="#F8FBFF" BorderBrush="#D7E2F0" BorderThickness="1" CornerRadius="14" Padding="12,8" Margin="12,0,0,0" VerticalAlignment="Stretch">
+            <Border Grid.Column="13" Background="#F8FBFF" BorderBrush="#D7E2F0" BorderThickness="1" CornerRadius="14" Padding="12,8" Margin="12,0,0,0" VerticalAlignment="Stretch">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="190" />
@@ -1493,7 +1501,7 @@
                 <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Foreground="#334155" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Column="1" Text="{Binding SyncStatusBarText}" VerticalAlignment="Center" Foreground="#1D4ED8" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
                 <TextBlock Grid.Column="2" Text="{Binding AdapterStatusText}" VerticalAlignment="Center" Foreground="#475569" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
-                <TextBlock Grid.Column="3" Text="{Binding StreamControlBlock}" VerticalAlignment="Center" Foreground="#64748B" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
+                <TextBlock Grid.Column="3" Text="{Binding LiveSafetyStatusText}" VerticalAlignment="Center" Foreground="#64748B" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
             </Grid>
         </Border>
     </Grid>

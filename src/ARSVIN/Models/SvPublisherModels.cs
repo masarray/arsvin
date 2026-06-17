@@ -72,6 +72,49 @@ public sealed class RampSignalChoice
         Keys.Any(key => string.Equals(key, channelKey, StringComparison.OrdinalIgnoreCase));
 }
 
+public enum LivePreflightSeverity
+{
+    Info,
+    Warning,
+    Error
+}
+
+public sealed class LivePreflightDiagnostic
+{
+    public LivePreflightSeverity Severity { get; init; }
+    public string Area { get; init; } = string.Empty;
+    public string Message { get; init; } = string.Empty;
+    public string Detail { get; init; } = string.Empty;
+
+    public string SeverityText => Severity.ToString().ToUpperInvariant();
+
+    public override string ToString()
+        => string.IsNullOrWhiteSpace(Detail)
+            ? $"{SeverityText}: {Area} — {Message}"
+            : $"{SeverityText}: {Area} — {Message} ({Detail})";
+}
+
+public sealed class LivePreflightReport
+{
+    public LivePreflightReport(IReadOnlyList<LivePreflightDiagnostic> diagnostics)
+    {
+        Diagnostics = diagnostics;
+    }
+
+    public IReadOnlyList<LivePreflightDiagnostic> Diagnostics { get; }
+    public int ErrorCount => Diagnostics.Count(diagnostic => diagnostic.Severity == LivePreflightSeverity.Error);
+    public int WarningCount => Diagnostics.Count(diagnostic => diagnostic.Severity == LivePreflightSeverity.Warning);
+    public int InfoCount => Diagnostics.Count(diagnostic => diagnostic.Severity == LivePreflightSeverity.Info);
+    public bool HasErrors => ErrorCount > 0;
+    public bool HasWarnings => WarningCount > 0;
+
+    public string SummaryText => HasErrors
+        ? $"Looptest check blocked: {ErrorCount} fatal error(s), {WarningCount} warning(s)."
+        : HasWarnings
+            ? $"Looptest check OK with {WarningCount} warning(s)."
+            : "Looptest check OK.";
+}
+
 public sealed class AdapterChoice
 {
     public required string Selector { get; init; }

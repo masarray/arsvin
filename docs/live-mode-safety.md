@@ -26,3 +26,7 @@ Confirm the following:
 ARSVIN is for lab publishing, relay readability checks, and traffic experiments.
 
 It is not intended to be used as a certified protection commissioning authority or calibrated acceptance-test source.
+
+## Preflight behavior
+
+Warnings are advisory and do not block KM Looptest / point-to-point lab publishing. Fatal errors still block live publish when ARSVIN cannot build or send a valid stream.

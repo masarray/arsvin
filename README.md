@@ -95,6 +95,7 @@ Create a portable package:
 - [Sync Compatibility Mode](docs/sync-compatibility-mode.md)
 - [Build and Release](docs/build-and-release.md)
 - [Live Mode Safety](docs/live-mode-safety.md)
+- [Live Preflight Diagnostics](docs/live-preflight-diagnostics.md)
 - [Known Limitations](docs/known-limitations.md)
 - [Safety Boundaries](docs/safety-boundaries.md)
 

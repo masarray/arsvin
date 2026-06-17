@@ -52,7 +52,9 @@ Before using live mode, confirm:
 
 ## 7. Publish
 
-Use **Start** for live publishing or run a dry test for validation without transmitting on the network.
+Use **Check** for optional live diagnostics, then **Start** for live publishing. ARSVIN uses a KM Looptest friendly preflight model: warnings do not block live publish, but fatal errors still stop invalid traffic.
+
+You can also run a dry test for validation without transmitting on the network.
 
 ## 8. Verify
 
