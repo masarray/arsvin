@@ -53,6 +53,7 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
             if (SetProperty(ref _isEnabled, value))
             {
                 OnPropertyChanged(nameof(StatusText));
+                OnPropertyChanged(nameof(StatusBadgeText));
                 OnPropertyChanged(nameof(SummaryText));
             }
         }
@@ -66,6 +67,9 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
             if (SetProperty(ref _selectedStream, value))
             {
                 OnPropertyChanged(nameof(StatusText));
+                OnPropertyChanged(nameof(StatusBadgeText));
+                OnPropertyChanged(nameof(StreamIdOrFallback));
+                OnPropertyChanged(nameof(StreamCardTitle));
                 OnPropertyChanged(nameof(SummaryText));
             }
         }
@@ -77,7 +81,11 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _streamId, value))
+            {
+                OnPropertyChanged(nameof(StreamIdOrFallback));
+                OnPropertyChanged(nameof(StreamCardTitle));
                 OnPropertyChanged(nameof(SummaryText));
+            }
         }
     }
 
@@ -87,7 +95,10 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _streamControlBlock, value))
+            {
+                OnPropertyChanged(nameof(StreamCardTitle));
                 OnPropertyChanged(nameof(SummaryText));
+            }
         }
     }
 
@@ -216,6 +227,8 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(SummaryText));
                 OnPropertyChanged(nameof(SourceText));
+                OnPropertyChanged(nameof(SourceBadgeText));
+                OnPropertyChanged(nameof(StreamCardTitle));
             }
         }
     }
@@ -229,6 +242,8 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
             {
                 OnPropertyChanged(nameof(HasComtrade));
                 OnPropertyChanged(nameof(SourceText));
+                OnPropertyChanged(nameof(SourceBadgeText));
+                OnPropertyChanged(nameof(StreamCardTitle));
             }
         }
     }
@@ -239,7 +254,11 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
         set
         {
             if (SetProperty(ref _comtradeSummary, string.IsNullOrWhiteSpace(value) ? "No COMTRADE loaded." : value))
+            {
                 OnPropertyChanged(nameof(SourceText));
+                OnPropertyChanged(nameof(SourceBadgeText));
+                OnPropertyChanged(nameof(StreamCardTitle));
+            }
         }
     }
 
@@ -264,6 +283,21 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
         get => _channels;
         set => _channels = value ?? Array.Empty<SignalChannelSnapshot>();
     }
+
+
+    public string StreamIdOrFallback => !string.IsNullOrWhiteSpace(StreamId)
+        ? StreamId
+        : SelectedStream?.Stream.SvId is { Length: > 0 } svId ? svId : "No stream";
+
+    public string StreamCardTitle => $"SV{Index} · {StreamIdOrFallback}";
+
+    public string SourceBadgeText => SignalSource == PublisherSignalSource.ComtradeReplay
+        ? "COMTRADE"
+        : "Manual";
+
+    public string StatusBadgeText => !IsEnabled
+        ? "Off"
+        : SelectedStream is null ? "Needs stream" : "Ready";
 
     public string StatusText => !IsEnabled
         ? "disabled"

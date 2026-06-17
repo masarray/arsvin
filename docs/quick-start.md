@@ -72,3 +72,15 @@ Useful checks include:
 ## Sync compatibility note
 
 For point-to-point relay readability checks, **Global compatibility — smpSynch=2** is usually the most practical starting point. It helps strict subscribers accept the SV stream, but it does not prove real PTP timing accuracy.
+
+
+## 9. Use the modern SV setup workflow
+
+The **SV Setup** window is organized for quick looptest work:
+
+- use the left **SV streams** navigator to select SV1, SV2, or SV3
+- edit the selected stream in the main panel
+- choose **Manual**, **Ramp**, **Sequence**, or **COMTRADE** source mode
+- press **Check** to open the Preflight Results window when you need details
+
+Warnings are shown in the Preflight Results window and event log. They do not block live publishing. Only fatal configuration errors block live publishing.

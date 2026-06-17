@@ -120,7 +120,10 @@ public sealed class SvPublisherViewModel : ObservableObject
             new(3)
         };
         foreach (var slot in PublisherSlots)
+        {
             slot.Channels = Channels.Select(c => c.ToSnapshot()).ToArray();
+            slot.PropertyChanged += OnPublisherSlotPropertyChanged;
+        }
 
         RampPreviewChannels = CreatePreviewChannels();
         SequencePreviewChannels = CreatePreviewChannels();
@@ -416,6 +419,18 @@ public sealed class SvPublisherViewModel : ObservableObject
 
     public bool HasLivePreflightErrors => LivePreflightDiagnostics.Any(diagnostic => diagnostic.Severity == LivePreflightSeverity.Error);
     public bool HasLivePreflightWarnings => LivePreflightDiagnostics.Any(diagnostic => diagnostic.Severity == LivePreflightSeverity.Warning);
+    public int LivePreflightErrorCount => LivePreflightDiagnostics.Count(diagnostic => diagnostic.Severity == LivePreflightSeverity.Error);
+    public int LivePreflightWarningCount => LivePreflightDiagnostics.Count(diagnostic => diagnostic.Severity == LivePreflightSeverity.Warning);
+    public int LivePreflightInfoCount => LivePreflightDiagnostics.Count(diagnostic => diagnostic.Severity == LivePreflightSeverity.Info);
+
+    public bool IsConfigComtradeWorkspaceVisible => SelectedPublisherSlot?.SignalSource == PublisherSignalSource.ComtradeReplay;
+    public bool IsConfigManualWorkspaceVisible => !IsConfigComtradeWorkspaceVisible && Mode == InjectionMode.Manual;
+    public bool IsConfigRampWorkspaceVisible => !IsConfigComtradeWorkspaceVisible && Mode == InjectionMode.Ramp;
+    public bool IsConfigSequencerWorkspaceVisible => !IsConfigComtradeWorkspaceVisible && Mode == InjectionMode.Sequencer;
+
+    public string SelectedStreamHeaderText => SelectedPublisherSlot is null
+        ? "No stream selected"
+        : $"SV{SelectedPublisherSlot.Index} — {SelectedPublisherSlot.StreamIdOrFallback}";
 
     public string LiveSafetyStatusText => HasLivePreflightErrors
         ? $"LIVE CHECK: FATAL · {LivePreflightSummaryText}"
@@ -433,8 +448,42 @@ public sealed class SvPublisherViewModel : ObservableObject
 
             SaveCurrentPublisherSlot();
             if (SetProperty(ref _selectedPublisherSlot, value) && value is not null)
+            {
                 LoadPublisherSlot(value);
+                RaiseConfigWorkspaceStateChanged();
+            }
         }
+    }
+
+
+    private void OnPublisherSlotPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (!ReferenceEquals(sender, SelectedPublisherSlot))
+            return;
+
+        if (e.PropertyName is nameof(SvPublisherSlotViewModel.SignalSource)
+            or nameof(SvPublisherSlotViewModel.IsEnabled)
+            or nameof(SvPublisherSlotViewModel.SelectedStream)
+            or nameof(SvPublisherSlotViewModel.StreamId)
+            or nameof(SvPublisherSlotViewModel.StreamControlBlock)
+            or nameof(SvPublisherSlotViewModel.AppIdText)
+            or nameof(SvPublisherSlotViewModel.UseVlan)
+            or nameof(SvPublisherSlotViewModel.VlanId)
+            or nameof(SvPublisherSlotViewModel.SampleRateHz)
+            or nameof(SvPublisherSlotViewModel.ComtradeSummary)
+            or nameof(SvPublisherSlotViewModel.ComtradePath))
+        {
+            RaiseConfigWorkspaceStateChanged();
+        }
+    }
+
+    private void RaiseConfigWorkspaceStateChanged()
+    {
+        OnPropertyChanged(nameof(IsConfigComtradeWorkspaceVisible));
+        OnPropertyChanged(nameof(IsConfigManualWorkspaceVisible));
+        OnPropertyChanged(nameof(IsConfigRampWorkspaceVisible));
+        OnPropertyChanged(nameof(IsConfigSequencerWorkspaceVisible));
+        OnPropertyChanged(nameof(SelectedStreamHeaderText));
     }
 
     public SampleRatePreset? SelectedSampleRatePreset
@@ -801,6 +850,7 @@ public sealed class SvPublisherViewModel : ObservableObject
             OnPropertyChanged(nameof(IsManualWorkspaceVisible));
             OnPropertyChanged(nameof(IsRampWorkspaceVisible));
             OnPropertyChanged(nameof(IsSequencerWorkspaceVisible));
+            RaiseConfigWorkspaceStateChanged();
             OnPropertyChanged(nameof(WorkspaceTitle));
             OnPropertyChanged(nameof(WorkspaceSubtitle));
             AppendEvent($"Workspace changed to {value}.");
@@ -1234,6 +1284,9 @@ public sealed class SvPublisherViewModel : ObservableObject
         LivePreflightSummaryText = report.SummaryText;
         OnPropertyChanged(nameof(HasLivePreflightErrors));
         OnPropertyChanged(nameof(HasLivePreflightWarnings));
+        OnPropertyChanged(nameof(LivePreflightErrorCount));
+        OnPropertyChanged(nameof(LivePreflightWarningCount));
+        OnPropertyChanged(nameof(LivePreflightInfoCount));
         OnPropertyChanged(nameof(LiveSafetyStatusText));
         return report;
     }

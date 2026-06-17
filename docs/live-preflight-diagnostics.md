@@ -9,7 +9,7 @@ The preflight check is designed to help the engineer see obvious configuration m
 - **Warnings do not block live publish**
 - **Fatal errors block live publish**
 - **Arm Live is not required**
-- The **Check** button is optional
+- The **Check** button is optional and opens a readable Preflight Results window
 - Live publish automatically runs the same check before sending traffic
 
 This keeps ARSVIN useful for quick lab work, KM Looptest, and relay readability checks.
@@ -49,7 +49,7 @@ Warnings are intentionally not blocking because ARSVIN is commonly used for quic
 1. Select the NIC adapter connected to the KM Looptest / relay point-to-point port.
 2. Open SCL and select the SV stream expected by the subscriber.
 3. Confirm APPID, destination MAC, VLAN, sample rate, and `smpSynch` mode.
-4. Press **Check** if you want diagnostics.
+4. Press **Check** if you want the Preflight Results window with fatal / warning / info detail.
 5. Press **Start**.
 
 If only warnings are shown, ARSVIN still allows live publish.

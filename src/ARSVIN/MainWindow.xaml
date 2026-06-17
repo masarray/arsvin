@@ -426,7 +426,7 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
         </Style>
 
-        <Style TargetType="ComboBox">
+        <Style TargetType="ComboBox" BasedOn="{StaticResource ModernComboBox}">
             <Setter Property="Height" Value="28" />
             <Setter Property="Padding" Value="8,2" />
             <Setter Property="BorderBrush" Value="#CBD5E1" />
@@ -760,7 +760,7 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="10" Command="{Binding RunPreflightCommand}" Style="{StaticResource RibbonButton}">
+            <Button Grid.Column="10" Click="CheckPreflight_Click" Style="{StaticResource RibbonButton}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Path Data="M4 12l4 4 12-12" Stroke="#334155" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><Ellipse Canvas.Left="3" Canvas.Top="3" Width="18" Height="18" Stroke="#2563EB" StrokeThickness="1.7" Fill="Transparent"/></Canvas></Viewbox>
                     <TextBlock Text="Check" Style="{StaticResource RibbonCaption}" />
