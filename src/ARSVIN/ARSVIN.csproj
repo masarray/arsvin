@@ -3,8 +3,6 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <AssemblyName>ARSVIN</AssemblyName>
     <RootNamespace>ARSVIN</RootNamespace>
@@ -13,16 +11,13 @@
     <Authors>Ari Sulistiono</Authors>
     <Product>ARSVIN - Sampled Values Publisher</Product>
     <Description>Lightweight IEC 61850 Sampled Values publisher simulator with SCL-based setup, lab PTP compatibility traffic, and COMTRADE replay.</Description>
-    <Copyright>Copyright © Ari Sulistiono</Copyright>
-    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
-    <RepositoryUrl>https://github.com/masarray/arsvin</RepositoryUrl>
-    <RepositoryType>git</RepositoryType>
+    <Copyright>Copyright © 2026 Ari Sulistiono</Copyright>
     <PackageTags>IEC 61850;Sampled Values;SV publisher;SV injector;COMTRADE;process bus;digital substation;relay testing</PackageTags>
     <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SharpPcap" Version="6.3.1" />
+    <PackageReference Include="SharpPcap" />
   </ItemGroup>
 
   <ItemGroup>

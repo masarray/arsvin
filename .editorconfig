@@ -10,6 +10,15 @@ trim_trailing_whitespace = true
 indent_style = space
 indent_size = 4
 
+[*.xaml]
+indent_style = space
+indent_size = 2
+
 [*.{yml,yaml,json,md,html,css,js}]
+indent_style = space
+indent_size = 2
+end_of_line = lf
+
+[*.ps1]
 indent_style = space
 indent_size = 2

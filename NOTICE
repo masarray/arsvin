@@ -1,6 +1,9 @@
-ARSVIN - IEC 61850 Sampled Values Injector
+ARSVIN - IEC 61850 Sampled Values Publisher & Process Bus Traffic Tester
 Copyright 2026 Ari Sulistiono
 
 Licensed under the Apache License, Version 2.0.
+
 Author: Ari Sulistiono
 GitHub: https://github.com/masarray
+
+ARSVIN can transmit raw Ethernet frames and is intended only for isolated lab networks, point-to-point engineering tests, and educational use.

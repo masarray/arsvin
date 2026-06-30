@@ -1,0 +1,22 @@
+name: Documentation improvement
+description: Improve README, docs, safety notes, or examples
+title: "Docs: "
+labels: [documentation]
+body:
+  - type: textarea
+    id: page
+    attributes:
+      label: Page or section
+      placeholder: docs/quick-start.md, README.md, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: What is unclear or missing?
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording or structure

@@ -11,8 +11,8 @@ permissions:
   contents: read
 
 jobs:
-  build:
-    name: Build ARSVIN
+  build-test:
+    name: Build and test
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -23,8 +23,17 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore
+      - name: Restore app
         run: dotnet restore src/ARSVIN/ARSVIN.csproj
 
-      - name: Build Release
+      - name: Restore tests
+        run: dotnet restore tests/ARSVIN.Tests/ARSVIN.Tests.csproj
+
+      - name: Build app
         run: dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore
+
+      - name: Test
+        run: dotnet test tests/ARSVIN.Tests/ARSVIN.Tests.csproj -c Release --no-restore --logger trx
+
+      - name: Dependency vulnerability report
+        run: dotnet list src/ARSVIN/ARSVIN.csproj package --vulnerable --include-transitive

@@ -22,29 +22,13 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore
-        run: dotnet restore src/ARSVIN/ARSVIN.csproj
-
-      - name: Publish single EXE
+      - name: Build and test
         shell: pwsh
-        run: |
-          dotnet publish src/ARSVIN/ARSVIN.csproj `
-            -c Release `
-            -r win-x64 `
-            --self-contained true `
-            -p:PublishSingleFile=true `
-            -p:IncludeNativeLibrariesForSelfExtract=true `
-            -p:EnableCompressionInSingleFile=true `
-            -p:DebugType=None `
-            -p:DebugSymbols=false `
-            -o artifacts/ARSVIN-win-x64
+        run: .\build.ps1
 
-      - name: Add release notes
+      - name: Publish portable ZIP
         shell: pwsh
-        run: |
-          Copy-Item README.md artifacts/ARSVIN-win-x64/README.txt
-          Copy-Item LICENSE artifacts/ARSVIN-win-x64/LICENSE.txt
-          Compress-Archive -Path artifacts/ARSVIN-win-x64/* -DestinationPath artifacts/ARSVIN-win-x64-portable.zip -Force
+        run: .\publish-win-x64.ps1
 
       - name: Upload workflow artifact
         uses: actions/upload-artifact@v4

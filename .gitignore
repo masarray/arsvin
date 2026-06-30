@@ -4,10 +4,14 @@ obj/
 artifacts/
 publish/
 TestResults/
+*.trx
+*.coverage
+*.coveragexml
 
 # IDE
 .vs/
 .vscode/.vs/
+.idea/
 *.user
 *.suo
 *.userosscache
@@ -17,8 +21,18 @@ TestResults/
 .DS_Store
 Thumbs.db
 
+# Logs and temp files
+*.log
+*.tmp
+*.bak
+
 # Local captures and large lab artifacts
 *.pcap
 *.pcapng
 *.etl
 *.svpub.json
+
+# Do not commit real station exports or confidential captures
+private/
+confidential/
+local-samples/

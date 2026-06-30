@@ -1,6 +1,17 @@
 $ErrorActionPreference = 'Stop'
 
-$project = Join-Path $PSScriptRoot 'src\ARSVIN\ARSVIN.csproj'
+$root = $PSScriptRoot
+$appProject = Join-Path $root 'src\ARSVIN\ARSVIN.csproj'
+$testProject = Join-Path $root 'tests\ARSVIN.Tests\ARSVIN.Tests.csproj'
 
-dotnet restore $project
-dotnet build $project -c Release --no-restore
+Write-Host '==> Restoring ARSVIN app'
+dotnet restore $appProject
+
+Write-Host '==> Restoring ARSVIN tests'
+dotnet restore $testProject
+
+Write-Host '==> Building ARSVIN app'
+dotnet build $appProject -c Release --no-restore
+
+Write-Host '==> Running tests'
+dotnet test $testProject -c Release --no-restore

@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest a focused improvement for ARSVIN
+title: "Feature: "
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please keep requests focused on SV publishing, safe lab workflows, SCL setup, COMTRADE replay, and relay readability checks.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Engineering problem
+      description: What real lab or workflow problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: safety
+    attributes:
+      label: Does this affect live packet publishing?
+      options:
+        - No
+        - Yes, live packet behavior changes
+        - Not sure
+    validations:
+      required: true

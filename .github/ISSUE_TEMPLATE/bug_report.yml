@@ -1,0 +1,70 @@
+name: Bug report
+description: Report a reproducible ARSVIN problem
+title: "Bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Do not attach confidential station files, relay credentials, internal network diagrams, or production captures.
+  - type: input
+    id: version
+    attributes:
+      label: ARSVIN version or commit
+      placeholder: v0.1.0 or commit SHA
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - SCL setup
+        - Manual publishing
+        - Ramp / sequencer
+        - COMTRADE replay
+        - Live packet publishing
+        - PTP / smpSynch
+        - UI / UX
+        - Build / release
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Provide a minimal safe reproduction.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. Click ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: |
+        Windows version:
+        .NET SDK version, if building:
+        Npcap version:
+        Wireshark version, if used:
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Screenshots or sanitized Wireshark notes are helpful.

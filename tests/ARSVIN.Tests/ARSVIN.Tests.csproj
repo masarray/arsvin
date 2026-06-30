@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Ethernet\EthernetConstants.cs" Link="Engine\Ethernet\EthernetConstants.cs" />
+    <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Ethernet\EthernetFrame.cs" Link="Engine\Ethernet\EthernetFrame.cs" />
+    <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Ethernet\EthernetFrameCodec.cs" Link="Engine\Ethernet\EthernetFrameCodec.cs" />
+    <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Ethernet\MacAddress.cs" Link="Engine\Ethernet\MacAddress.cs" />
+    <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Ethernet\VlanTag.cs" Link="Engine\Ethernet\VlanTag.cs" />
+  </ItemGroup>
+
+</Project>
