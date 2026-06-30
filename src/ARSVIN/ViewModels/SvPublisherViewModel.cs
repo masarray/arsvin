@@ -1415,16 +1415,27 @@ public sealed class SvPublisherViewModel : ObservableObject
             if (slot.SignalSource == PublisherSignalSource.ComtradeReplay && slot.ComtradeDataset is null)
                 Add(LivePreflightSeverity.Error, slot.Header, "COMTRADE replay selected but no COMTRADE file is loaded.");
 
-            if (stream.NoAsdu != 1)
-                Add(LivePreflightSeverity.Error, slot.Header, $"nofASDU={stream.NoAsdu} is not supported.", "This publisher currently supports exactly one ASDU per frame.");
-
             try
             {
+                var validation = SampledValuesPublisherValidator.Validate(stream);
+                foreach (var finding in validation.Findings)
+                {
+                    var severity = finding.Severity switch
+                    {
+                        SampledValuesPublisherValidationSeverity.Error => LivePreflightSeverity.Error,
+                        SampledValuesPublisherValidationSeverity.Warning => LivePreflightSeverity.Warning,
+                        _ => LivePreflightSeverity.Info
+                    };
+                    Add(severity, slot.Header, finding.Message, string.IsNullOrWhiteSpace(finding.Detail) ? finding.Code : $"{finding.Code}: {finding.Detail}");
+                }
+
                 var layout = SampledValuesPayloadLayout.FromDataSet(stream.Entries);
-                if (!layout.IsFullySupported)
-                    Add(LivePreflightSeverity.Error, slot.Header, "Unsupported SV payload layout.", string.Join("; ", layout.UnsupportedElements.Select(x => $"{x.SignalReference} bType={x.BType}")));
-                else
-                    Add(LivePreflightSeverity.Info, slot.Header, "Payload layout supported.", $"entries={stream.Entries.Count}, payload={layout.PayloadByteLength} bytes.");
+                if (layout.IsFullySupported && stream.Address.AppId.HasValue && stream.Address.DestinationMac.HasValue)
+                {
+                    var noAsdu = SampledValuesPublisherProfile.ResolveAsduPerFrame(stream);
+                    var publishRate = SampledValuesPublisherProfile.ResolvePublicationRate(slot.SampleRateHz, noAsdu);
+                    Add(LivePreflightSeverity.Info, slot.Header, "Frame preview.", $"nofASDU={noAsdu}, sample={slot.SampleRateHz:0.#} fps, publish={publishRate:0.#} fps, payload={layout.PayloadByteLength} B/ASDU.");
+                }
             }
             catch (Exception ex)
             {
@@ -1607,9 +1618,11 @@ public sealed class SvPublisherViewModel : ObservableObject
         var primary = publisherStates[0];
         var source = primary.Source;
         var vlan = primary.Vlan;
-        var frameLimitPerPublisher = publisherStates.ToDictionary(s => s.SlotIndex, s => sessionPlan.ResolveFrameLimit(s.SampleRateHz));
+        var frameLimitPerPublisher = publisherStates.ToDictionary(s => s.SlotIndex, s => sessionPlan.ResolveFrameLimit(s.PublicationRateHz));
         var startedTicks = Stopwatch.GetTimestamp();
         var startedAt = DateTimeOffset.UtcNow;
+        foreach (var state in publisherStates)
+            state.SampleCount = SampleCounterPolicy.InitialSampleCount(startedAt, state.SampleRateHz, state.SampleCounterWrap, SampleCounterMode.SecondAligned);
         var nextUiTicks = startedTicks;
 
         var ptpMonitor = new PtpPassiveMonitor();
@@ -1651,7 +1664,7 @@ public sealed class SvPublisherViewModel : ObservableObject
             long? sourceLimit = state.SignalSource == PublisherSignalSource.ComtradeReplay &&
                                 state.ComtradeDataset is { } dataset &&
                                 !state.ComtradeLoop
-                ? dataset.SampleCount
+                ? Math.Max(1, (long)Math.Ceiling(dataset.SampleCount / (double)Math.Max(1, state.NoAsdu)))
                 : null;
 
             var effectiveLimit = MinLimit(sessionLimit, sourceLimit);
@@ -1665,7 +1678,7 @@ public sealed class SvPublisherViewModel : ObservableObject
                 PtpStatusText = live ? $"PTP: listening domain {ExpectedPtpDomain}" : "PTP: dry-run monitor inactive";
                 UpdatePtpPublisherStatus(labPtpPublisher);
                 SmpSynchStatusText = live ? $"smpSynch: waiting ({SyncPolicyShortLabel})" : FormatSmpSynchStatus(ResolveSampleSynchronization(null));
-                PublishText = $"Prepared {publisherStates.Length} SV publisher(s), {sessionPlan.DisplayName}: {string.Join(", ", publisherStates.Select(s => $"P{s.SlotIndex}@{s.SampleRateHz:0.#}fps"))}";
+                PublishText = $"Prepared {publisherStates.Length} SV publisher(s), {sessionPlan.DisplayName}: {string.Join(", ", publisherStates.Select(s => $"P{s.SlotIndex}@{s.SampleRateHz:0.#}sps/{s.PublicationRateHz:0.#}fps nofASDU={s.NoAsdu}"))}";
             });
 
             while (publisherStates.Any(IsActive))
@@ -1685,60 +1698,65 @@ public sealed class SvPublisherViewModel : ObservableObject
                     if (state.DueTicks(startedTicks) > nowTicks)
                         continue;
 
-                    var elapsedSeconds = state.Sent / state.SampleRateHz;
-                    var timestamp = startedAt.AddTicks((long)Math.Round(state.Sent * TimeSpan.TicksPerSecond / state.SampleRateHz));
-                    var sampleTime = new Iec61850UtcTime(timestamp, Quality: 0);
-                    byte[] payload;
-                    if (state.SignalSource == PublisherSignalSource.ComtradeReplay && state.ComtradeDataset is { } dataset)
-                    {
-                        var sample = dataset.GetSampleByIndex(state.Sent, state.ComtradeLoop);
-                        var instantaneousValues = ResolveComtradeInstantaneousValues(sample, state.ComtradeChannelMap);
-                        payload = BuildInstantaneousSamplePayload(state.Stream, sampleTime, instantaneousValues, state.CurrentDlsb, state.VoltageDlsb);
-                    }
-                    else
-                    {
-                        var baseChannels = state.IsSelectedSlot && AutoApplyWhileRunning
-                            ? CaptureBaseEffectiveChannels()
-                            : state.FrozenChannels;
-                        var effectiveChannels = state.IsSelectedSlot
-                            ? sessionPlan.ResolveChannels(baseChannels, elapsedSeconds)
-                            : baseChannels;
-                        var phasedChannels = ApplyOscillatorPhases(effectiveChannels, state.OscillatorStates, state.SampleRateHz);
-                        payload = BuildSamplePayload(state.Stream, sampleTime, phasedChannels, state.CurrentDlsb, state.VoltageDlsb);
-                    }
                     var smpSynch = ResolveSampleSynchronization(latestPtpReport);
+                    var samplePayloads = new List<byte[]>(state.NoAsdu);
+                    var asdus = new List<SampledValueAsdu>(state.NoAsdu);
+                    var baseChannelsForFrame = state.IsSelectedSlot && AutoApplyWhileRunning
+                        ? CaptureBaseEffectiveChannels()
+                        : state.FrozenChannels;
+
+                    for (var asduIndex = 0; asduIndex < state.NoAsdu; asduIndex++)
+                    {
+                        var sampleIndex = (state.Sent * state.NoAsdu) + asduIndex;
+                        var elapsedSeconds = sampleIndex / state.SampleRateHz;
+                        var timestamp = startedAt.AddTicks((long)Math.Round(sampleIndex * TimeSpan.TicksPerSecond / state.SampleRateHz));
+                        var sampleTime = new Iec61850UtcTime(timestamp, Quality: 0);
+                        byte[] payload;
+                        if (state.SignalSource == PublisherSignalSource.ComtradeReplay && state.ComtradeDataset is { } dataset)
+                        {
+                            var sample = dataset.GetSampleByIndex(sampleIndex, state.ComtradeLoop);
+                            var instantaneousValues = ResolveComtradeInstantaneousValues(sample, state.ComtradeChannelMap);
+                            payload = BuildInstantaneousSamplePayload(state.Stream, sampleTime, instantaneousValues, state.CurrentDlsb, state.VoltageDlsb);
+                        }
+                        else
+                        {
+                            var effectiveChannels = state.IsSelectedSlot
+                                ? sessionPlan.ResolveChannels(baseChannelsForFrame, elapsedSeconds)
+                                : baseChannelsForFrame;
+                            var phasedChannels = ApplyOscillatorPhases(effectiveChannels, state.OscillatorStates, state.SampleRateHz);
+                            payload = BuildSamplePayload(state.Stream, sampleTime, phasedChannels, state.CurrentDlsb, state.VoltageDlsb);
+                        }
+
+                        samplePayloads.Add(payload);
+                        asdus.Add(new SampledValueAsdu
+                        {
+                            SvId = state.SvId,
+                            DataSetReference = state.DataSetReference,
+                            SampleCount = SampleCounterPolicy.Increment(state.SampleCount, state.SampleCounterWrap, asduIndex),
+                            ConfigurationRevision = state.Stream.ConfigurationRevision,
+                            ReferenceTime = sampleTime,
+                            SampleSynchronization = (byte)smpSynch,
+                            SampleRate = ToSampleRate(state.SampleRateHz, state.NominalFrequencyHz, state.Stream.SampleMode),
+                            SampleMode = MapSampleMode(state.Stream.SampleMode),
+                            SamplePayload = payload
+                        });
+                    }
+
                     var frame = SampledValuesFrameBuilder.BuildEthernetFrame(new SampledValuesFrame
                     {
                         Destination = state.Destination,
                         Source = state.Source,
                         Vlan = state.Vlan,
                         AppId = state.AppId,
-                        Pdu = new SampledValuesPdu
-                        {
-                            Asdus =
-                            [
-                                new SampledValueAsdu
-                                {
-                                    SvId = state.SvId,
-                                    DataSetReference = state.DataSetReference,
-                                    SampleCount = state.SampleCount,
-                                    ConfigurationRevision = state.Stream.ConfigurationRevision,
-                                    ReferenceTime = sampleTime,
-                                    SampleSynchronization = (byte)smpSynch,
-                                    SampleRate = ToSampleRate(state.SampleRateHz, state.NominalFrequencyHz, state.Stream.SampleMode),
-                                    SampleMode = MapSampleMode(state.Stream.SampleMode),
-                                    SamplePayload = payload
-                                }
-                            ]
-                        }
+                        Pdu = new SampledValuesPdu { Asdus = asdus }
                     });
 
                     await transport.SendAsync(frame, cancellationToken).ConfigureAwait(false);
-                    state.SampleCount = IncrementSampleCount(state.SampleCount, state.SampleCounterWrap);
+                    state.SampleCount = SampleCounterPolicy.Increment(state.SampleCount, state.SampleCounterWrap, state.NoAsdu);
                     state.Sent++;
                     totalSent++;
                     lastFrameBytes = frame.Length;
-                    lastPayloadBytes = payload.Length;
+                    lastPayloadBytes = samplePayloads.Count == 0 ? 0 : samplePayloads[0].Length;
                 }
 
                 if (nowTicks >= nextUiTicks)
@@ -1747,8 +1765,9 @@ public sealed class SvPublisherViewModel : ObservableObject
                     var smpSynch = ResolveSampleSynchronization(latestPtpReport);
                     var elapsed = Stopwatch.GetElapsedTime(startedTicks);
                     var effectiveRate = totalSent / Math.Max(elapsed.TotalSeconds, 0.001);
-                    var perPublisher = string.Join("  ", publisherStates.Select(s => $"P{s.SlotIndex}:{s.Sent} smpCnt={s.SampleCount}"));
-                    var message = $"{(live ? "LIVE" : "DRY")} {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} rate={effectiveRate:0.0} fps smpSynch={(byte)smpSynch} ({SyncPolicyShortLabel}) payload={lastPayloadBytes}B frame={lastFrameBytes}B  {perPublisher}";
+                    var totalSamples = publisherStates.Sum(s => s.Sent * s.NoAsdu);
+                    var perPublisher = string.Join("  ", publisherStates.Select(s => $"P{s.SlotIndex}:{s.Sent}f/{s.Sent * s.NoAsdu}s smpCnt={s.SampleCount}"));
+                    var message = $"{(live ? "LIVE" : "DRY")} {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} samples={totalSamples} rate={effectiveRate:0.0} fps smpSynch={(byte)smpSynch} ({SyncPolicyShortLabel}) payload={lastPayloadBytes}B/asdu frame={lastFrameBytes}B  {perPublisher}";
                     Dispatch(() =>
                     {
                         PayloadBytes = lastPayloadBytes;
@@ -1783,7 +1802,8 @@ public sealed class SvPublisherViewModel : ObservableObject
         var rate = totalSent / Math.Max(totalElapsed.TotalSeconds, 0.001);
         Dispatch(() =>
         {
-            PublishText = $"Complete {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} elapsed={totalElapsed.TotalSeconds:0.000}s rate={rate:0.0} fps lastFrame={lastFrameBytes}B";
+            var totalSamples = publisherStates.Sum(s => s.Sent * s.NoAsdu);
+            PublishText = $"Complete {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} samples={totalSamples} elapsed={totalElapsed.TotalSeconds:0.000}s rate={rate:0.0} fps lastFrame={lastFrameBytes}B";
             StatusText = "Publisher complete.";
             AppendEvent(PublishText);
         });
@@ -1824,6 +1844,7 @@ public sealed class SvPublisherViewModel : ObservableObject
                 SvId = slot.StreamId.Trim(),
                 DataSetReference = slot.DataSetReference.Trim(),
                 SampleCounterWrap = ResolveSampleCounterWrap(stream, slot.SampleRateHz, slot.NominalFrequencyHz),
+                NoAsdu = SampledValuesPublisherProfile.ResolveAsduPerFrame(stream),
                 FrozenChannels = channels,
                 OscillatorStates = channels.ToDictionary(
                     x => x.Key,
@@ -1875,6 +1896,8 @@ public sealed class SvPublisherViewModel : ObservableObject
         public string SvId { get; init; } = string.Empty;
         public string DataSetReference { get; init; } = string.Empty;
         public ushort? SampleCounterWrap { get; init; }
+        public ushort NoAsdu { get; init; } = 1;
+        public double PublicationRateHz => SampledValuesPublisherProfile.ResolvePublicationRate(SampleRateHz, NoAsdu);
         public ushort SampleCount { get; set; }
         public long Sent { get; set; }
         public required IReadOnlyDictionary<string, EffectiveChannel> FrozenChannels { get; init; }
@@ -1885,7 +1908,7 @@ public sealed class SvPublisherViewModel : ObservableObject
         public IReadOnlyDictionary<string, int> ComtradeChannelMap { get; init; } = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
 
         public long DueTicks(long startedTicks)
-            => startedTicks + (long)Math.Round(Sent * Stopwatch.Frequency / SampleRateHz);
+            => startedTicks + (long)Math.Round(Sent * Stopwatch.Frequency / PublicationRateHz);
     }
 
 private static async Task CapturePtpAsync(
@@ -2094,8 +2117,13 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             if (!entriesByIndex.TryGetValue(element.Index, out var entry))
                 throw new InvalidOperationException($"SV payload layout entry {element.Index} has no matching DataSet entry.");
 
-            if (element.Kind == SampledValuePayloadElementKind.Quality ||
-                element.Kind == SampledValuePayloadElementKind.BitString ||
+            if (element.Kind == SampledValuePayloadElementKind.Quality)
+            {
+                values.Add(MmsDataValue.BitString(0, SampledValueQuality.Good.ToBytes(element.Width)));
+                continue;
+            }
+
+            if (element.Kind == SampledValuePayloadElementKind.BitString ||
                 element.Kind == SampledValuePayloadElementKind.EntryTime)
             {
                 values.Add(MmsDataValue.BitString(0, new byte[element.Width]));
@@ -2162,8 +2190,13 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             if (!entriesByIndex.TryGetValue(element.Index, out var entry))
                 throw new InvalidOperationException($"SV payload layout entry {element.Index} has no matching DataSet entry.");
 
-            if (element.Kind == SampledValuePayloadElementKind.Quality ||
-                element.Kind == SampledValuePayloadElementKind.BitString ||
+            if (element.Kind == SampledValuePayloadElementKind.Quality)
+            {
+                values.Add(MmsDataValue.BitString(0, SampledValueQuality.Good.ToBytes(element.Width)));
+                continue;
+            }
+
+            if (element.Kind == SampledValuePayloadElementKind.BitString ||
                 element.Kind == SampledValuePayloadElementKind.EntryTime)
             {
                 values.Add(MmsDataValue.BitString(0, new byte[element.Width]));
@@ -2457,8 +2490,9 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
                 throw new InvalidOperationException($"{slot.Header}: COMTRADE replay is selected but no COMTRADE file is loaded.");
 
             var stream = selectedSlotStream.Stream;
-            if (stream.NoAsdu != 1)
-                throw new InvalidOperationException($"{slot.Header}: SV stream declares nofASDU={stream.NoAsdu}. This publisher currently supports exactly one ASDU per frame.");
+            var noAsdu = SampledValuesPublisherProfile.ResolveAsduPerFrame(stream);
+            if (noAsdu > SampledValuesPublisherProfile.MaxAsduPerFrame)
+                throw new InvalidOperationException($"{slot.Header}: SV stream declares nofASDU={stream.NoAsdu}. This publisher supports up to {SampledValuesPublisherProfile.MaxAsduPerFrame} ASDUs per frame.");
 
             var layout = SampledValuesPayloadLayout.FromDataSet(stream.Entries);
             if (!layout.IsFullySupported)
@@ -2638,12 +2672,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
     }
 
     private static ushort IncrementSampleCount(ushort current, ushort? wrap)
-    {
-        if (wrap is > 1)
-            return current + 1 >= wrap.Value ? (ushort)0 : (ushort)(current + 1);
-
-        return current == ushort.MaxValue ? (ushort)0 : (ushort)(current + 1);
-    }
+        => SampleCounterPolicy.Increment(current, wrap);
 
     private static async Task DelayUntilSampleAsync(long startedTicks, long sampleIndex, double sampleRateHz, CancellationToken cancellationToken)
     {

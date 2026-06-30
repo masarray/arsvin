@@ -159,3 +159,17 @@ GitHub: [github.com/masarray](https://github.com/masarray)
 Apache License 2.0. See [LICENSE](LICENSE).
 
 Third-party dependency notes are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+### P0 publisher protocol upgrades
+
+This package includes the first P0 protocol-readiness pass for the SV publisher:
+
+- `nofASDU=1/2/4/8` frame packing support.
+- sequential per-ASDU `smpCnt` generation with rollover handling.
+- second-aligned runtime `smpCnt` start for lab synchronization behavior.
+- publisher-side SCL validation and frame preview.
+- quality-bit simulation foundation.
+- generated-frame PCAP export foundation.
+- unit tests for multi-ASDU SV frame round-trip, quality encoding, sample counter, and PCAP output.
+
+See [`docs/p0-publisher-protocol-roadmap.md`](docs/p0-publisher-protocol-roadmap.md) and [`docs/sv-profile-support.md`](docs/sv-profile-support.md).

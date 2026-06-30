@@ -28,7 +28,7 @@ public static class SampledValuesPayloadBuilder
         return payload;
     }
 
-    public static byte[] BuildDefaultPayload(SampledValuesPayloadLayout layout, Iec61850UtcTime? timestamp = null)
+    public static byte[] BuildDefaultPayload(SampledValuesPayloadLayout layout, Iec61850UtcTime? timestamp = null, SampledValueQuality? quality = null)
     {
         ArgumentNullException.ThrowIfNull(layout);
 
@@ -40,6 +40,9 @@ public static class SampledValuesPayloadBuilder
         {
             if (element.Kind == SampledValuePayloadElementKind.Timestamp && timestamp is { } time)
                 BerWriter.EncodeUtcTime(time.Value, time.Quality).CopyTo(payload.AsSpan(element.Offset, element.Width));
+
+            if (element.Kind == SampledValuePayloadElementKind.Quality)
+                (quality ?? SampledValueQuality.Good).ToBytes(element.Width).CopyTo(payload.AsSpan(element.Offset, element.Width));
         }
 
         return payload;
@@ -50,7 +53,8 @@ public static class SampledValuesPayloadBuilder
         long sampleIndex,
         double sampleRateHz,
         double nominalHz,
-        Iec61850UtcTime? timestamp = null)
+        Iec61850UtcTime? timestamp = null,
+        SampledValueQuality? quality = null)
     {
         ArgumentNullException.ThrowIfNull(layout);
 
@@ -67,8 +71,13 @@ public static class SampledValuesPayloadBuilder
         foreach (var element in layout.Elements)
         {
             var destination = payload.AsSpan(element.Offset, element.Width);
-            if (element.Kind == SampledValuePayloadElementKind.Quality ||
-                element.Kind == SampledValuePayloadElementKind.BitString ||
+            if (element.Kind == SampledValuePayloadElementKind.Quality)
+            {
+                (quality ?? SampledValueQuality.Good).ToBytes(element.Width).CopyTo(destination);
+                continue;
+            }
+
+            if (element.Kind == SampledValuePayloadElementKind.BitString ||
                 element.Kind == SampledValuePayloadElementKind.EntryTime)
             {
                 continue;

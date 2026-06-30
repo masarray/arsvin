@@ -6,6 +6,7 @@ namespace AR.Iec61850.SampledValues;
 
 public sealed class SampledValuesPublisherProfile
 {
+    public const ushort MaxAsduPerFrame = 8;
     private SampledValuesPublisherProfile(
         SclSampledValuesStream stream,
         ushort appId,
@@ -25,6 +26,7 @@ public sealed class SampledValuesPublisherProfile
     public VlanTag? Vlan { get; }
     public SampledValuesPayloadLayout PayloadLayout { get; }
     public IReadOnlyList<SclDataSetEntry> Entries => Stream.Entries;
+    public ushort AsduPerFrame => ResolveAsduPerFrame(Stream);
 
     public static IReadOnlyList<SampledValuesPublisherProfile> CreateMany(SclDocument document)
     {
@@ -53,30 +55,46 @@ public sealed class SampledValuesPublisherProfile
         Iec61850UtcTime? referenceTime = null,
         byte sampleSynchronization = 2)
     {
+        if (AsduPerFrame != 1)
+            throw new InvalidOperationException($"SV {Stream.ControlBlockReference} declares nofASDU={AsduPerFrame}. Use the multi-ASDU CreateFrame overload.");
+
+        return CreateFrame(source, sampleCount, new[] { samplePayload.ToArray() }, referenceTime, sampleSynchronization);
+    }
+
+    public SampledValuesFrame CreateFrame(
+        MacAddress source,
+        ushort sampleCount,
+        IReadOnlyList<byte[]> samplePayloads,
+        Iec61850UtcTime? referenceTime = null,
+        byte sampleSynchronization = 2)
+    {
+        ArgumentNullException.ThrowIfNull(samplePayloads);
+        ValidateAsduPayloadBatch(samplePayloads);
+
+        var asdus = new List<SampledValueAsdu>(samplePayloads.Count);
+        for (var i = 0; i < samplePayloads.Count; i++)
+        {
+            asdus.Add(new SampledValueAsdu
+            {
+                SvId = Stream.SvId,
+                DataSetReference = Stream.DataSetReference,
+                SampleCount = SampleCounterPolicy.Increment(sampleCount, null, i),
+                ConfigurationRevision = Stream.ConfigurationRevision,
+                ReferenceTime = referenceTime,
+                SampleSynchronization = sampleSynchronization,
+                SampleRate = Stream.SampleRate == 0 ? null : Stream.SampleRate,
+                SampleMode = TryMapSampleMode(Stream.SampleMode),
+                SamplePayload = samplePayloads[i].ToArray()
+            });
+        }
+
         return new SampledValuesFrame
         {
             Destination = Destination,
             Source = source,
             Vlan = Vlan,
             AppId = AppId,
-            Pdu = new SampledValuesPdu
-            {
-                Asdus =
-                [
-                    new SampledValueAsdu
-                    {
-                        SvId = Stream.SvId,
-                        DataSetReference = Stream.DataSetReference,
-                        SampleCount = sampleCount,
-                        ConfigurationRevision = Stream.ConfigurationRevision,
-                        ReferenceTime = referenceTime,
-                        SampleSynchronization = sampleSynchronization,
-                        SampleRate = Stream.SampleRate == 0 ? null : Stream.SampleRate,
-                        SampleMode = TryMapSampleMode(Stream.SampleMode),
-                        SamplePayload = samplePayload.ToArray()
-                    }
-                ]
-            }
+            Pdu = new SampledValuesPdu { Asdus = asdus }
         };
     }
 
@@ -90,6 +108,16 @@ public sealed class SampledValuesPublisherProfile
         return SampledValuesFrameBuilder.BuildEthernetFrame(CreateFrame(source, sampleCount, samplePayload, referenceTime, sampleSynchronization));
     }
 
+    public byte[] BuildEthernetFrame(
+        MacAddress source,
+        ushort sampleCount,
+        IReadOnlyList<byte[]> samplePayloads,
+        Iec61850UtcTime? referenceTime = null,
+        byte sampleSynchronization = 2)
+    {
+        return SampledValuesFrameBuilder.BuildEthernetFrame(CreateFrame(source, sampleCount, samplePayloads, referenceTime, sampleSynchronization));
+    }
+
     public byte[] BuildPayload(IReadOnlyList<MmsDataValue> values)
         => SampledValuesPayloadBuilder.BuildPayload(PayloadLayout, values);
 
@@ -100,8 +128,9 @@ public sealed class SampledValuesPublisherProfile
         long sampleIndex,
         double sampleRateHz,
         double nominalHz,
-        Iec61850UtcTime? timestamp = null)
-        => SampledValuesPayloadBuilder.BuildDemoPayload(PayloadLayout, sampleIndex, sampleRateHz, nominalHz, timestamp);
+        Iec61850UtcTime? timestamp = null,
+        SampledValueQuality? quality = null)
+        => SampledValuesPayloadBuilder.BuildDemoPayload(PayloadLayout, sampleIndex, sampleRateHz, nominalHz, timestamp, quality);
 
     public ushort? ResolveSampleCounterWrap(double nominalFrequencyHz)
     {
@@ -122,7 +151,7 @@ public sealed class SampledValuesPublisherProfile
         return (ushort)Math.Round(samplesPerSecond);
     }
 
-    private static SampledValuesPublisherProfile Create(SclSampledValuesStream stream)
+    public static SampledValuesPublisherProfile Create(SclSampledValuesStream stream)
     {
         if (!stream.Address.AppId.HasValue)
             throw new SclProfileException($"SV {stream.ControlBlockReference} has no valid APPID in SCL Communication/SMV.");
@@ -136,10 +165,41 @@ public sealed class SampledValuesPublisherProfile
         if (string.IsNullOrWhiteSpace(stream.DataSetReference) || stream.Entries.Count == 0)
             throw new SclProfileException($"SV {stream.ControlBlockReference} has no resolved DataSet entries.");
 
-        if (stream.NoAsdu != 1)
-            throw new SclProfileException($"SV {stream.ControlBlockReference} declares nofASDU={stream.NoAsdu}. This publisher currently supports exactly one ASDU per frame.");
+        var noAsdu = ResolveAsduPerFrame(stream);
+        if (noAsdu > MaxAsduPerFrame)
+            throw new SclProfileException($"SV {stream.ControlBlockReference} declares nofASDU={stream.NoAsdu}. This publisher supports up to {MaxAsduPerFrame} ASDUs per frame.");
 
         return new SampledValuesPublisherProfile(stream, stream.Address.AppId.Value, stream.Address.DestinationMac.Value, stream.Address.ToVlanTag());
+    }
+
+    public static ushort ResolveAsduPerFrame(SclSampledValuesStream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        return (stream.NoAsdu == 0 ? (ushort)1 : stream.NoAsdu);
+    }
+
+    public static double ResolvePublicationRate(double sampleRateHz, ushort noAsdu)
+    {
+        if (sampleRateHz <= 0)
+            throw new ArgumentOutOfRangeException(nameof(sampleRateHz), "Sample rate must be greater than 0.");
+
+        if (noAsdu == 0)
+            throw new ArgumentOutOfRangeException(nameof(noAsdu), "nofASDU must be greater than 0.");
+
+        return sampleRateHz / noAsdu;
+    }
+
+    private void ValidateAsduPayloadBatch(IReadOnlyList<byte[]> samplePayloads)
+    {
+        var expected = AsduPerFrame;
+        if (samplePayloads.Count != expected)
+            throw new ArgumentException($"SV {Stream.ControlBlockReference} expects nofASDU={expected}, got {samplePayloads.Count} payload(s).", nameof(samplePayloads));
+
+        for (var i = 0; i < samplePayloads.Count; i++)
+        {
+            if (samplePayloads[i].Length != PayloadLayout.PayloadByteLength)
+                throw new ArgumentException($"SV ASDU payload {i} has {samplePayloads[i].Length} byte(s), expected {PayloadLayout.PayloadByteLength}.", nameof(samplePayloads));
+        }
     }
 
     private static ushort? TryMapSampleMode(string sampleMode)

@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- P0 SV publisher protocol upgrade: `nofASDU=1/2/4/8` support.
+- Multi-ASDU SavPdu generation with sequential per-ASDU `smpCnt`.
+- Second-aligned sample counter initialization for lab publishing.
+- Publisher SCL validation and frame preview helpers.
+- Sampled Value quality-bit helper and generated PCAP export helper.
+- Golden-style unit tests for multi-ASDU frame round-trip, quality bits, sample counter, and PCAP output.
+- Sample SCL file for `nofASDU=8`.
+
+
 All notable changes to ARSVIN should be documented in this file.
 
 This project follows a simple public-release style:
