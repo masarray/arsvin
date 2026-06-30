@@ -1664,7 +1664,7 @@ public sealed class SvPublisherViewModel : ObservableObject
             long? sourceLimit = state.SignalSource == PublisherSignalSource.ComtradeReplay &&
                                 state.ComtradeDataset is { } dataset &&
                                 !state.ComtradeLoop
-                ? Math.Max(1, (long)Math.Ceiling(dataset.SampleCount / (double)Math.Max(1, state.NoAsdu)))
+                ? Math.Max(1L, (long)Math.Ceiling(dataset.SampleCount / (double)Math.Max(1, (int)state.NoAsdu)))
                 : null;
 
             var effectiveLimit = MinLimit(sessionLimit, sourceLimit);
