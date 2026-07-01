@@ -142,16 +142,60 @@ public sealed class SignalChannelSnapshot
     public double Magnitude { get; init; }
     public double AngleDegrees { get; init; }
     public double FrequencyHz { get; init; }
+    public double DcOffsetPercent { get; init; }
+    public double HarmonicPercent { get; init; }
+    public int HarmonicOrder { get; init; } = 2;
+    public double ClipPercent { get; init; } = 100;
 }
 
 public sealed class SequenceStateSnapshot
 {
     public string Name { get; init; } = string.Empty;
     public double DurationSeconds { get; init; }
+
+    // Legacy balanced-set fields retained for simple scenarios and older saved plans.
     public double CurrentScale { get; init; } = 1;
     public double VoltageScale { get; init; } = 1;
     public double AngleShiftDegrees { get; init; }
     public double FrequencyHz { get; init; } = 50;
+
+    // P2 per-phase multipliers. Defaults keep legacy balanced behavior.
+    public double CurrentScaleA { get; init; } = 1;
+    public double CurrentScaleB { get; init; } = 1;
+    public double CurrentScaleC { get; init; } = 1;
+    public double CurrentScaleN { get; init; }
+    public double VoltageScaleA { get; init; } = 1;
+    public double VoltageScaleB { get; init; } = 1;
+    public double VoltageScaleC { get; init; } = 1;
+    public double VoltageScaleN { get; init; }
+    public double AngleOffsetA { get; init; }
+    public double AngleOffsetB { get; init; }
+    public double AngleOffsetC { get; init; }
+    public double AngleOffsetN { get; init; }
+
+    // P2 publisher-side waveform shaping for lab stress scenarios. These are intentionally
+    // lightweight publisher approximations, not calibrated transient simulation models.
+    public double CurrentDcOffsetPercent { get; init; }
+    public double VoltageDcOffsetPercent { get; init; }
+    public double CurrentHarmonicPercent { get; init; }
+    public double VoltageHarmonicPercent { get; init; }
+    public int HarmonicOrder { get; init; } = 2;
+    public double CurrentClipPercent { get; init; } = 100;
+    public double VoltageClipPercent { get; init; } = 100;
+
+    public string ScenarioTag { get; init; } = string.Empty;
+}
+
+
+public sealed class PublisherScenarioPresetChoice
+{
+    public required string Key { get; init; }
+    public required string Label { get; init; }
+    public required string ShortLabel { get; init; }
+    public required string HelpText { get; init; }
+    public required IReadOnlyList<SequenceStateSnapshot> States { get; init; }
+
+    public override string ToString() => Label;
 }
 
 public sealed class SvPublisherSlotConfigSnapshot
@@ -214,6 +258,7 @@ public sealed class SvPublisherConfigSnapshot
     public int PtpSyncIntervalMs { get; init; } = 250;
     public bool PtpRespondToPeerDelay { get; init; } = true;
     public string RampSignalKey { get; init; } = string.Empty;
+    public string ScenarioPresetKey { get; init; } = string.Empty;
     public double RampTargetMagnitude { get; init; }
     public double RampDurationSeconds { get; init; }
     public IReadOnlyList<SignalChannelSnapshot> Channels { get; init; } = Array.Empty<SignalChannelSnapshot>();

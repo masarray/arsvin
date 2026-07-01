@@ -1,10 +1,11 @@
 {
   "name": "ARSVIN - IEC 61850 Sampled Values Publisher",
   "short_name": "ARSVIN",
+  "description": "Apache-2.0 IEC 61850 Sampled Values Publisher for Windows with SCL setup, COMTRADE replay, TX timing health, and PCAP evidence export.",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f6f9ff",
-  "theme_color": "#0b1d4d",
+  "background_color": "#f6f9fd",
+  "theme_color": "#081522",
   "icons": [
     {
       "src": "assets/icon-192.png",

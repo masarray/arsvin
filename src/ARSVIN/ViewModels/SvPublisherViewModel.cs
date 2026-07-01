@@ -68,6 +68,7 @@ public sealed class SvPublisherViewModel : ObservableObject
     private double _nominalFrequencyHz = 50;
     private SampleRatePreset? _selectedSampleRatePreset;
     private SampleQualityChoice? _selectedSampleQualityChoice;
+    private PublisherScenarioPresetChoice? _selectedScenarioPresetChoice;
     private double _currentDlsb = 0.001;
     private double _voltageDlsb = 0.01;
     private double _durationSeconds = 1;
@@ -154,6 +155,7 @@ public sealed class SvPublisherViewModel : ObservableObject
         SelectedSequenceState = SequenceStates.FirstOrDefault();
         SelectedSampleRatePreset = SampleRatePresets.FirstOrDefault(preset => preset.Key == "9-2LE-80-50");
         _selectedSampleQualityChoice = SampleQualityChoices.FirstOrDefault(choice => choice.Key == "good");
+        SelectedScenarioPresetChoice = ScenarioPresetChoices.FirstOrDefault(choice => choice.Key == "protection-fault");
         SelectedPublisherSlot = PublisherSlots.FirstOrDefault();
         _selectedSyncPolicyChoice = ResolveSyncPolicyChoice(_syncPolicyMode);
         SmpSynchStatusText = FormatSmpSynchStatus(ResolveSampleSynchronization(null));
@@ -166,6 +168,7 @@ public sealed class SvPublisherViewModel : ObservableObject
         SaveProfileCommand = new AsyncRelayCommand(SaveProfileAsync, () => !IsPublishing);
         ExportGeneratedPcapCommand = new AsyncRelayCommand(ExportGeneratedPcapAsync, () => !IsPublishing);
         ExportPublisherEvidenceReportCommand = new AsyncRelayCommand(ExportPublisherEvidenceReportAsync, () => !IsPublishing);
+        ApplyScenarioPresetCommand = new RelayCommand(ApplySelectedScenarioPreset, () => !IsPublishing && SelectedScenarioPresetChoice is not null);
         RunDryCommand = new AsyncRelayCommand(() => RunPublishAsync(live: false), () => !IsPublishing);
         RunLiveCommand = new AsyncRelayCommand(() => RunPublishAsync(live: true), () => !IsPublishing);
         StopCommand = new RelayCommand(StopPublisher, () => IsPublishing);
@@ -245,6 +248,172 @@ public sealed class SvPublisherViewModel : ObservableObject
         new SampleRatePreset { Key = "61869-9-96-60", Label = "IEC 61869-9 profile — 96 spc / 60 Hz / 5760 fps", SampleRateHz = 5760, NominalFrequencyHz = 60, SamplesPerCycle = 96 },
         new SampleRatePreset { Key = "61869-9-288-50", Label = "IEC 61869-9 profile — 288 spc / 50 Hz / 14400 fps", SampleRateHz = 14400, NominalFrequencyHz = 50, SamplesPerCycle = 288 },
         new SampleRatePreset { Key = "61869-9-288-60", Label = "IEC 61869-9 profile — 288 spc / 60 Hz / 17280 fps", SampleRateHz = 17280, NominalFrequencyHz = 60, SamplesPerCycle = 288 }
+    ];
+
+    public IReadOnlyList<PublisherScenarioPresetChoice> ScenarioPresetChoices { get; } =
+    [
+        new PublisherScenarioPresetChoice
+        {
+            Key = "protection-fault",
+            Label = "Protection fault — prefault / 3-phase fault / recovery",
+            ShortLabel = "3P fault",
+            HelpText = "Balanced three-phase protection scenario: nominal prefault, high-current low-voltage fault, recovery.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Prefault", DurationSeconds = 0.200, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "prefault" },
+                new SequenceStateSnapshot { Name = "3P fault", DurationSeconds = 0.120, CurrentScale = 5.000, VoltageScale = 0.200, FrequencyHz = 50.000, ScenarioTag = "three-phase-fault" },
+                new SequenceStateSnapshot { Name = "Recovery", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "recovery" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "single-phase-a-ground",
+            Label = "Single-phase A-G fault — per-phase",
+            ShortLabel = "A-G fault",
+            HelpText = "Per-phase publisher scenario: phase-A current rises, phase-A voltage collapses, B/C remain near nominal.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Prefault", DurationSeconds = 0.200, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "prefault" },
+                new SequenceStateSnapshot { Name = "A-G fault", DurationSeconds = 0.160, CurrentScale = 1.000, VoltageScale = 1.000, CurrentScaleA = 7.000, CurrentScaleB = 0.900, CurrentScaleC = 0.900, CurrentScaleN = 3.500, VoltageScaleA = 0.080, VoltageScaleB = 1.000, VoltageScaleC = 1.000, FrequencyHz = 50.000, ScenarioTag = "single-phase-a-ground" },
+                new SequenceStateSnapshot { Name = "Recovery", DurationSeconds = 0.300, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "recovery" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "phase-bc-fault",
+            Label = "Phase-to-phase B-C fault — per-phase",
+            ShortLabel = "B-C fault",
+            HelpText = "Per-phase publisher scenario: B/C currents rise with opposing angle bias, B/C voltages depress, A remains near nominal.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Prefault", DurationSeconds = 0.200, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "prefault" },
+                new SequenceStateSnapshot { Name = "B-C fault", DurationSeconds = 0.160, CurrentScale = 1.000, VoltageScale = 1.000, CurrentScaleA = 0.700, CurrentScaleB = 6.000, CurrentScaleC = 6.000, VoltageScaleA = 1.000, VoltageScaleB = 0.250, VoltageScaleC = 0.250, AngleOffsetB = 18.000, AngleOffsetC = -18.000, FrequencyHz = 50.000, ScenarioTag = "phase-bc-fault" },
+                new SequenceStateSnapshot { Name = "Recovery", DurationSeconds = 0.300, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "recovery" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "negative-sequence",
+            Label = "Negative sequence / unbalance — per-phase",
+            ShortLabel = "Negative sequence",
+            HelpText = "Unbalanced per-phase magnitude and angle offsets for subscriber negative-sequence behavior checks.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Balanced", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "balanced" },
+                new SequenceStateSnapshot { Name = "Neg-seq bias", DurationSeconds = 0.400, CurrentScale = 1.000, VoltageScale = 1.000, CurrentScaleA = 1.400, CurrentScaleB = 0.700, CurrentScaleC = 1.150, VoltageScaleA = 0.950, VoltageScaleB = 0.820, VoltageScaleC = 1.060, AngleOffsetA = 0.000, AngleOffsetB = 28.000, AngleOffsetC = -22.000, FrequencyHz = 50.000, ScenarioTag = "negative-sequence-unbalance" },
+                new SequenceStateSnapshot { Name = "Balanced restore", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "balanced" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "zero-sequence",
+            Label = "Zero sequence / residual stress — per-phase",
+            ShortLabel = "Zero sequence",
+            HelpText = "Residual-current/neutral scenario. Neutral channels publish only when the dataset and channel enablement include In/Vn.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Balanced", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, CurrentScaleN = 0.000, VoltageScaleN = 0.000, FrequencyHz = 50.000, ScenarioTag = "balanced" },
+                new SequenceStateSnapshot { Name = "Residual", DurationSeconds = 0.350, CurrentScale = 0.800, VoltageScale = 0.950, CurrentScaleA = 1.100, CurrentScaleB = 0.900, CurrentScaleC = 0.850, CurrentScaleN = 2.000, VoltageScaleN = 0.120, AngleOffsetN = 0.000, FrequencyHz = 50.000, ScenarioTag = "zero-sequence-residual" },
+                new SequenceStateSnapshot { Name = "Balanced restore", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, CurrentScaleN = 0.000, VoltageScaleN = 0.000, FrequencyHz = 50.000, ScenarioTag = "balanced" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "ct-saturation",
+            Label = "CT saturation stress — clipping / DC / harmonic",
+            ShortLabel = "CT saturation",
+            HelpText = "Publisher-side CT saturation approximation using high current, DC offset, 2nd harmonic, and current clipping. Not a calibrated CT transient model.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Prefault", DurationSeconds = 0.200, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "prefault" },
+                new SequenceStateSnapshot { Name = "Fault inception", DurationSeconds = 0.040, CurrentScale = 9.000, VoltageScale = 0.300, CurrentDcOffsetPercent = 45.000, CurrentHarmonicPercent = 10.000, HarmonicOrder = 2, CurrentClipPercent = 85.000, FrequencyHz = 50.000, ScenarioTag = "ct-saturation-inception" },
+                new SequenceStateSnapshot { Name = "CT saturated", DurationSeconds = 0.160, CurrentScale = 7.000, VoltageScale = 0.250, AngleShiftDegrees = -10.000, CurrentDcOffsetPercent = 30.000, CurrentHarmonicPercent = 28.000, HarmonicOrder = 2, CurrentClipPercent = 60.000, FrequencyHz = 50.000, ScenarioTag = "ct-saturation-clipped" },
+                new SequenceStateSnapshot { Name = "Recovery", DurationSeconds = 0.300, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "recovery" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "vt-fuse-a",
+            Label = "VT fuse fail A-phase — per-phase",
+            ShortLabel = "VT fuse A",
+            HelpText = "Per-phase VT fuse fail approximation: phase-A voltage collapses while B/C remain available.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Normal VT", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "normal-vt" },
+                new SequenceStateSnapshot { Name = "A fuse fail", DurationSeconds = 0.300, CurrentScale = 0.800, VoltageScale = 1.000, VoltageScaleA = 0.020, VoltageScaleB = 1.000, VoltageScaleC = 1.000, FrequencyHz = 50.000, ScenarioTag = "vt-fuse-a" },
+                new SequenceStateSnapshot { Name = "VT restored", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "vt-restored" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "harmonic-injection",
+            Label = "Harmonic injection — 5th harmonic",
+            ShortLabel = "5th harmonic",
+            HelpText = "Publisher-side harmonic approximation for power-quality subscriber checks. Fundamental remains balanced.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Fundamental", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "fundamental" },
+                new SequenceStateSnapshot { Name = "5th harmonic", DurationSeconds = 0.500, CurrentScale = 1.000, VoltageScale = 1.000, CurrentHarmonicPercent = 18.000, VoltageHarmonicPercent = 6.000, HarmonicOrder = 5, FrequencyHz = 50.000, ScenarioTag = "harmonic-5" },
+                new SequenceStateSnapshot { Name = "Clean restore", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "clean" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "dc-offset-transient",
+            Label = "DC offset transient — decaying steps",
+            ShortLabel = "DC offset",
+            HelpText = "DC offset approximation using stepped states with decreasing offset magnitude.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Prefault", DurationSeconds = 0.150, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "prefault" },
+                new SequenceStateSnapshot { Name = "DC offset high", DurationSeconds = 0.080, CurrentScale = 5.000, VoltageScale = 0.500, CurrentDcOffsetPercent = 60.000, FrequencyHz = 50.000, ScenarioTag = "dc-offset-high" },
+                new SequenceStateSnapshot { Name = "DC offset mid", DurationSeconds = 0.120, CurrentScale = 4.000, VoltageScale = 0.700, CurrentDcOffsetPercent = 30.000, FrequencyHz = 50.000, ScenarioTag = "dc-offset-mid" },
+                new SequenceStateSnapshot { Name = "DC offset low", DurationSeconds = 0.160, CurrentScale = 2.500, VoltageScale = 0.900, CurrentDcOffsetPercent = 12.000, FrequencyHz = 50.000, ScenarioTag = "dc-offset-low" },
+                new SequenceStateSnapshot { Name = "Recovery", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "recovery" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "frequency-steps",
+            Label = "Frequency steps — 49 to 51 Hz",
+            ShortLabel = "Frequency steps",
+            HelpText = "Discrete frequency-step publisher scenario for testing subscriber tracking. This is a step sequence, not a continuous ramp waveform.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "49.0 Hz", DurationSeconds = 0.200, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 49.000, ScenarioTag = "frequency-49" },
+                new SequenceStateSnapshot { Name = "49.5 Hz", DurationSeconds = 0.200, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 49.500, ScenarioTag = "frequency-49-5" },
+                new SequenceStateSnapshot { Name = "50.0 Hz", DurationSeconds = 0.200, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.000, ScenarioTag = "frequency-50" },
+                new SequenceStateSnapshot { Name = "50.5 Hz", DurationSeconds = 0.200, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 50.500, ScenarioTag = "frequency-50-5" },
+                new SequenceStateSnapshot { Name = "51.0 Hz", DurationSeconds = 0.200, CurrentScale = 1.000, VoltageScale = 1.000, FrequencyHz = 51.000, ScenarioTag = "frequency-51" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "phase-jump",
+            Label = "Phase jump — ±20 degrees",
+            ShortLabel = "Phase jump",
+            HelpText = "Balanced three-phase phase-angle jump sequence for subscriber behavior checks.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Reference", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, AngleShiftDegrees = 0.000, FrequencyHz = 50.000, ScenarioTag = "reference" },
+                new SequenceStateSnapshot { Name = "+20 deg jump", DurationSeconds = 0.180, CurrentScale = 1.000, VoltageScale = 1.000, AngleShiftDegrees = 20.000, FrequencyHz = 50.000, ScenarioTag = "phase-jump-plus20" },
+                new SequenceStateSnapshot { Name = "-20 deg jump", DurationSeconds = 0.180, CurrentScale = 1.000, VoltageScale = 1.000, AngleShiftDegrees = -20.000, FrequencyHz = 50.000, ScenarioTag = "phase-jump-minus20" },
+                new SequenceStateSnapshot { Name = "Reference restore", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, AngleShiftDegrees = 0.000, FrequencyHz = 50.000, ScenarioTag = "reference" }
+            ]
+        },
+        new PublisherScenarioPresetChoice
+        {
+            Key = "load-reversal",
+            Label = "Load reversal — 180 degree shift",
+            ShortLabel = "Load reversal",
+            HelpText = "Balanced 180-degree angle reversal approximation for directional element lab checks.",
+            States =
+            [
+                new SequenceStateSnapshot { Name = "Forward", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, AngleShiftDegrees = 0.000, FrequencyHz = 50.000, ScenarioTag = "forward" },
+                new SequenceStateSnapshot { Name = "Reverse", DurationSeconds = 0.300, CurrentScale = 1.000, VoltageScale = 1.000, AngleShiftDegrees = 180.000, FrequencyHz = 50.000, ScenarioTag = "reverse" },
+                new SequenceStateSnapshot { Name = "Forward restore", DurationSeconds = 0.250, CurrentScale = 1.000, VoltageScale = 1.000, AngleShiftDegrees = 0.000, FrequencyHz = 50.000, ScenarioTag = "forward" }
+            ]
+        }
     ];
 
     public IReadOnlyList<string> ManualSetModes { get; } =
@@ -365,6 +534,7 @@ public sealed class SvPublisherViewModel : ObservableObject
     public ICommand SaveProfileCommand { get; }
     public ICommand ExportGeneratedPcapCommand { get; }
     public ICommand ExportPublisherEvidenceReportCommand { get; }
+    public ICommand ApplyScenarioPresetCommand { get; }
     public ICommand RunDryCommand { get; }
     public ICommand RunLiveCommand { get; }
     public ICommand StopCommand { get; }
@@ -589,6 +759,21 @@ public sealed class SvPublisherViewModel : ObservableObject
     public string SampleQualityHelpText => SelectedSampleQualityChoice.HelpText;
 
     public string SampleQualityStatusText => $"q={SelectedSampleQualityChoice.ShortLabel}";
+
+    public PublisherScenarioPresetChoice? SelectedScenarioPresetChoice
+    {
+        get => _selectedScenarioPresetChoice;
+        set
+        {
+            if (SetProperty(ref _selectedScenarioPresetChoice, value))
+            {
+                OnPropertyChanged(nameof(ScenarioPresetHelpText));
+                CommandManager.InvalidateRequerySuggested();
+            }
+        }
+    }
+
+    public string ScenarioPresetHelpText => SelectedScenarioPresetChoice?.HelpText ?? "Select a publisher scenario preset, then apply it to the State Sequencer.";
 
     private SampleQualityChoice ResolveSampleQualityChoice(string? key)
         => SampleQualityChoices.FirstOrDefault(choice => string.Equals(choice.Key, key, StringComparison.OrdinalIgnoreCase))
@@ -1736,7 +1921,7 @@ public sealed class SvPublisherViewModel : ObservableObject
             CreatedAt: DateTimeOffset.Now,
             SclPath: SclPath,
             Adapter: SelectedAdapter?.DisplayName ?? "-",
-            Mode: $"{Mode}; continuous={Continuous}; duration={DurationSeconds:0.###}s",
+            Mode: $"{Mode}; scenario={SelectedScenarioPresetChoice?.ShortLabel ?? "custom"}; continuous={Continuous}; duration={DurationSeconds:0.###}s",
             TxTiming: TxTimingHealthText,
             SafetyBoundary: "Lab publisher / TX-side evidence only; not an analyzer and not a certified merging unit.",
             Streams: streams,
@@ -2205,11 +2390,11 @@ public sealed class SvPublisherViewModel : ObservableObject
             var channels = slot.Channels.Count > 0
                 ? slot.Channels.ToDictionary(
                     c => c.Key,
-                    c => new EffectiveChannel(ResolveChannelKind(c.Key), c.IsEnabled, c.Magnitude, c.AngleDegrees, c.FrequencyHz, c.AngleDegrees * Math.PI / 180.0),
+                    c => new EffectiveChannel(ResolveChannelKind(c.Key), c.IsEnabled, c.Magnitude, c.AngleDegrees, c.FrequencyHz, c.AngleDegrees * Math.PI / 180.0, c.DcOffsetPercent, c.HarmonicPercent, Math.Clamp(c.HarmonicOrder, 2, 63), c.ClipPercent),
                     StringComparer.OrdinalIgnoreCase)
                 : Channels.ToDictionary(
                     c => c.Key,
-                    c => new EffectiveChannel(c.Kind, c.IsEnabled, c.Magnitude, c.AngleDegrees, c.FrequencyHz, c.AngleDegrees * Math.PI / 180.0),
+                    c => new EffectiveChannel(c.Kind, c.IsEnabled, c.Magnitude, c.AngleDegrees, c.FrequencyHz, c.AngleDegrees * Math.PI / 180.0, c.DcOffsetPercent, c.HarmonicPercent, Math.Clamp(c.HarmonicOrder, 2, 63), c.ClipPercent),
                     StringComparer.OrdinalIgnoreCase);
 
             states.Add(new PublisherRuntimeState
@@ -2625,9 +2810,26 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             throw new InvalidOperationException("dLSB must be greater than 0.");
 
         // Operator values are RMS phasors. IEC 61850-9-2 Sampled Values carry instantaneous samples,
-        // therefore the RMS setpoint is converted to peak before dLSB scaling.
+        // therefore the RMS setpoint is converted to peak before dLSB scaling. P2 scenario shaping
+        // adds lightweight publisher-side harmonic/DC/clipping approximations for lab stress workflows.
         var counts = effective.MagnitudeRms * Math.Sqrt(2.0) / dlsb;
         var sample = counts * Math.Sin(effective.PhaseRadians);
+        if (effective.HarmonicPercent > 0)
+        {
+            var harmonicOrder = Math.Clamp(effective.HarmonicOrder, 2, 63);
+            sample += counts * (effective.HarmonicPercent / 100.0) * Math.Sin(effective.PhaseRadians * harmonicOrder);
+        }
+
+        if (Math.Abs(effective.DcOffsetPercent) > 0)
+            sample += counts * (effective.DcOffsetPercent / 100.0);
+
+        if (effective.ClipPercent > 0 && effective.ClipPercent < 1000)
+        {
+            var limit = Math.Abs(counts * effective.ClipPercent / 100.0);
+            if (limit > 0)
+                sample = Math.Clamp(sample, -limit, limit);
+        }
+
         return element.Kind switch
         {
             SampledValuePayloadElementKind.Boolean => MmsDataValue.Boolean(Math.Abs(sample) >= 0.5),
@@ -2668,7 +2870,11 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
                 channel.Magnitude,
                 channel.AngleDegrees,
                 frequency,
-                channel.AngleDegrees * Math.PI / 180.0);
+                channel.AngleDegrees * Math.PI / 180.0,
+                channel.DcOffsetPercent,
+                channel.HarmonicPercent,
+                channel.HarmonicOrder,
+                channel.ClipPercent);
         }
 
         return channels;
@@ -2712,7 +2918,27 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
                 state.CurrentScale,
                 NominalVoltageLn * Math.Max(0, state.VoltageScale),
                 state.AngleShiftDegrees,
-                state.FrequencyHz))
+                state.FrequencyHz,
+                state.CurrentScaleA,
+                state.CurrentScaleB,
+                state.CurrentScaleC,
+                state.CurrentScaleN,
+                state.VoltageScaleA,
+                state.VoltageScaleB,
+                state.VoltageScaleC,
+                state.VoltageScaleN,
+                state.AngleOffsetA,
+                state.AngleOffsetB,
+                state.AngleOffsetC,
+                state.AngleOffsetN,
+                state.CurrentDcOffsetPercent,
+                state.VoltageDcOffsetPercent,
+                state.CurrentHarmonicPercent,
+                state.VoltageHarmonicPercent,
+                state.HarmonicOrder,
+                state.CurrentClipPercent,
+                state.VoltageClipPercent,
+                state.ScenarioTag))
             .ToArray();
 
         if (segments.Length == 0)
@@ -2837,7 +3063,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             if (slot.Channels.Count > 0)
             {
                 foreach (var snapshot in slot.Channels)
-                    SetChannel(snapshot.Key, snapshot.Magnitude, snapshot.AngleDegrees, snapshot.IsEnabled, snapshot.FrequencyHz);
+                    SetChannel(snapshot.Key, snapshot.Magnitude, snapshot.AngleDegrees, snapshot.IsEnabled, snapshot.FrequencyHz, snapshot.DcOffsetPercent, snapshot.HarmonicPercent, snapshot.HarmonicOrder, snapshot.ClipPercent);
             }
 
             DataSetEntryCount = slot.DataSetEntryCount;
@@ -3891,7 +4117,16 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             row.AngleDegrees = angle;
     }
 
-    private void SetChannel(string key, double magnitude, double angle, bool enabled, double frequencyHz)
+    private void SetChannel(
+        string key,
+        double magnitude,
+        double angle,
+        bool enabled,
+        double frequencyHz,
+        double? dcOffsetPercent = null,
+        double? harmonicPercent = null,
+        int? harmonicOrder = null,
+        double? clipPercent = null)
     {
         var channel = Channel(key);
         if (channel is null)
@@ -3901,6 +4136,14 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         channel.AngleDegrees = NormalizeDegrees(angle);
         channel.FrequencyHz = frequencyHz >= 0 ? frequencyHz : NominalFrequencyHz;
         channel.IsEnabled = enabled;
+        if (dcOffsetPercent.HasValue)
+            channel.DcOffsetPercent = dcOffsetPercent.Value;
+        if (harmonicPercent.HasValue)
+            channel.HarmonicPercent = harmonicPercent.Value;
+        if (harmonicOrder.HasValue)
+            channel.HarmonicOrder = harmonicOrder.Value;
+        if (clipPercent.HasValue)
+            channel.ClipPercent = clipPercent.Value;
     }
 
     private void SetChannelFromPhasor(string key, Complex phasor, bool enabled, double frequencyHz)
@@ -4008,6 +4251,76 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         CommandManager.InvalidateRequerySuggested();
     }
 
+    private void ApplySelectedScenarioPreset()
+    {
+        if (SelectedScenarioPresetChoice is not { } preset || preset.States.Count == 0)
+            return;
+
+        foreach (var state in SequenceStates)
+            DetachSequenceState(state);
+
+        SequenceStates.Clear();
+        foreach (var snapshot in preset.States)
+        {
+            var state = CreateSequenceState(snapshot);
+            AttachSequenceState(state);
+            SequenceStates.Add(state);
+        }
+
+        Mode = InjectionMode.Sequencer;
+        AutoEnableResidualChannelsForScenario(preset);
+        SelectedSequenceState = SequenceStates.FirstOrDefault();
+        UpdateSequencePreview();
+        StatusText = $"Scenario applied: {preset.ShortLabel}.";
+        AppendEvent($"Applied publisher scenario preset: {preset.Label}. {preset.HelpText}");
+        CommandManager.InvalidateRequerySuggested();
+    }
+
+    private void AutoEnableResidualChannelsForScenario(PublisherScenarioPresetChoice preset)
+    {
+        var needsResidual = preset.States.Any(state => state.CurrentScaleN > 0 || state.VoltageScaleN > 0);
+        if (!needsResidual)
+            return;
+
+        foreach (var key in new[] { "In", "Vn" })
+        {
+            var channel = Channels.FirstOrDefault(c => string.Equals(c.Key, key, StringComparison.OrdinalIgnoreCase));
+            if (channel is not null)
+                channel.IsEnabled = true;
+        }
+
+        SaveCurrentPublisherSlot();
+    }
+
+    private static SequenceStateViewModel CreateSequenceState(SequenceStateSnapshot snapshot)
+        => new(
+            string.IsNullOrWhiteSpace(snapshot.Name) ? "State" : snapshot.Name,
+            snapshot.DurationSeconds,
+            snapshot.CurrentScale,
+            snapshot.VoltageScale,
+            snapshot.AngleShiftDegrees,
+            snapshot.FrequencyHz,
+            snapshot.CurrentScaleA,
+            snapshot.CurrentScaleB,
+            snapshot.CurrentScaleC,
+            snapshot.CurrentScaleN,
+            snapshot.VoltageScaleA,
+            snapshot.VoltageScaleB,
+            snapshot.VoltageScaleC,
+            snapshot.VoltageScaleN,
+            snapshot.AngleOffsetA,
+            snapshot.AngleOffsetB,
+            snapshot.AngleOffsetC,
+            snapshot.AngleOffsetN,
+            snapshot.CurrentDcOffsetPercent,
+            snapshot.VoltageDcOffsetPercent,
+            snapshot.CurrentHarmonicPercent,
+            snapshot.VoltageHarmonicPercent,
+            snapshot.HarmonicOrder,
+            snapshot.CurrentClipPercent,
+            snapshot.VoltageClipPercent,
+            snapshot.ScenarioTag);
+
     private void AddSequenceState()
     {
         var state = new SequenceStateViewModel($"State {SequenceStates.Count + 1}", 0.500, 1.0, 1.0, 0, NominalFrequencyHz);
@@ -4091,6 +4404,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             PtpSyncIntervalMs = PtpSyncIntervalMs,
             PtpRespondToPeerDelay = PtpRespondToPeerDelay,
             RampSignalKey = SelectedRampSignalChoice?.KeyCsv ?? SelectedRampState?.SignalKey ?? string.Empty,
+            ScenarioPresetKey = SelectedScenarioPresetChoice?.Key ?? string.Empty,
             RampTargetMagnitude = RampTargetMagnitude,
             RampDurationSeconds = RampDurationSeconds,
             Channels = Channels.Select(c => c.ToSnapshot()).ToArray(),
@@ -4307,17 +4621,23 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             foreach (var pair in baseChannels)
             {
                 var channel = pair.Value;
-                var magnitude = string.Equals(channel.Kind, "I", StringComparison.OrdinalIgnoreCase)
-                    ? state.CurrentMagnitude
-                    : state.VoltageMagnitude;
-                var angle = state.AngleShiftDegrees + PhaseOffsetForChannel(pair.Key);
+                var isCurrent = string.Equals(channel.Kind, "I", StringComparison.OrdinalIgnoreCase);
+                var multiplier = isCurrent
+                    ? state.CurrentMultiplierFor(pair.Key)
+                    : state.VoltageMultiplierFor(pair.Key);
+                var magnitude = (isCurrent ? state.CurrentMagnitude : state.VoltageMagnitude) * multiplier;
+                var angle = state.AngleShiftDegrees + PhaseOffsetForChannel(pair.Key) + state.AngleOffsetFor(pair.Key);
                 var frequency = state.FrequencyHz > 0 ? state.FrequencyHz : channel.FrequencyHz;
                 result[pair.Key] = channel with
                 {
                     MagnitudeRms = magnitude,
                     AngleDegrees = angle,
                     FrequencyHz = frequency,
-                    PhaseRadians = angle * Math.PI / 180.0
+                    PhaseRadians = angle * Math.PI / 180.0,
+                    DcOffsetPercent = isCurrent ? state.CurrentDcOffsetPercent : state.VoltageDcOffsetPercent,
+                    HarmonicPercent = isCurrent ? state.CurrentHarmonicPercent : state.VoltageHarmonicPercent,
+                    HarmonicOrder = state.HarmonicOrder,
+                    ClipPercent = isCurrent ? state.CurrentClipPercent : state.VoltageClipPercent
                 };
             }
 
@@ -4363,7 +4683,68 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         double CurrentMagnitude,
         double VoltageMagnitude,
         double AngleShiftDegrees,
-        double FrequencyHz);
+        double FrequencyHz,
+        double CurrentScaleA,
+        double CurrentScaleB,
+        double CurrentScaleC,
+        double CurrentScaleN,
+        double VoltageScaleA,
+        double VoltageScaleB,
+        double VoltageScaleC,
+        double VoltageScaleN,
+        double AngleOffsetA,
+        double AngleOffsetB,
+        double AngleOffsetC,
+        double AngleOffsetN,
+        double CurrentDcOffsetPercent,
+        double VoltageDcOffsetPercent,
+        double CurrentHarmonicPercent,
+        double VoltageHarmonicPercent,
+        int HarmonicOrder,
+        double CurrentClipPercent,
+        double VoltageClipPercent,
+        string ScenarioTag)
+    {
+        public double CurrentMultiplierFor(string channelKey) => PhaseSuffix(channelKey) switch
+        {
+            "A" => CurrentScaleA,
+            "B" => CurrentScaleB,
+            "C" => CurrentScaleC,
+            "N" => CurrentScaleN,
+            _ => 1
+        };
+
+        public double VoltageMultiplierFor(string channelKey) => PhaseSuffix(channelKey) switch
+        {
+            "A" => VoltageScaleA,
+            "B" => VoltageScaleB,
+            "C" => VoltageScaleC,
+            "N" => VoltageScaleN,
+            _ => 1
+        };
+
+        public double AngleOffsetFor(string channelKey) => PhaseSuffix(channelKey) switch
+        {
+            "A" => AngleOffsetA,
+            "B" => AngleOffsetB,
+            "C" => AngleOffsetC,
+            "N" => AngleOffsetN,
+            _ => 0
+        };
+
+        private static string PhaseSuffix(string channelKey)
+        {
+            if (channelKey.EndsWith("a", StringComparison.OrdinalIgnoreCase))
+                return "A";
+            if (channelKey.EndsWith("b", StringComparison.OrdinalIgnoreCase))
+                return "B";
+            if (channelKey.EndsWith("c", StringComparison.OrdinalIgnoreCase))
+                return "C";
+            if (channelKey.EndsWith("n", StringComparison.OrdinalIgnoreCase))
+                return "N";
+            return string.Empty;
+        }
+    }
 
     private sealed class OscillatorState
     {
@@ -4371,5 +4752,15 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         public double LastAngleDegrees { get; set; }
     }
 
-    private readonly record struct EffectiveChannel(string Kind, bool IsEnabled, double MagnitudeRms, double AngleDegrees, double FrequencyHz, double PhaseRadians);
+    private readonly record struct EffectiveChannel(
+        string Kind,
+        bool IsEnabled,
+        double MagnitudeRms,
+        double AngleDegrees,
+        double FrequencyHz,
+        double PhaseRadians,
+        double DcOffsetPercent = 0,
+        double HarmonicPercent = 0,
+        int HarmonicOrder = 2,
+        double ClipPercent = 100);
 }

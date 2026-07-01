@@ -87,8 +87,9 @@ public sealed class WaveformPlot : FrameworkElement
                     var t = i / 240.0;
                     var angle = (4.0 * Math.PI * t) + (channel.AngleDegrees * Math.PI / 180.0);
                     var normalized = channel.Magnitude / maxMagnitude;
+                    var shaped = ShapeNormalizedSample(angle, channel);
                     var x = lane.X + lane.Width * t;
-                    var y = midY - Math.Sin(angle) * amp * normalized;
+                    var y = midY - shaped * amp * normalized;
                     var point = new Point(x, y);
 
                     if (i == 0)
@@ -102,6 +103,29 @@ public sealed class WaveformPlot : FrameworkElement
             drawingContext.DrawGeometry(null, new Pen(new SolidColorBrush(ResolveColor(channel.Key)), 2), geometry);
         }
 
+    }
+
+    private static double ShapeNormalizedSample(double phaseRadians, SignalChannelViewModel channel)
+    {
+        var sample = Math.Sin(phaseRadians);
+
+        if (channel.HarmonicPercent > 0)
+        {
+            var harmonicOrder = Math.Clamp(channel.HarmonicOrder, 2, 63);
+            sample += (channel.HarmonicPercent / 100.0) * Math.Sin(phaseRadians * harmonicOrder);
+        }
+
+        if (Math.Abs(channel.DcOffsetPercent) > 0)
+            sample += channel.DcOffsetPercent / 100.0;
+
+        if (channel.ClipPercent > 0 && channel.ClipPercent < 1000)
+        {
+            var limit = Math.Abs(channel.ClipPercent / 100.0);
+            if (limit > 0)
+                sample = Math.Clamp(sample, -limit, limit);
+        }
+
+        return sample;
     }
 
     private IEnumerable<SignalChannelViewModel> GetChannels()

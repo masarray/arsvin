@@ -59,6 +59,15 @@ public partial class MainWindow : Window
         }.ShowDialog();
     }
 
+    private void OpenWaveformShape_Click(object sender, RoutedEventArgs e)
+    {
+        new WaveformShapeWindow
+        {
+            Owner = this,
+            DataContext = _viewModel
+        }.ShowDialog();
+    }
+
     private void ManualMode_Click(object sender, RoutedEventArgs e)
         => _viewModel.Mode = InjectionMode.Manual;
 

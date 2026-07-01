@@ -9,6 +9,10 @@ public sealed class SignalChannelViewModel : ObservableObject
     private double _magnitude;
     private double _angleDegrees;
     private double _frequencyHz;
+    private double _dcOffsetPercent;
+    private double _harmonicPercent;
+    private int _harmonicOrder = 2;
+    private double _clipPercent = 100;
 
     public SignalChannelViewModel(string key, string name, string kind, string unit, double magnitude, double angleDegrees, double frequencyHz = 50)
     {
@@ -43,6 +47,21 @@ public sealed class SignalChannelViewModel : ObservableObject
     public string AngleDegreesText => $"{AngleDegrees:0.000} °";
 
     public string FrequencyHzText => $"{FrequencyHz:0.000} Hz";
+
+    public string WaveformShapeSummary
+    {
+        get
+        {
+            var parts = new List<string>();
+            if (Math.Abs(DcOffsetPercent) > 0.0001)
+                parts.Add($"DC {DcOffsetPercent:0.###}%");
+            if (HarmonicPercent > 0.0001)
+                parts.Add($"H{HarmonicOrder} {HarmonicPercent:0.###}%");
+            if (Math.Abs(ClipPercent - 100.0) > 0.0001)
+                parts.Add($"clip {ClipPercent:0.###}%");
+            return parts.Count == 0 ? "clean" : string.Join(", ", parts);
+        }
+    }
 
     public bool IsEnabled
     {
@@ -84,6 +103,54 @@ public sealed class SignalChannelViewModel : ObservableObject
         }
     }
 
+    public double DcOffsetPercent
+    {
+        get => _dcOffsetPercent;
+        set
+        {
+            if (SetProperty(ref _dcOffsetPercent, CoercePercent(value, -300, 300)))
+                OnPropertyChanged(nameof(WaveformShapeSummary));
+        }
+    }
+
+    public double HarmonicPercent
+    {
+        get => _harmonicPercent;
+        set
+        {
+            if (SetProperty(ref _harmonicPercent, CoercePercent(value, 0, 300)))
+                OnPropertyChanged(nameof(WaveformShapeSummary));
+        }
+    }
+
+    public int HarmonicOrder
+    {
+        get => _harmonicOrder;
+        set
+        {
+            if (SetProperty(ref _harmonicOrder, Math.Clamp(value, 2, 63)))
+                OnPropertyChanged(nameof(WaveformShapeSummary));
+        }
+    }
+
+    public double ClipPercent
+    {
+        get => _clipPercent;
+        set
+        {
+            if (SetProperty(ref _clipPercent, CoercePercent(value, 1, 1000)))
+                OnPropertyChanged(nameof(WaveformShapeSummary));
+        }
+    }
+
+    public void ResetWaveformShape()
+    {
+        DcOffsetPercent = 0;
+        HarmonicPercent = 0;
+        HarmonicOrder = 2;
+        ClipPercent = 100;
+    }
+
     public SignalChannelSnapshot ToSnapshot()
         => new()
         {
@@ -91,6 +158,13 @@ public sealed class SignalChannelViewModel : ObservableObject
             IsEnabled = IsEnabled,
             Magnitude = Magnitude,
             AngleDegrees = AngleDegrees,
-            FrequencyHz = FrequencyHz
+            FrequencyHz = FrequencyHz,
+            DcOffsetPercent = DcOffsetPercent,
+            HarmonicPercent = HarmonicPercent,
+            HarmonicOrder = HarmonicOrder,
+            ClipPercent = ClipPercent
         };
+
+    private static double CoercePercent(double value, double min, double max)
+        => double.IsFinite(value) ? Math.Clamp(value, min, max) : 0;
 }

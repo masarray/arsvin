@@ -22,6 +22,26 @@ public sealed class SequenceStateViewModel : ObservableObject
     private double _voltageScale;
     private double _angleShiftDegrees;
     private double _frequencyHz;
+    private double _currentScaleA = 1;
+    private double _currentScaleB = 1;
+    private double _currentScaleC = 1;
+    private double _currentScaleN;
+    private double _voltageScaleA = 1;
+    private double _voltageScaleB = 1;
+    private double _voltageScaleC = 1;
+    private double _voltageScaleN;
+    private double _angleOffsetA;
+    private double _angleOffsetB;
+    private double _angleOffsetC;
+    private double _angleOffsetN;
+    private double _currentDcOffsetPercent;
+    private double _voltageDcOffsetPercent;
+    private double _currentHarmonicPercent;
+    private double _voltageHarmonicPercent;
+    private int _harmonicOrder = 2;
+    private double _currentClipPercent = 100;
+    private double _voltageClipPercent = 100;
+    private string _scenarioTag = string.Empty;
     private bool _isSelected;
     private string _durationText = string.Empty;
     private string _currentText = string.Empty;
@@ -38,7 +58,27 @@ public sealed class SequenceStateViewModel : ObservableObject
         double currentScale,
         double voltageScale,
         double angleShiftDegrees,
-        double frequencyHz)
+        double frequencyHz,
+        double currentScaleA = 1,
+        double currentScaleB = 1,
+        double currentScaleC = 1,
+        double currentScaleN = 0,
+        double voltageScaleA = 1,
+        double voltageScaleB = 1,
+        double voltageScaleC = 1,
+        double voltageScaleN = 0,
+        double angleOffsetA = 0,
+        double angleOffsetB = 0,
+        double angleOffsetC = 0,
+        double angleOffsetN = 0,
+        double currentDcOffsetPercent = 0,
+        double voltageDcOffsetPercent = 0,
+        double currentHarmonicPercent = 0,
+        double voltageHarmonicPercent = 0,
+        int harmonicOrder = 2,
+        double currentClipPercent = 100,
+        double voltageClipPercent = 100,
+        string scenarioTag = "")
     {
         _name = name;
         _durationSeconds = CoerceSeconds(durationSeconds);
@@ -46,6 +86,26 @@ public sealed class SequenceStateViewModel : ObservableObject
         _voltageScale = CoerceMagnitude(voltageScale);
         _angleShiftDegrees = NormalizeDegrees(angleShiftDegrees);
         _frequencyHz = CoerceFrequency(frequencyHz);
+        _currentScaleA = CoerceMultiplier(currentScaleA, 1);
+        _currentScaleB = CoerceMultiplier(currentScaleB, 1);
+        _currentScaleC = CoerceMultiplier(currentScaleC, 1);
+        _currentScaleN = CoerceMultiplier(currentScaleN, 0);
+        _voltageScaleA = CoerceMultiplier(voltageScaleA, 1);
+        _voltageScaleB = CoerceMultiplier(voltageScaleB, 1);
+        _voltageScaleC = CoerceMultiplier(voltageScaleC, 1);
+        _voltageScaleN = CoerceMultiplier(voltageScaleN, 0);
+        _angleOffsetA = NormalizeDegrees(angleOffsetA);
+        _angleOffsetB = NormalizeDegrees(angleOffsetB);
+        _angleOffsetC = NormalizeDegrees(angleOffsetC);
+        _angleOffsetN = NormalizeDegrees(angleOffsetN);
+        _currentDcOffsetPercent = CoercePercent(currentDcOffsetPercent, -300, 300);
+        _voltageDcOffsetPercent = CoercePercent(voltageDcOffsetPercent, -300, 300);
+        _currentHarmonicPercent = CoercePercent(currentHarmonicPercent, 0, 300);
+        _voltageHarmonicPercent = CoercePercent(voltageHarmonicPercent, 0, 300);
+        _harmonicOrder = Math.Clamp(harmonicOrder, 2, 63);
+        _currentClipPercent = CoercePercent(currentClipPercent, 1, 1000);
+        _voltageClipPercent = CoercePercent(voltageClipPercent, 1, 1000);
+        _scenarioTag = scenarioTag ?? string.Empty;
         RefreshTexts();
     }
 
@@ -135,6 +195,27 @@ public sealed class SequenceStateViewModel : ObservableObject
                 FrequencyText = FormatHertz(coerced);
         }
     }
+
+    public double CurrentScaleA { get => _currentScaleA; set => SetProperty(ref _currentScaleA, CoerceMultiplier(value, 1)); }
+    public double CurrentScaleB { get => _currentScaleB; set => SetProperty(ref _currentScaleB, CoerceMultiplier(value, 1)); }
+    public double CurrentScaleC { get => _currentScaleC; set => SetProperty(ref _currentScaleC, CoerceMultiplier(value, 1)); }
+    public double CurrentScaleN { get => _currentScaleN; set => SetProperty(ref _currentScaleN, CoerceMultiplier(value, 0)); }
+    public double VoltageScaleA { get => _voltageScaleA; set => SetProperty(ref _voltageScaleA, CoerceMultiplier(value, 1)); }
+    public double VoltageScaleB { get => _voltageScaleB; set => SetProperty(ref _voltageScaleB, CoerceMultiplier(value, 1)); }
+    public double VoltageScaleC { get => _voltageScaleC; set => SetProperty(ref _voltageScaleC, CoerceMultiplier(value, 1)); }
+    public double VoltageScaleN { get => _voltageScaleN; set => SetProperty(ref _voltageScaleN, CoerceMultiplier(value, 0)); }
+    public double AngleOffsetA { get => _angleOffsetA; set => SetProperty(ref _angleOffsetA, NormalizeDegrees(value)); }
+    public double AngleOffsetB { get => _angleOffsetB; set => SetProperty(ref _angleOffsetB, NormalizeDegrees(value)); }
+    public double AngleOffsetC { get => _angleOffsetC; set => SetProperty(ref _angleOffsetC, NormalizeDegrees(value)); }
+    public double AngleOffsetN { get => _angleOffsetN; set => SetProperty(ref _angleOffsetN, NormalizeDegrees(value)); }
+    public double CurrentDcOffsetPercent { get => _currentDcOffsetPercent; set => SetProperty(ref _currentDcOffsetPercent, CoercePercent(value, -300, 300)); }
+    public double VoltageDcOffsetPercent { get => _voltageDcOffsetPercent; set => SetProperty(ref _voltageDcOffsetPercent, CoercePercent(value, -300, 300)); }
+    public double CurrentHarmonicPercent { get => _currentHarmonicPercent; set => SetProperty(ref _currentHarmonicPercent, CoercePercent(value, 0, 300)); }
+    public double VoltageHarmonicPercent { get => _voltageHarmonicPercent; set => SetProperty(ref _voltageHarmonicPercent, CoercePercent(value, 0, 300)); }
+    public int HarmonicOrder { get => _harmonicOrder; set => SetProperty(ref _harmonicOrder, Math.Clamp(value, 2, 63)); }
+    public double CurrentClipPercent { get => _currentClipPercent; set => SetProperty(ref _currentClipPercent, CoercePercent(value, 1, 1000)); }
+    public double VoltageClipPercent { get => _voltageClipPercent; set => SetProperty(ref _voltageClipPercent, CoercePercent(value, 1, 1000)); }
+    public string ScenarioTag { get => _scenarioTag; set => SetProperty(ref _scenarioTag, value ?? string.Empty); }
 
     public bool IsSelected
     {
@@ -354,6 +435,12 @@ public sealed class SequenceStateViewModel : ObservableObject
     private static double CoerceMagnitude(double value)
         => IsFinite(value) ? Math.Clamp(value, 0, 1_000_000_000) : 0;
 
+    private static double CoerceMultiplier(double value, double fallback)
+        => IsFinite(value) ? Math.Clamp(value, 0, 1_000_000) : fallback;
+
+    private static double CoercePercent(double value, double minimum, double maximum)
+        => IsFinite(value) ? Math.Clamp(value, minimum, maximum) : 0;
+
     private static double CoerceFrequency(double value)
         => IsFinite(value) && value >= 0 ? Math.Min(value, 5_000) : 50;
 
@@ -401,6 +488,26 @@ public sealed class SequenceStateViewModel : ObservableObject
             CurrentScale = CurrentScale,
             VoltageScale = VoltageScale,
             AngleShiftDegrees = AngleShiftDegrees,
-            FrequencyHz = FrequencyHz
+            FrequencyHz = FrequencyHz,
+            CurrentScaleA = CurrentScaleA,
+            CurrentScaleB = CurrentScaleB,
+            CurrentScaleC = CurrentScaleC,
+            CurrentScaleN = CurrentScaleN,
+            VoltageScaleA = VoltageScaleA,
+            VoltageScaleB = VoltageScaleB,
+            VoltageScaleC = VoltageScaleC,
+            VoltageScaleN = VoltageScaleN,
+            AngleOffsetA = AngleOffsetA,
+            AngleOffsetB = AngleOffsetB,
+            AngleOffsetC = AngleOffsetC,
+            AngleOffsetN = AngleOffsetN,
+            CurrentDcOffsetPercent = CurrentDcOffsetPercent,
+            VoltageDcOffsetPercent = VoltageDcOffsetPercent,
+            CurrentHarmonicPercent = CurrentHarmonicPercent,
+            VoltageHarmonicPercent = VoltageHarmonicPercent,
+            HarmonicOrder = HarmonicOrder,
+            CurrentClipPercent = CurrentClipPercent,
+            VoltageClipPercent = VoltageClipPercent,
+            ScenarioTag = ScenarioTag
         };
 }

@@ -3,98 +3,206 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ARSVIN — IEC 61850 Sampled Values Publisher & Process Bus Traffic Tester</title>
-  <meta name="description" content="ARSVIN is a lightweight IEC 61850 Sampled Values publisher simulator for lab publishing, SCL-based stream setup, COMTRADE replay, relay readability checks, and process-bus traffic experiments." />
-  <meta name="keywords" content="IEC 61850, Sampled Values, SV publisher, SV injector, COMTRADE replay, digital substation, process bus, relay readability, PTP traffic tester" />
+  <title>ARSVIN — IEC 61850 Sampled Values Publisher for Windows</title>
+  <meta name="description" content="Apache-2.0 IEC 61850 Sampled Values Publisher for Windows with SCL setup, nofASDU support, COMTRADE replay, TX timing health, per-phase scenario presets, and PCAP evidence export." />
   <meta name="author" content="Ari Sulistiono" />
-  <meta property="og:title" content="ARSVIN — IEC 61850 Sampled Values Publisher & Process Bus Traffic Tester" />
-  <meta property="og:description" content="A focused Windows tool for Sampled Values publishing, SCL-based stream setup, COMTRADE replay, and lab PTP traffic and explicit smpSynch compatibility modes." />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <link rel="canonical" href="https://masarray.github.io/arsvin/" />
+
+  <meta property="og:site_name" content="ARSVIN" />
+  <meta property="og:title" content="ARSVIN — IEC 61850 Sampled Values Publisher for Windows" />
+  <meta property="og:description" content="SCL-driven SV publishing, COMTRADE replay, nofASDU support, TX timing health, per-phase scenario presets, and PCAP evidence export for isolated lab use." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://masarray.github.io/arsvin/" />
-  <meta property="og:image" content="https://masarray.github.io/arsvin/assets/arsvin.png" />
+  <meta property="og:image" content="https://masarray.github.io/arsvin/assets/arsvin-social-preview.png" />
+  <meta property="og:image:width" content="1280" />
+  <meta property="og:image:height" content="640" />
   <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="ARSVIN — IEC 61850 Sampled Values Publisher for Windows" />
+  <meta name="twitter:description" content="Apache-2.0 SCL-driven Sampled Values publisher with COMTRADE replay, TX timing health, and PCAP evidence export." />
+  <meta name="twitter:image" content="https://masarray.github.io/arsvin/assets/arsvin-social-preview.png" />
+
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png" />
   <link rel="manifest" href="site.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
+
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
     "@type": "SoftwareApplication",
     "name": "ARSVIN",
+    "alternateName": "ARSVIN IEC 61850 Sampled Values Publisher",
     "applicationCategory": "EngineeringApplication",
-    "operatingSystem": "Windows",
-    "softwareVersion": "0.1.0",
+    "operatingSystem": "Windows 10/11 x64",
+    "softwareRequirements": "Npcap, .NET 8 SDK for source builds",
     "license": "https://www.apache.org/licenses/LICENSE-2.0",
+    "codeRepository": "https://github.com/masarray/arsvin",
+    "url": "https://masarray.github.io/arsvin/",
+    "downloadUrl": "https://github.com/masarray/arsvin/releases",
+    "image": "https://masarray.github.io/arsvin/assets/arsvin-social-preview.png",
     "author": { "@type": "Person", "name": "Ari Sulistiono", "url": "https://github.com/masarray" },
-    "description": "Lightweight IEC 61850 Sampled Values publisher simulator with SCL-based setup, manual or sequenced publishing, COMTRADE replay, and lab PTP traffic and explicit smpSynch compatibility modes."
+    "description": "Apache-2.0 IEC 61850 Sampled Values Publisher for Windows with SCL setup, nofASDU support, COMTRADE replay, TX timing health, per-phase scenario presets, and PCAP evidence export for isolated lab use."
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "What is ARSVIN?",
+        "acceptedAnswer": { "@type": "Answer", "text": "ARSVIN is an Apache-2.0 IEC 61850 Sampled Values Publisher for Windows, focused on SCL-driven SV publishing, COMTRADE replay, TX timing visibility, per-phase publisher scenarios, and generated evidence export for isolated lab use." }
+      },
+      {
+        "@type": "Question",
+        "name": "Is ARSVIN an IEC 61850 analyzer?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. ARSVIN is a publisher. It does not replace Wireshark, StationScout, IEDScout, or a live process-bus analyzer." }
+      },
+      {
+        "@type": "Question",
+        "name": "Can ARSVIN detect live SV subscribers?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. Sampled Values traffic is multicast and unacknowledged. ARSVIN can publish SV frames and derive expected subscribers from complete SCL/SCD data in future workflows, but a publisher cannot confirm live reception by itself." }
+      },
+      {
+        "@type": "Question",
+        "name": "Is ARSVIN a certified relay test set or merging unit?",
+        "acceptedAnswer": { "@type": "Answer", "text": "No. ARSVIN is a lab-oriented software publisher. It is not calibrated, not a certified merging unit, and not an IEC 61850 conformance test set." }
+      }
+    ]
   }
   </script>
 </head>
 <body>
-  <header class="nav">
-    <a class="brand" href="#top"><img src="assets/arsvin.png" alt="ARSVIN icon" /> <span>ARSVIN</span></a>
-    <nav><a href="#features">Features</a><a href="#workflow">Workflow</a><a href="#download">Download</a><a href="https://github.com/masarray/arsvin">GitHub</a></nav>
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="ARSVIN home">
+      <img src="assets/arsvin.png" alt="ARSVIN logo" />
+      <span>ARSVIN</span>
+    </a>
+    <nav aria-label="Primary navigation">
+      <a href="#features">Features</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#profiles">Profiles</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/masarray/arsvin">GitHub</a>
+    </nav>
   </header>
 
   <main id="top">
     <section class="hero">
       <div class="hero-copy">
-        <p class="eyebrow">IEC 61850 Sampled Values Publisher &amp; Process Bus Traffic Tester</p>
-        <h1>Publish SV traffic, replay COMTRADE, and check relay readability in isolated lab setups.</h1>
-        <p class="lead">ARSVIN is a focused Windows tool for engineers who need SCL-based Sampled Values publishing, manual / ramp / sequencer workflows, lab PTP traffic, and explicit <code>smpSynch</code> compatibility modes.</p>
-        <div class="actions"><a class="button primary" href="https://github.com/masarray/arsvin/releases">Download portable EXE</a><a class="button" href="https://github.com/masarray/arsvin">View source</a></div>
-        <p class="note">Apache-2.0. Built by Ari Sulistiono. For lab and engineering use. Not a certified protection test set.</p>
-      </div>
-      <div class="hero-card">
-        <div class="screen">
-          <div class="bar"><span></span><span></span><span></span></div>
-          <div class="grid">
-            <div class="metric"><b>3</b><span>SV publishers</span></div>
-            <div class="metric"><b>SCL</b><span>stream setup</span></div>
-            <div class="metric"><b>CFG/DAT</b><span>COMTRADE</span></div>
-            <div class="metric"><b>PTP</b><span>lab traffic</span></div>
-          </div>
-          <div class="wave"></div>
+        <p class="eyebrow">Apache-2.0 · Windows · IEC 61850 lab publishing</p>
+        <h1>IEC 61850 Sampled Values Publisher for Windows.</h1>
+        <p class="lead">Publish SCL-driven SV streams, replay COMTRADE analog records, test nofASDU frame packing, monitor TX timing health, and export generated PCAP/report evidence in isolated lab setups.</p>
+        <div class="actions">
+          <a class="button primary" href="https://github.com/masarray/arsvin/releases">Download latest release</a>
+          <a class="button" href="https://github.com/masarray/arsvin">View source</a>
+          <a class="button soft" href="https://github.com/masarray/arsvin/blob/main/docs/quick-start.md">Quick start</a>
         </div>
+        <p class="safety-note">Publisher-focused. Not a certified relay test set, calibrated merging unit, process-bus analyzer, or production tool.</p>
       </div>
+      <div class="product-panel" aria-label="ARSVIN publisher capability preview">
+        <img src="assets/arsvin-iec-61850-sampled-values-publisher-preview.png" alt="ARSVIN IEC 61850 Sampled Values Publisher preview with SCL setup, TX Timing Health, nofASDU, COMTRADE replay, PCAP evidence, and per-phase scenario presets" />
+      </div>
+    </section>
+
+    <section class="strip" aria-label="Core capabilities">
+      <div><strong>nofASDU</strong><span>1 / 2 / 4 / 8</span></div>
+      <div><strong>SCL</strong><span>APPID, MAC, VLAN, svID</span></div>
+      <div><strong>COMTRADE</strong><span>ASCII, BINARY, BINARY32, FLOAT32</span></div>
+      <div><strong>Evidence</strong><span>PCAP + Markdown report</span></div>
     </section>
 
     <section id="features" class="section">
-      <h2>Small scope. Sharp purpose.</h2>
+      <div class="section-head">
+        <p class="eyebrow">Focused publisher workflow</p>
+        <h2>Everything is built around trustworthy SV generation.</h2>
+        <p>ARSVIN stays intentionally narrow: configure the publisher, generate the SV stream, expose TX health, and export evidence for independent inspection.</p>
+      </div>
       <div class="cards">
-        <article><h3>SV Publishing</h3><p>Publish Sampled Values traffic from a Windows workstation for process-bus experiments and relay subscription checks.</p></article>
-        <article><h3>SCL-Based Setup</h3><p>Load SCL and reuse APPID, MAC, VLAN, <code>svID</code>, and dataset information instead of typing everything manually.</p></article>
-        <article><h3>Manual, Ramp, Sequencer</h3><p>Run continuous publishing, time-based ramps, or state sequences depending on the lab scenario you want to simulate.</p></article>
-        <article><h3>COMTRADE Replay</h3><p>Replay analog COMTRADE records as Sampled Values for transient-style experiments and stream validation.</p></article>
-        <article><h3>PTP / smpSynch Compatibility</h3><p>Keep lab PTP traffic separate from explicit smpSynch compatibility modes so relay readability checks stay practical and honest.</p></article>
-        <article><h3>KM Looptest-friendly diagnostics</h3><p>Live checks warn about risky settings without blocking simple point-to-point lab publishing unless a fatal configuration error is found.</p></article>
-        <article><h3>Portable Windows Delivery</h3><p>Build or download a self-contained win-x64 package for easy deployment on engineering laptops.</p></article>
+        <article><h3>SCL-driven stream setup</h3><p>Load SCL/SCD data and reuse APPID, destination MAC, VLAN, <code>svID</code>, dataset, <code>confRev</code>, <code>smpRate</code>, <code>smpMod</code>, and <code>nofASDU</code>.</p></article>
+        <article><h3>Multi-ASDU SV publishing</h3><p>Publish lab-oriented SV streams with <code>nofASDU=1/2/4/8</code>, sequential per-ASDU sample counters, and frame-rate calculation.</p></article>
+        <article><h3>COMTRADE to SV</h3><p>Replay analog records as Sampled Values for controlled relay readability checks and transient-style lab experiments.</p></article>
+        <article><h3>Publisher scenarios</h3><p>Use repeatable state presets such as 3P fault, A-G fault, B-C fault, negative/zero sequence, VT fuse fail, CT saturation, harmonic injection, DC offset, frequency steps, phase jump, and load reversal.</p></article>
+        <article><h3>TX Timing Health</h3><p>Track target FPS, actual FPS, jitter, late frames, missed schedule count, send duration, and overall publisher health.</p></article>
+        <article><h3>Safety-first preflight</h3><p>Review stream settings and warnings before live TX. ARSVIN makes scope and risk visible instead of hiding them.</p></article>
       </div>
     </section>
 
-    <section id="workflow" class="section split">
+    <section id="evidence" class="section split">
       <div>
-        <h2>Built for readable lab workflow.</h2>
-        <p>Open SCL, choose a publisher slot, configure values or replay a COMTRADE record, then publish the stream and verify it in Wireshark or on the target relay. The workflow stays intentionally narrow so the tool remains useful, fast, and maintainable.</p>
+        <p class="eyebrow">Publisher evidence</p>
+        <h2>Export what ARSVIN generated.</h2>
+        <p>ARSVIN does not claim live subscriber confirmation. Instead, it exports TX-side evidence: generated PCAP frames and Markdown reports containing stream settings, preflight findings, quality mode, scenario metadata, and timing health.</p>
+      </div>
+      <div class="evidence-box">
+        <div><span>PCAP</span><p>Generated SV frames for Wireshark/offline inspection.</p></div>
+        <div><span>Report</span><p>Markdown evidence for APPID, VLAN, nofASDU, sample rate, bandwidth, quality, and timing.</p></div>
+        <div><span>Health</span><p>GOOD/WARN/BAD TX status from publisher scheduling metrics.</p></div>
+      </div>
+    </section>
+
+    <section id="profiles" class="section">
+      <div class="section-head compact">
+        <p class="eyebrow">Profile support</p>
+        <h2>Honest IEC 61850 scope.</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Area</th><th>Support</th><th>Boundary</th></tr></thead>
+          <tbody>
+            <tr><td>IEC 61850 Sampled Values APDU</td><td>Lab publisher implementation</td><td>Not a certified conformance test set.</td></tr>
+            <tr><td>9-2LE style 4I+4V</td><td>Supported as lab profile</td><td>Use independent tools for formal validation.</td></tr>
+            <tr><td>nofASDU</td><td>1 / 2 / 4 / 8</td><td>Frame packing, sample-counter, and timing visibility are publisher-side.</td></tr>
+            <tr><td>PTP / smpSynch</td><td>Compatibility/lab mode</td><td>Not a certified IEC 61850-9-3 clock implementation.</td></tr>
+            <tr><td>Subscribers</td><td>Not live-detected</td><td>SV is multicast and unacknowledged.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section workflow">
+      <div class="section-head compact">
+        <p class="eyebrow">Fast start</p>
+        <h2>From SCL to generated evidence.</h2>
       </div>
       <ol class="steps">
-        <li>Open SCL</li>
-        <li>Select Publisher 1–3</li>
-        <li>Choose manual, ramp, sequencer, or COMTRADE</li>
-        <li>Review APPID, MAC, VLAN, and smpSynch mode</li>
-        <li>Start dry run or live publish</li>
-        <li>Verify traffic and relay subscription</li>
+        <li><strong>Open SCL/SCD</strong><span>Select the SV stream and publisher slot.</span></li>
+        <li><strong>Choose source mode</strong><span>Manual values, COMTRADE replay, ramp, or scenario preset.</span></li>
+        <li><strong>Run preflight</strong><span>Review APPID, MAC, VLAN, nofASDU, sample rate, and warnings.</span></li>
+        <li><strong>Publish or dry run</strong><span>Use isolated lab links for live raw Ethernet TX.</span></li>
+        <li><strong>Export evidence</strong><span>Save generated PCAP and Markdown publisher report.</span></li>
       </ol>
     </section>
 
+    <section id="faq" class="section faq">
+      <div class="section-head compact">
+        <p class="eyebrow">FAQ</p>
+        <h2>Clear boundaries matter.</h2>
+      </div>
+      <details open><summary>Is ARSVIN an IEC 61850 analyzer?</summary><p>No. ARSVIN is a Sampled Values publisher. Use Wireshark, StationScout, IEDScout, relay vendor tools, or dedicated analyzers for live network analysis.</p></details>
+      <details><summary>Can ARSVIN detect who subscribes to its SV stream?</summary><p>No. SV traffic is multicast and unacknowledged. A publisher cannot confirm live reception by itself. Subscriber expectations must come from complete SCL/SCD engineering data or external tools.</p></details>
+      <details><summary>Does ARSVIN support IEC 61850-9-2LE?</summary><p>ARSVIN supports lab-oriented 9-2LE style 4I+4V workflows and nofASDU publishing. It is not a certified 9-2LE conformance test set.</p></details>
+      <details><summary>Does ARSVIN need Npcap?</summary><p>Yes for live raw Ethernet publishing on Windows. Dry-run and configuration workflows can be used without live packet transmission.</p></details>
+    </section>
+
     <section id="download" class="section cta">
-      <h2>Portable Windows package for lab use.</h2>
-      <p>GitHub Actions builds a self-contained win-x64 release package from tagged releases.</p>
-      <a class="button primary" href="https://github.com/masarray/arsvin/releases">Get ARSVIN</a>
+      <p class="eyebrow">Get ARSVIN</p>
+      <h2>Portable Windows release for controlled lab use.</h2>
+      <p>Download the latest win-x64 portable package, or build from source with .NET 8.</p>
+      <div class="actions center">
+        <a class="button primary" href="https://github.com/masarray/arsvin/releases">Download release</a>
+        <a class="button" href="https://github.com/masarray/arsvin/blob/main/docs/quick-start.md">Read quick start</a>
+      </div>
     </section>
   </main>
 
-  <footer>© Ari Sulistiono · Apache-2.0 · <a href="https://github.com/masarray/arsvin">github.com/masarray/arsvin</a></footer>
+  <footer>
+    <span>© Ari Sulistiono · Apache-2.0</span>
+    <a href="https://github.com/masarray/arsvin">GitHub</a>
+    <a href="https://github.com/masarray/arsvin/blob/main/SECURITY.md">Security</a>
+    <a href="https://github.com/masarray/arsvin/blob/main/docs/safety-boundaries.md">Safety</a>
+  </footer>
 </body>
 </html>

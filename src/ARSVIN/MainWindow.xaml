@@ -632,6 +632,7 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -752,11 +753,35 @@
                         <TextBlock Text="Del State" Style="{StaticResource RibbonCaption}" />
                     </StackPanel>
                 </Button>
+                <ComboBox Width="210" Height="34" Margin="8,0,2,0"
+                          VerticalContentAlignment="Center"
+                          ItemsSource="{Binding ScenarioPresetChoices}"
+                          SelectedItem="{Binding SelectedScenarioPresetChoice, Mode=TwoWay}"
+                          ToolTip="{Binding ScenarioPresetHelpText}" />
+                <Button Command="{Binding ApplyScenarioPresetCommand}" Style="{StaticResource RibbonButton}" ToolTip="Apply scenario preset to the State Sequencer">
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Path Data="M4 18 L9 13 L13 16 L20 7" Stroke="#334155" StrokeThickness="2" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/><Path Data="M4 21 H20" Stroke="#2563EB" StrokeThickness="2" StrokeStartLineCap="Round"/></Canvas></Viewbox>
+                        <TextBlock Text="Scenario" Style="{StaticResource RibbonCaption}" />
+                    </StackPanel>
+                </Button>
             </StackPanel>
 
             <Rectangle Grid.Column="8" Width="1" Fill="#D8E2EF" Margin="8,10" />
 
-            <Button Grid.Column="9" Command="{Binding ImportComtradeCommand}" Style="{StaticResource RibbonButton}">
+            <Button Grid.Column="9" Click="OpenWaveformShape_Click" Style="{StaticResource RibbonButton}" ToolTip="Open advanced waveform shaping in a dedicated panel">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Viewbox Width="24" Height="24">
+                        <Canvas Width="24" Height="24">
+                            <Path Data="M3 12 C5 6 8 6 10 12 S15 18 17 12 S20 6 21 12" Stroke="#334155" StrokeThickness="1.9" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            <Path Data="M4 19 H20" Stroke="#2563EB" StrokeThickness="1.9" StrokeStartLineCap="Round"/>
+                            <Path Data="M7 19 V15 M12 19 V11 M17 19 V14" Stroke="#2563EB" StrokeThickness="1.9" StrokeStartLineCap="Round"/>
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="Waveform" Style="{StaticResource RibbonCaption}" />
+                </StackPanel>
+            </Button>
+
+            <Button Grid.Column="10" Command="{Binding ImportComtradeCommand}" Style="{StaticResource RibbonButton}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24">
                         <Canvas Width="24" Height="24">
@@ -769,7 +794,7 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="10" Click="CheckPreflight_Click" Style="{StaticResource RibbonButton}">
+            <Button Grid.Column="11" Click="CheckPreflight_Click" Style="{StaticResource RibbonButton}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24">
                         <Canvas Width="24" Height="24">
@@ -782,7 +807,7 @@
             </Button>
 
 
-            <Button Grid.Column="11" Command="{Binding ExportGeneratedPcapCommand}" Style="{StaticResource RibbonButton}">
+            <Button Grid.Column="12" Command="{Binding ExportGeneratedPcapCommand}" Style="{StaticResource RibbonButton}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24">
                         <Canvas Width="24" Height="24">
@@ -796,7 +821,7 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="12" Command="{Binding ExportPublisherEvidenceReportCommand}" Style="{StaticResource RibbonButton}">
+            <Button Grid.Column="13" Command="{Binding ExportPublisherEvidenceReportCommand}" Style="{StaticResource RibbonButton}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24">
                         <Canvas Width="24" Height="24">
@@ -811,21 +836,21 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="13" Command="{Binding RunLiveCommand}" Style="{StaticResource StartButtonStyle}">
+            <Button Grid.Column="14" Command="{Binding RunLiveCommand}" Style="{StaticResource StartButtonStyle}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Path Data="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" Stroke="#FFFFFF" StrokeThickness="1.9" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Canvas></Viewbox>
                     <TextBlock Text="Start" Style="{StaticResource RibbonCaption}" Foreground="#FFFFFF" />
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="14" Command="{Binding StopCommand}" Style="{StaticResource StopButtonStyle}">
+            <Button Grid.Column="15" Command="{Binding StopCommand}" Style="{StaticResource StopButtonStyle}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Rectangle Canvas.Left="3.5" Canvas.Top="3.5" Width="17" Height="17" RadiusX="2" RadiusY="2" Stroke="#FFFFFF" StrokeThickness="1.9" Fill="Transparent"/></Canvas></Viewbox>
                     <TextBlock Text="Stop" Style="{StaticResource RibbonCaption}" Foreground="#FFFFFF" />
                 </StackPanel>
             </Button>
 
-            <Border Grid.Column="15" Background="#F8FBFF" BorderBrush="#D7E2F0" BorderThickness="1" CornerRadius="14" Padding="12,8" Margin="12,0,0,0" VerticalAlignment="Stretch">
+            <Border Grid.Column="16" Background="#F8FBFF" BorderBrush="#D7E2F0" BorderThickness="1" CornerRadius="14" Padding="12,8" Margin="12,0,0,0" VerticalAlignment="Stretch">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="190" />
