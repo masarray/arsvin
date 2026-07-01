@@ -1,3 +1,4 @@
+using AR.Iec61850.SampledValues;
 using AR.Iec61850.Scl;
 
 namespace AR.Iec61850.SvPublisher.Models;
@@ -37,6 +38,18 @@ public enum PtpPublisherMode
 {
     MonitorOnly,
     LabPublisher
+}
+
+
+public sealed class SampleQualityChoice
+{
+    public required string Key { get; init; }
+    public required string Label { get; init; }
+    public required string ShortLabel { get; init; }
+    public required string HelpText { get; init; }
+    public required SampledValueQuality Quality { get; init; }
+
+    public override string ToString() => Label;
 }
 
 public enum PublisherSignalSource
@@ -163,6 +176,7 @@ public sealed class SvPublisherSlotConfigSnapshot
     public PublisherSignalSource SignalSource { get; init; } = PublisherSignalSource.Manual;
     public string ComtradePath { get; init; } = string.Empty;
     public bool ComtradeLoop { get; init; }
+    public string SampleQualityKey { get; init; } = "good";
     public IReadOnlyList<SignalChannelSnapshot> Channels { get; init; } = Array.Empty<SignalChannelSnapshot>();
 }
 
@@ -194,6 +208,7 @@ public sealed class SvPublisherConfigSnapshot
     public int ExpectedPtpDomain { get; init; }
     public bool PtpAllowLocalFallback { get; init; } = true;
     public PtpPublisherMode PtpPublisherMode { get; init; } = PtpPublisherMode.MonitorOnly;
+    public string SampleQualityKey { get; init; } = "good";
     public string PtpClockIdentity { get; init; } = "02:00:00:FF:FE:00:00:01";
     public int PtpAnnounceIntervalMs { get; init; } = 1000;
     public int PtpSyncIntervalMs { get; init; } = 250;

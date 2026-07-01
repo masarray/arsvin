@@ -170,6 +170,17 @@ This package includes the first P0 protocol-readiness pass for the SV publisher:
 - publisher-side SCL validation and frame preview.
 - quality-bit simulation foundation.
 - generated-frame PCAP export foundation.
-- unit tests for multi-ASDU SV frame round-trip, quality encoding, sample counter, and PCAP output.
+- TX Timing Health for publisher-side FPS, jitter, late-frame, missed-schedule, and send-duration visibility.
+- unit tests for multi-ASDU SV frame round-trip, quality encoding, sample counter, timing health, and PCAP output.
 
 See [`docs/p0-publisher-protocol-roadmap.md`](docs/p0-publisher-protocol-roadmap.md) and [`docs/sv-profile-support.md`](docs/sv-profile-support.md).
+
+
+## P1 publisher evidence
+
+ARSVIN now includes TX-side publisher evidence export:
+
+- **PCAP** exports generated SV frames for offline inspection.
+- **Report** exports a Markdown evidence report with enabled streams, SCL validation findings, `nofASDU`, sample/publication rate, payload size, estimated bandwidth, quality mode, and TX timing summary.
+
+This is still publisher evidence only. ARSVIN does not become a network analyzer or certified merging unit.

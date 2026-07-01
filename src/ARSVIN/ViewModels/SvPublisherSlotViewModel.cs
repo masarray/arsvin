@@ -23,6 +23,7 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
     private double _voltageDlsb = 0.01;
     private string _manualSetMode = "Direct";
     private string _sampleRatePresetKey = "9-2LE-80-50";
+    private string _sampleQualityKey = "good";
     private PublisherSignalSource _signalSource = PublisherSignalSource.Manual;
     private string _comtradePath = string.Empty;
     private string _comtradeSummary = "No COMTRADE loaded.";
@@ -200,6 +201,16 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
         set => SetProperty(ref _sampleRatePresetKey, value);
     }
 
+    public string SampleQualityKey
+    {
+        get => _sampleQualityKey;
+        set
+        {
+            if (SetProperty(ref _sampleQualityKey, string.IsNullOrWhiteSpace(value) ? "good" : value))
+                OnPropertyChanged(nameof(SummaryText));
+        }
+    }
+
     public int DataSetEntryCount
     {
         get => _dataSetEntryCount;
@@ -314,7 +325,8 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
             var vlan = UseVlan ? $" VLAN {VlanId}" : " untagged";
             var appId = string.IsNullOrWhiteSpace(AppIdText) ? "APPID -" : AppIdText;
             var source = SignalSource == PublisherSignalSource.ComtradeReplay ? "  COMTRADE" : string.Empty;
-            return $"{stream}  {appId}{vlan}  {SampleRateHz:0.#} fps{source}";
+            var quality = string.Equals(SampleQualityKey, "good", StringComparison.OrdinalIgnoreCase) ? string.Empty : $"  q={SampleQualityKey}";
+            return $"{stream}  {appId}{vlan}  {SampleRateHz:0.#} fps{source}{quality}";
         }
     }
 }

@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Numerics;
+using System.Reflection;
 using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
@@ -50,6 +51,7 @@ public sealed class SvPublisherViewModel : ObservableObject
     private string _sclSummary = "Open an SCL file to resolve SV streams.";
     private string _statusText = "Idle";
     private string _publishText = "No active publisher.";
+    private string _txTimingHealthText = "TX Timing: idle";
     private string _evidenceText = string.Empty;
     private string _liveApplyText = "Auto apply ready.";
     private string _livePreflightSummaryText = "Looptest quick mode: preflight not run.";
@@ -65,6 +67,7 @@ public sealed class SvPublisherViewModel : ObservableObject
     private double _sampleRateHz = 4000;
     private double _nominalFrequencyHz = 50;
     private SampleRatePreset? _selectedSampleRatePreset;
+    private SampleQualityChoice? _selectedSampleQualityChoice;
     private double _currentDlsb = 0.001;
     private double _voltageDlsb = 0.01;
     private double _durationSeconds = 1;
@@ -150,6 +153,7 @@ public sealed class SvPublisherViewModel : ObservableObject
         SelectedRampState = RampStates.FirstOrDefault();
         SelectedSequenceState = SequenceStates.FirstOrDefault();
         SelectedSampleRatePreset = SampleRatePresets.FirstOrDefault(preset => preset.Key == "9-2LE-80-50");
+        _selectedSampleQualityChoice = SampleQualityChoices.FirstOrDefault(choice => choice.Key == "good");
         SelectedPublisherSlot = PublisherSlots.FirstOrDefault();
         _selectedSyncPolicyChoice = ResolveSyncPolicyChoice(_syncPolicyMode);
         SmpSynchStatusText = FormatSmpSynchStatus(ResolveSampleSynchronization(null));
@@ -160,6 +164,8 @@ public sealed class SvPublisherViewModel : ObservableObject
         RefreshAdaptersCommand = new RelayCommand(RefreshAdapters, () => !IsPublishing);
         RunPreflightCommand = new RelayCommand(RunLivePreflight, () => !IsPublishing);
         SaveProfileCommand = new AsyncRelayCommand(SaveProfileAsync, () => !IsPublishing);
+        ExportGeneratedPcapCommand = new AsyncRelayCommand(ExportGeneratedPcapAsync, () => !IsPublishing);
+        ExportPublisherEvidenceReportCommand = new AsyncRelayCommand(ExportPublisherEvidenceReportAsync, () => !IsPublishing);
         RunDryCommand = new AsyncRelayCommand(() => RunPublishAsync(live: false), () => !IsPublishing);
         RunLiveCommand = new AsyncRelayCommand(() => RunPublishAsync(live: true), () => !IsPublishing);
         StopCommand = new RelayCommand(StopPublisher, () => IsPublishing);
@@ -280,6 +286,58 @@ public sealed class SvPublisherViewModel : ObservableObject
         }
     ];
 
+    public IReadOnlyList<SampleQualityChoice> SampleQualityChoices { get; } =
+    [
+        new()
+        {
+            Key = "good",
+            Label = "Good quality",
+            ShortLabel = "good",
+            HelpText = "Default SV quality: valid measurement for normal publisher output.",
+            Quality = SampledValueQuality.Good
+        },
+        new()
+        {
+            Key = "invalid",
+            Label = "Invalid",
+            ShortLabel = "invalid",
+            HelpText = "Sets the IEC 61850 quality validity bits to invalid for quality fields in the SV dataset.",
+            Quality = SampledValueQuality.Invalid
+        },
+        new()
+        {
+            Key = "questionable",
+            Label = "Questionable",
+            ShortLabel = "questionable",
+            HelpText = "Sets the quality validity bits to questionable for relay behavior tests.",
+            Quality = SampledValueQuality.Questionable
+        },
+        new()
+        {
+            Key = "oldData",
+            Label = "Old data",
+            ShortLabel = "oldData",
+            HelpText = "Publishes good validity with the oldData detail bit set.",
+            Quality = SampledValueQuality.OldDataGood
+        },
+        new()
+        {
+            Key = "test",
+            Label = "Test bit",
+            ShortLabel = "test",
+            HelpText = "Publishes good validity with the test bit set.",
+            Quality = SampledValueQuality.TestGood
+        },
+        new()
+        {
+            Key = "operatorBlocked",
+            Label = "Operator blocked",
+            ShortLabel = "operatorBlocked",
+            HelpText = "Publishes good validity with the operatorBlocked detail bit set.",
+            Quality = SampledValueQuality.OperatorBlockedGood
+        }
+    ];
+
     public IReadOnlyList<PublisherSignalSource> SignalSources { get; } =
     [
         PublisherSignalSource.Manual,
@@ -305,6 +363,8 @@ public sealed class SvPublisherViewModel : ObservableObject
     public ICommand RefreshAdaptersCommand { get; }
     public ICommand RunPreflightCommand { get; }
     public ICommand SaveProfileCommand { get; }
+    public ICommand ExportGeneratedPcapCommand { get; }
+    public ICommand ExportPublisherEvidenceReportCommand { get; }
     public ICommand RunDryCommand { get; }
     public ICommand RunLiveCommand { get; }
     public ICommand StopCommand { get; }
@@ -357,6 +417,12 @@ public sealed class SvPublisherViewModel : ObservableObject
     {
         get => _publishText;
         private set => SetProperty(ref _publishText, value);
+    }
+
+    public string TxTimingHealthText
+    {
+        get => _txTimingHealthText;
+        private set => SetProperty(ref _txTimingHealthText, value);
     }
 
     public string AdapterStatusText => SelectedAdapter is null
@@ -500,6 +566,33 @@ public sealed class SvPublisherViewModel : ObservableObject
                 slot.SampleRatePresetKey = value.Key;
         }
     }
+
+    public SampleQualityChoice SelectedSampleQualityChoice
+    {
+        get => _selectedSampleQualityChoice ?? SampleQualityChoices.First(choice => choice.Key == "good");
+        set
+        {
+            if (value is null)
+                return;
+
+            if (SetProperty(ref _selectedSampleQualityChoice, value))
+            {
+                OnPropertyChanged(nameof(SampleQualityHelpText));
+                OnPropertyChanged(nameof(SampleQualityStatusText));
+                if (!_isLoadingPublisherSlot && SelectedPublisherSlot is { } slot)
+                    slot.SampleQualityKey = value.Key;
+                AppendEvent($"SV quality changed to {value.Label}.");
+            }
+        }
+    }
+
+    public string SampleQualityHelpText => SelectedSampleQualityChoice.HelpText;
+
+    public string SampleQualityStatusText => $"q={SelectedSampleQualityChoice.ShortLabel}";
+
+    private SampleQualityChoice ResolveSampleQualityChoice(string? key)
+        => SampleQualityChoices.FirstOrDefault(choice => string.Equals(choice.Key, key, StringComparison.OrdinalIgnoreCase))
+           ?? SampleQualityChoices.First(choice => choice.Key == "good");
 
     public SvStreamChoice? SelectedStream
     {
@@ -1415,6 +1508,12 @@ public sealed class SvPublisherViewModel : ObservableObject
             if (slot.SignalSource == PublisherSignalSource.ComtradeReplay && slot.ComtradeDataset is null)
                 Add(LivePreflightSeverity.Error, slot.Header, "COMTRADE replay selected but no COMTRADE file is loaded.");
 
+            var qualityChoice = ResolveSampleQualityChoice(slot.SampleQualityKey);
+            if (!string.Equals(qualityChoice.Key, "good", StringComparison.OrdinalIgnoreCase))
+                Add(LivePreflightSeverity.Warning, slot.Header, "Non-default SV quality selected.", $"Quality={qualityChoice.Label}. Use only for intentional relay behavior tests.");
+            else
+                Add(LivePreflightSeverity.Info, slot.Header, "SV quality", qualityChoice.Label);
+
             try
             {
                 var validation = SampledValuesPublisherValidator.Validate(stream);
@@ -1561,6 +1660,162 @@ public sealed class SvPublisherViewModel : ObservableObject
         }
     }
 
+
+    private async Task ExportGeneratedPcapAsync()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export Generated SV Frames to PCAP",
+            Filter = "PCAP files (*.pcap)|*.pcap|All files (*.*)|*.*",
+            FileName = $"arsvin-sv-generated-{DateTime.Now:yyyyMMdd-HHmmss}.pcap"
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            SaveCurrentPublisherSlot();
+            ValidateBeforeRun(live: false);
+            var frames = await Task.Run(() => BuildGeneratedPcapFrames(maxFramesPerPublisher: 1000)).ConfigureAwait(true);
+            SampledValuesPcapExporter.WriteGeneratedFrames(dialog.FileName, frames);
+            StatusText = "Generated PCAP exported.";
+            AppendEvent($"Exported generated SV PCAP: {dialog.FileName} ({frames.Count} frame(s)).");
+        }
+        catch (Exception ex)
+        {
+            StatusText = "PCAP export failed.";
+            AppendEvent(ex.Message);
+        }
+    }
+
+    private async Task ExportPublisherEvidenceReportAsync()
+    {
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export SV Publisher Evidence Report",
+            Filter = "Markdown report (*.md)|*.md|Text files (*.txt)|*.txt|All files (*.*)|*.*",
+            FileName = $"arsvin-sv-evidence-{DateTime.Now:yyyyMMdd-HHmmss}.md"
+        };
+
+        if (dialog.ShowDialog() != true)
+            return;
+
+        try
+        {
+            SaveCurrentPublisherSlot();
+            var preflight = RefreshLivePreflight();
+            var evidence = BuildPublisherEvidenceReport(preflight);
+            var markdown = SampledValuesPublisherEvidenceReportWriter.ToMarkdown(evidence);
+            await File.WriteAllTextAsync(dialog.FileName, markdown).ConfigureAwait(true);
+            StatusText = "Publisher evidence report exported.";
+            AppendEvent($"Exported publisher evidence report: {dialog.FileName}");
+        }
+        catch (Exception ex)
+        {
+            StatusText = "Evidence export failed.";
+            AppendEvent(ex.Message);
+        }
+    }
+
+    private SampledValuesPublisherEvidenceReport BuildPublisherEvidenceReport(LivePreflightReport preflight)
+    {
+        ArgumentNullException.ThrowIfNull(preflight);
+        var activeSlots = PublisherSlots.Where(slot => slot.IsEnabled).ToArray();
+        var streams = activeSlots.Select(slot => BuildEvidenceStream(slot, preflight)).ToArray();
+        var streamAreas = new HashSet<string>(activeSlots.Select(slot => slot.Header), StringComparer.OrdinalIgnoreCase);
+        var globalFindings = preflight.Diagnostics
+            .Where(diagnostic => !streamAreas.Contains(diagnostic.Area))
+            .Select(ToEvidenceFinding)
+            .ToArray();
+        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "dev";
+
+        return new SampledValuesPublisherEvidenceReport(
+            ToolName: "ARSVIN",
+            ToolVersion: version,
+            CreatedAt: DateTimeOffset.Now,
+            SclPath: SclPath,
+            Adapter: SelectedAdapter?.DisplayName ?? "-",
+            Mode: $"{Mode}; continuous={Continuous}; duration={DurationSeconds:0.###}s",
+            TxTiming: TxTimingHealthText,
+            SafetyBoundary: "Lab publisher / TX-side evidence only; not an analyzer and not a certified merging unit.",
+            Streams: streams,
+            GlobalFindings: globalFindings);
+    }
+
+    private SampledValuesEvidenceStream BuildEvidenceStream(SvPublisherSlotViewModel slot, LivePreflightReport preflight)
+    {
+        var findings = preflight.Diagnostics
+            .Where(diagnostic => string.Equals(diagnostic.Area, slot.Header, StringComparison.OrdinalIgnoreCase))
+            .Select(ToEvidenceFinding)
+            .ToArray();
+
+        var controlBlock = slot.StreamControlBlock;
+        var svId = slot.StreamId;
+        var dataSet = slot.DataSetReference;
+        var noAsdu = (ushort)1;
+        var payloadBytes = Math.Max(0, slot.PayloadBytes);
+        var estimatedBytes = 0;
+        var estimatedBandwidth = 0.0;
+
+        if (slot.SelectedStream?.Stream is { } stream)
+        {
+            controlBlock = string.IsNullOrWhiteSpace(controlBlock) ? stream.ControlBlockReference : controlBlock;
+            svId = string.IsNullOrWhiteSpace(svId) ? stream.SvId : svId;
+            dataSet = string.IsNullOrWhiteSpace(dataSet) ? stream.DataSetReference : dataSet;
+            noAsdu = SampledValuesPublisherProfile.ResolveAsduPerFrame(stream);
+            try
+            {
+                var layout = SampledValuesPayloadLayout.FromDataSet(stream.Entries);
+                payloadBytes = layout.PayloadByteLength;
+                if (stream.Address.AppId.HasValue && stream.Address.DestinationMac.HasValue)
+                {
+                    var preview = SampledValuesFramePreview.FromStream(stream, slot.SampleRateHz);
+                    estimatedBytes = preview.EstimatedEthernetBytes;
+                    estimatedBandwidth = preview.EstimatedBandwidthBitsPerSecond;
+                }
+            }
+            catch
+            {
+                // Preflight findings carry the user-visible detail. The evidence row remains exportable.
+            }
+        }
+
+        var publicationRate = SampledValuesPublisherProfile.ResolvePublicationRate(slot.SampleRateHz, noAsdu);
+        var quality = ResolveSampleQualityChoice(slot.SampleQualityKey).Label;
+        var vlan = slot.UseVlan ? $"VID={slot.VlanId}/PCP={slot.VlanPriority}" : "untagged";
+        var status = slot.SelectedStream is null ? "needs stream" : "ready";
+
+        return new SampledValuesEvidenceStream(
+            SlotName: slot.Header,
+            IsEnabled: slot.IsEnabled,
+            ControlBlockReference: controlBlock,
+            SvId: svId,
+            DataSetReference: dataSet,
+            AppId: slot.AppIdText,
+            SourceMac: slot.SourceMac,
+            DestinationMac: slot.DestinationMac,
+            Vlan: vlan,
+            SampleRateHz: slot.SampleRateHz,
+            PublicationRateHz: publicationRate,
+            NoAsdu: noAsdu,
+            PayloadBytesPerAsdu: payloadBytes,
+            EstimatedEthernetBytes: estimatedBytes,
+            EstimatedBandwidthBitsPerSecond: estimatedBandwidth,
+            SignalSource: slot.SignalSource == PublisherSignalSource.ComtradeReplay ? "COMTRADE replay" : "Manual phasor",
+            Quality: quality,
+            SyncMode: NormalizeSyncPolicyMode(SyncPolicyMode).ToString(),
+            Status: status,
+            Findings: findings);
+    }
+
+    private static SampledValuesEvidenceFinding ToEvidenceFinding(LivePreflightDiagnostic diagnostic)
+        => new(
+            diagnostic.Severity.ToString().ToUpperInvariant(),
+            diagnostic.Area,
+            diagnostic.Message,
+            diagnostic.Detail);
+
     private async Task RunPublishAsync(bool live)
     {
         try
@@ -1580,6 +1835,7 @@ public sealed class SvPublisherViewModel : ObservableObject
             IsPublishing = true;
             var planPreview = BuildPublisherSessionPlan();
             StatusText = live ? "START PUBLISH - live NIC." : "START PUBLISH - dry run.";
+            TxTimingHealthText = "TX Timing: starting";
             AutoApplyWhileRunning = true;
             LiveApplyText = planPreview.LiveApplyText;
             AppendEvent(live ? $"Start Publish: live NIC {planPreview.DisplayName}." : $"Start Publish: dry-run {planPreview.DisplayName}.");
@@ -1602,9 +1858,88 @@ public sealed class SvPublisherViewModel : ObservableObject
             _publisherStop = null;
             IsPublishing = false;
             if (!PublishText.StartsWith("Complete", StringComparison.OrdinalIgnoreCase))
+            {
                 PublishText = "Publisher stopped.";
+                TxTimingHealthText = "TX Timing: stopped";
+            }
             CommandManager.InvalidateRequerySuggested();
         }
+    }
+
+
+    private IReadOnlyList<(DateTimeOffset Timestamp, byte[] Frame)> BuildGeneratedPcapFrames(int maxFramesPerPublisher)
+    {
+        var publisherStates = BuildPublisherRuntimeStates().ToArray();
+        if (publisherStates.Length == 0)
+            throw new InvalidOperationException("Enable at least one IED / MU publisher slot with a selected SV stream before exporting generated PCAP.");
+
+        var sessionPlan = BuildPublisherSessionPlan();
+        var startedAt = DateTimeOffset.UtcNow;
+        var frames = new List<(DateTimeOffset Timestamp, byte[] Frame)>();
+
+        foreach (var state in publisherStates)
+        {
+            state.SampleCount = SampleCounterPolicy.InitialSampleCount(startedAt, state.SampleRateHz, state.SampleCounterWrap, SampleCounterMode.SecondAligned);
+            var sessionLimit = sessionPlan.ResolveFrameLimit(state.PublicationRateHz);
+            var frameLimit = Math.Min(maxFramesPerPublisher, checked((int)Math.Min(sessionLimit ?? maxFramesPerPublisher, maxFramesPerPublisher)));
+            var baseChannels = state.FrozenChannels;
+
+            for (var frameIndex = 0; frameIndex < frameLimit; frameIndex++)
+            {
+                var frameTimestamp = startedAt.AddTicks((long)Math.Round(frameIndex * TimeSpan.TicksPerSecond / state.PublicationRateHz));
+                var asdus = new List<SampledValueAsdu>(state.NoAsdu);
+
+                for (var asduIndex = 0; asduIndex < state.NoAsdu; asduIndex++)
+                {
+                    var sampleIndex = ((long)frameIndex * state.NoAsdu) + asduIndex;
+                    var elapsedSeconds = sampleIndex / state.SampleRateHz;
+                    var timestamp = startedAt.AddTicks((long)Math.Round(sampleIndex * TimeSpan.TicksPerSecond / state.SampleRateHz));
+                    var sampleTime = new Iec61850UtcTime(timestamp, Quality: 0);
+
+                    byte[] payload;
+                    if (state.SignalSource == PublisherSignalSource.ComtradeReplay && state.ComtradeDataset is { } dataset)
+                    {
+                        var sample = dataset.GetSampleByIndex(sampleIndex, state.ComtradeLoop);
+                        var instantaneousValues = ResolveComtradeInstantaneousValues(sample, state.ComtradeChannelMap);
+                        payload = BuildInstantaneousSamplePayload(state.Stream, sampleTime, instantaneousValues, state.CurrentDlsb, state.VoltageDlsb, state.Quality);
+                    }
+                    else
+                    {
+                        var effectiveChannels = sessionPlan.ResolveChannels(baseChannels, elapsedSeconds);
+                        var phasedChannels = ApplyOscillatorPhases(effectiveChannels, state.OscillatorStates, state.SampleRateHz);
+                        payload = BuildSamplePayload(state.Stream, sampleTime, phasedChannels, state.CurrentDlsb, state.VoltageDlsb, state.Quality);
+                    }
+
+                    asdus.Add(new SampledValueAsdu
+                    {
+                        SvId = state.SvId,
+                        DataSetReference = state.DataSetReference,
+                        SampleCount = SampleCounterPolicy.Increment(state.SampleCount, state.SampleCounterWrap, asduIndex),
+                        ConfigurationRevision = state.Stream.ConfigurationRevision,
+                        ReferenceTime = sampleTime,
+                        SampleSynchronization = (byte)ResolveSampleSynchronization(null),
+                        SampleRate = ToSampleRate(state.SampleRateHz, state.NominalFrequencyHz, state.Stream.SampleMode),
+                        SampleMode = MapSampleMode(state.Stream.SampleMode),
+                        SamplePayload = payload
+                    });
+                }
+
+                var frame = SampledValuesFrameBuilder.BuildEthernetFrame(new SampledValuesFrame
+                {
+                    Destination = state.Destination,
+                    Source = state.Source,
+                    Vlan = state.Vlan,
+                    AppId = state.AppId,
+                    Pdu = new SampledValuesPdu { Asdus = asdus }
+                });
+
+                frames.Add((frameTimestamp, frame));
+                state.SampleCount = SampleCounterPolicy.Increment(state.SampleCount, state.SampleCounterWrap, state.NoAsdu);
+                state.Sent++;
+            }
+        }
+
+        return frames;
     }
 
     private async Task PublishLoopAsync(bool live, CancellationToken cancellationToken)
@@ -1678,7 +2013,8 @@ public sealed class SvPublisherViewModel : ObservableObject
                 PtpStatusText = live ? $"PTP: listening domain {ExpectedPtpDomain}" : "PTP: dry-run monitor inactive";
                 UpdatePtpPublisherStatus(labPtpPublisher);
                 SmpSynchStatusText = live ? $"smpSynch: waiting ({SyncPolicyShortLabel})" : FormatSmpSynchStatus(ResolveSampleSynchronization(null));
-                PublishText = $"Prepared {publisherStates.Length} SV publisher(s), {sessionPlan.DisplayName}: {string.Join(", ", publisherStates.Select(s => $"P{s.SlotIndex}@{s.SampleRateHz:0.#}sps/{s.PublicationRateHz:0.#}fps nofASDU={s.NoAsdu}"))}";
+                TxTimingHealthText = $"TX Timing: target={publisherStates.Sum(s => s.PublicationRateHz):0.0}fps";
+                PublishText = $"Prepared {publisherStates.Length} SV publisher(s), {sessionPlan.DisplayName}: {string.Join(", ", publisherStates.Select(s => $"P{s.SlotIndex}@{s.SampleRateHz:0.#}sps/{s.PublicationRateHz:0.#}fps nofASDU={s.NoAsdu} q={s.QualityLabel}"))}";
             });
 
             while (publisherStates.Any(IsActive))
@@ -1716,7 +2052,7 @@ public sealed class SvPublisherViewModel : ObservableObject
                         {
                             var sample = dataset.GetSampleByIndex(sampleIndex, state.ComtradeLoop);
                             var instantaneousValues = ResolveComtradeInstantaneousValues(sample, state.ComtradeChannelMap);
-                            payload = BuildInstantaneousSamplePayload(state.Stream, sampleTime, instantaneousValues, state.CurrentDlsb, state.VoltageDlsb);
+                            payload = BuildInstantaneousSamplePayload(state.Stream, sampleTime, instantaneousValues, state.CurrentDlsb, state.VoltageDlsb, state.Quality);
                         }
                         else
                         {
@@ -1724,7 +2060,7 @@ public sealed class SvPublisherViewModel : ObservableObject
                                 ? sessionPlan.ResolveChannels(baseChannelsForFrame, elapsedSeconds)
                                 : baseChannelsForFrame;
                             var phasedChannels = ApplyOscillatorPhases(effectiveChannels, state.OscillatorStates, state.SampleRateHz);
-                            payload = BuildSamplePayload(state.Stream, sampleTime, phasedChannels, state.CurrentDlsb, state.VoltageDlsb);
+                            payload = BuildSamplePayload(state.Stream, sampleTime, phasedChannels, state.CurrentDlsb, state.VoltageDlsb, state.Quality);
                         }
 
                         samplePayloads.Add(payload);
@@ -1751,7 +2087,11 @@ public sealed class SvPublisherViewModel : ObservableObject
                         Pdu = new SampledValuesPdu { Asdus = asdus }
                     });
 
+                    var scheduledTicks = state.DueTicks(startedTicks);
+                    var sendStartTicks = Stopwatch.GetTimestamp();
                     await transport.SendAsync(frame, cancellationToken).ConfigureAwait(false);
+                    var sendEndTicks = Stopwatch.GetTimestamp();
+                    state.TimingHealth.Record(scheduledTicks, sendStartTicks, sendEndTicks);
                     state.SampleCount = SampleCounterPolicy.Increment(state.SampleCount, state.SampleCounterWrap, state.NoAsdu);
                     state.Sent++;
                     totalSent++;
@@ -1767,11 +2107,13 @@ public sealed class SvPublisherViewModel : ObservableObject
                     var effectiveRate = totalSent / Math.Max(elapsed.TotalSeconds, 0.001);
                     var totalSamples = publisherStates.Sum(s => s.Sent * s.NoAsdu);
                     var perPublisher = string.Join("  ", publisherStates.Select(s => $"P{s.SlotIndex}:{s.Sent}f/{s.Sent * s.NoAsdu}s smpCnt={s.SampleCount}"));
-                    var message = $"{(live ? "LIVE" : "DRY")} {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} samples={totalSamples} rate={effectiveRate:0.0} fps smpSynch={(byte)smpSynch} ({SyncPolicyShortLabel}) payload={lastPayloadBytes}B/asdu frame={lastFrameBytes}B  {perPublisher}";
+                    var txTimingText = FormatTxTimingHealth(publisherStates, nowTicks);
+                    var message = $"{(live ? "LIVE" : "DRY")} {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} samples={totalSamples} rate={effectiveRate:0.0} fps smpSynch={(byte)smpSynch} ({SyncPolicyShortLabel}) payload={lastPayloadBytes}B/asdu frame={lastFrameBytes}B q={string.Join(",", publisherStates.Select(s => s.QualityLabel).Distinct())} {txTimingText}  {perPublisher}";
                     Dispatch(() =>
                     {
                         PayloadBytes = lastPayloadBytes;
                         PublishText = message;
+                        TxTimingHealthText = txTimingText;
                         UpdatePtpStatus(latestPtpReport, smpSynch, live);
                         UpdatePtpPublisherStatus(labPtpPublisher);
                     });
@@ -1800,13 +2142,55 @@ public sealed class SvPublisherViewModel : ObservableObject
 
         var totalElapsed = Stopwatch.GetElapsedTime(startedTicks);
         var rate = totalSent / Math.Max(totalElapsed.TotalSeconds, 0.001);
+        var finalTxTimingText = FormatTxTimingHealth(publisherStates, Stopwatch.GetTimestamp());
         Dispatch(() =>
         {
             var totalSamples = publisherStates.Sum(s => s.Sent * s.NoAsdu);
-            PublishText = $"Complete {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} samples={totalSamples} elapsed={totalElapsed.TotalSeconds:0.000}s rate={rate:0.0} fps lastFrame={lastFrameBytes}B";
+            PublishText = $"Complete {sessionPlan.ShortName} publishers={publisherStates.Length} frames={totalSent} samples={totalSamples} elapsed={totalElapsed.TotalSeconds:0.000}s rate={rate:0.0} fps lastFrame={lastFrameBytes}B {finalTxTimingText}";
+            TxTimingHealthText = finalTxTimingText;
             StatusText = "Publisher complete.";
             AppendEvent(PublishText);
         });
+    }
+
+    private static string FormatTxTimingHealth(IReadOnlyList<PublisherRuntimeState> publisherStates, long nowTicks)
+    {
+        if (publisherStates.Count == 0)
+            return "TX Timing: idle";
+
+        var snapshots = publisherStates.Select(state => state.TimingHealth.Snapshot(nowTicks)).ToArray();
+        var targetFps = snapshots.Sum(snapshot => snapshot.TargetFramesPerSecond);
+        var actualFps = snapshots.Sum(snapshot => snapshot.ActualFramesPerSecond);
+        var totalFrames = Math.Max(1, snapshots.Sum(snapshot => snapshot.FrameCount));
+        var averageJitter = snapshots.Sum(snapshot => snapshot.AverageAbsJitterMicroseconds * Math.Max(1, snapshot.FrameCount)) / totalFrames;
+        var maxJitter = snapshots.Max(snapshot => snapshot.MaxAbsJitterMicroseconds);
+        var lateFrames = snapshots.Sum(snapshot => snapshot.LateFrameCount);
+        var missedSchedules = snapshots.Sum(snapshot => snapshot.MissedScheduleCount);
+        var averageSend = snapshots.Sum(snapshot => snapshot.AverageSendDurationMicroseconds * Math.Max(1, snapshot.FrameCount)) / totalFrames;
+        var maxSend = snapshots.Max(snapshot => snapshot.MaxSendDurationMicroseconds);
+        var maxLateBy = snapshots.Max(snapshot => snapshot.MaxLateByMicroseconds);
+        var status = ResolveWorstTxTimingStatus(snapshots);
+        var label = status switch
+        {
+            TxTimingHealthStatus.Good => "GOOD",
+            TxTimingHealthStatus.Warning => "WARN",
+            TxTimingHealthStatus.Bad => "BAD",
+            _ => "IDLE"
+        };
+
+        return $"TX Timing: {label} act={actualFps:0.0}/{targetFps:0.0}fps jitter={averageJitter:0}/{maxJitter:0}us late={lateFrames} missed={missedSchedules} send={averageSend:0}/{maxSend:0}us maxLate={maxLateBy:0}us";
+    }
+
+    private static TxTimingHealthStatus ResolveWorstTxTimingStatus(IEnumerable<TxTimingHealthSnapshot> snapshots)
+    {
+        var materialized = snapshots.ToArray();
+        if (materialized.Any(snapshot => snapshot.Status == TxTimingHealthStatus.Bad))
+            return TxTimingHealthStatus.Bad;
+        if (materialized.Any(snapshot => snapshot.Status == TxTimingHealthStatus.Warning))
+            return TxTimingHealthStatus.Warning;
+        if (materialized.Any(snapshot => snapshot.Status == TxTimingHealthStatus.Good))
+            return TxTimingHealthStatus.Good;
+        return TxTimingHealthStatus.Idle;
     }
 
     private IReadOnlyList<PublisherRuntimeState> BuildPublisherRuntimeStates()
@@ -1841,10 +2225,13 @@ public sealed class SvPublisherViewModel : ObservableObject
                 NominalFrequencyHz = slot.NominalFrequencyHz,
                 CurrentDlsb = slot.CurrentDlsb,
                 VoltageDlsb = slot.VoltageDlsb,
+                Quality = ResolveSampleQualityChoice(slot.SampleQualityKey).Quality,
+                QualityLabel = ResolveSampleQualityChoice(slot.SampleQualityKey).ShortLabel,
                 SvId = slot.StreamId.Trim(),
                 DataSetReference = slot.DataSetReference.Trim(),
                 SampleCounterWrap = ResolveSampleCounterWrap(stream, slot.SampleRateHz, slot.NominalFrequencyHz),
                 NoAsdu = SampledValuesPublisherProfile.ResolveAsduPerFrame(stream),
+                TimingHealth = new TxTimingHealth(SampledValuesPublisherProfile.ResolvePublicationRate(slot.SampleRateHz, SampledValuesPublisherProfile.ResolveAsduPerFrame(stream))),
                 FrozenChannels = channels,
                 OscillatorStates = channels.ToDictionary(
                     x => x.Key,
@@ -1893,11 +2280,14 @@ public sealed class SvPublisherViewModel : ObservableObject
         public double NominalFrequencyHz { get; init; }
         public double CurrentDlsb { get; init; }
         public double VoltageDlsb { get; init; }
+        public SampledValueQuality Quality { get; init; } = SampledValueQuality.Good;
+        public string QualityLabel { get; init; } = "good";
         public string SvId { get; init; } = string.Empty;
         public string DataSetReference { get; init; } = string.Empty;
         public ushort? SampleCounterWrap { get; init; }
         public ushort NoAsdu { get; init; } = 1;
         public double PublicationRateHz => SampledValuesPublisherProfile.ResolvePublicationRate(SampleRateHz, NoAsdu);
+        public required TxTimingHealth TimingHealth { get; init; }
         public ushort SampleCount { get; set; }
         public long Sent { get; set; }
         public required IReadOnlyDictionary<string, EffectiveChannel> FrozenChannels { get; init; }
@@ -2104,7 +2494,8 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         Iec61850UtcTime timestamp,
         IReadOnlyDictionary<string, double> instantaneousValues,
         double currentDlsb,
-        double voltageDlsb)
+        double voltageDlsb,
+        SampledValueQuality quality)
     {
         var layout = SampledValuesPayloadLayout.FromDataSet(stream.Entries);
         if (!layout.IsFullySupported)
@@ -2119,7 +2510,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
 
             if (element.Kind == SampledValuePayloadElementKind.Quality)
             {
-                values.Add(MmsDataValue.BitString(0, SampledValueQuality.Good.ToBytes(element.Width)));
+                values.Add(MmsDataValue.BitString(0, quality.ToBytes(element.Width)));
                 continue;
             }
 
@@ -2136,7 +2527,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
                 continue;
             }
 
-            values.Add(BuildInstantaneousChannelValue(entry, element, instantaneousValues, currentDlsb, voltageDlsb));
+            values.Add(BuildInstantaneousChannelValue(entry, element, instantaneousValues, currentDlsb, voltageDlsb, quality));
         }
 
         return SampledValuesPayloadBuilder.BuildPayload(layout, values);
@@ -2147,7 +2538,8 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         SampledValuePayloadElement element,
         IReadOnlyDictionary<string, double> instantaneousValues,
         double currentDlsb,
-        double voltageDlsb)
+        double voltageDlsb,
+        SampledValueQuality quality)
     {
         var key = ResolveSignalKey(entry);
         if (key is null || !instantaneousValues.TryGetValue(key, out var value))
@@ -2177,7 +2569,8 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         Iec61850UtcTime timestamp,
         IReadOnlyDictionary<string, EffectiveChannel> channels,
         double currentDlsb,
-        double voltageDlsb)
+        double voltageDlsb,
+        SampledValueQuality quality)
     {
         var layout = SampledValuesPayloadLayout.FromDataSet(stream.Entries);
         if (!layout.IsFullySupported)
@@ -2192,7 +2585,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
 
             if (element.Kind == SampledValuePayloadElementKind.Quality)
             {
-                values.Add(MmsDataValue.BitString(0, SampledValueQuality.Good.ToBytes(element.Width)));
+                values.Add(MmsDataValue.BitString(0, quality.ToBytes(element.Width)));
                 continue;
             }
 
@@ -2209,7 +2602,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
                 continue;
             }
 
-            values.Add(BuildChannelValue(entry, element, channels, currentDlsb, voltageDlsb));
+            values.Add(BuildChannelValue(entry, element, channels, currentDlsb, voltageDlsb, quality));
         }
 
         return SampledValuesPayloadBuilder.BuildPayload(layout, values);
@@ -2220,7 +2613,8 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         SampledValuePayloadElement element,
         IReadOnlyDictionary<string, EffectiveChannel> channels,
         double currentDlsb,
-        double voltageDlsb)
+        double voltageDlsb,
+        SampledValueQuality quality)
     {
         var key = ResolveSignalKey(entry);
         if (key is null || !channels.TryGetValue(key, out var effective) || !effective.IsEnabled)
@@ -2408,6 +2802,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         slot.VoltageDlsb = VoltageDlsb;
         slot.ManualSetMode = ManualSetMode;
         slot.SampleRatePresetKey = SelectedSampleRatePreset?.Key ?? slot.SampleRatePresetKey;
+        slot.SampleQualityKey = SelectedSampleQualityChoice.Key;
         slot.DataSetEntryCount = DataSetEntryCount;
         slot.MappedSignalCount = MappedSignalCount;
         slot.PayloadBytes = PayloadBytes;
@@ -2437,6 +2832,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             SelectedSampleRatePreset = SampleRatePresets.FirstOrDefault(p => p.Key == slot.SampleRatePresetKey)
                 ?? SampleRatePresets.FirstOrDefault(p => Math.Abs(p.SampleRateHz - slot.SampleRateHz) < 0.5)
                 ?? SampleRatePresets.FirstOrDefault();
+            SelectedSampleQualityChoice = ResolveSampleQualityChoice(slot.SampleQualityKey);
 
             if (slot.Channels.Count > 0)
             {
@@ -3680,6 +4076,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
                 SignalSource = slot.SignalSource,
                 ComtradePath = slot.ComtradePath,
                 ComtradeLoop = slot.ComtradeLoop,
+                SampleQualityKey = slot.SampleQualityKey,
                 Channels = slot.Channels
             }).ToArray(),
             AutoApplyWhileRunning = AutoApplyWhileRunning,
@@ -3688,6 +4085,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             ExpectedPtpDomain = ExpectedPtpDomain,
             PtpAllowLocalFallback = PtpAllowLocalFallback,
             PtpPublisherMode = PtpPublisherMode,
+            SampleQualityKey = SelectedSampleQualityChoice.Key,
             PtpClockIdentity = PtpClockIdentityText,
             PtpAnnounceIntervalMs = PtpAnnounceIntervalMs,
             PtpSyncIntervalMs = PtpSyncIntervalMs,

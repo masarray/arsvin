@@ -77,3 +77,45 @@ Unit tests were added for:
 3. Add golden PCAP files under `tests/golden/` and compare byte-level expected output.
 4. Add `nofASDU=2`, `nofASDU=4`, and `nofASDU=8` sample SCL files to CI test data.
 5. Add jitter/p95/p99 TX health statistics to the publish status bar.
+
+## P0.1 Publisher evidence update
+
+This revision keeps ARSVIN scoped as a publisher, not an analyzer.
+
+Added evidence-oriented publisher functions:
+
+- TX quality preset selection for the selected publisher slot: good, invalid, questionable, oldData, test, operatorBlocked.
+- Runtime payload quality fields now follow the selected preset instead of always emitting good quality.
+- Preflight shows a warning when a non-default quality preset is selected.
+- Generated PCAP export writes ARSVIN-created SV Ethernet frames without capturing live network traffic.
+- Publish status includes per-publisher `q=` labels so operator intent is visible during live/dry runs.
+
+Generated PCAP export is meant for offline evidence in Wireshark or third-party SV tools. It is not packet capture and it does not turn ARSVIN into a network analyzer.
+
+## P0.2 TX Timing Health update
+
+This revision adds publisher-side timing health only. It does not capture external packets and does not make ARSVIN a process-bus analyzer.
+
+The runtime records, per enabled publisher slot:
+
+- target publication rate, derived from `sampleRateHz / nofASDU`;
+- actual publication rate observed from the TX loop;
+- target frame interval;
+- average and maximum absolute jitter;
+- late frame count;
+- missed schedule count;
+- average and maximum send duration.
+
+The status bar shows a compact global summary using the worst status from all enabled publishers:
+
+```text
+TX Timing: GOOD act=1599.8/1600.0fps jitter=8/42us late=0 missed=0 send=6/18us maxLate=20us
+```
+
+Status meaning:
+
+- `GOOD`: frame rate and local TX timing are stable enough for lab publishing.
+- `WARN`: the publisher is running but jitter/late frames are visible.
+- `BAD`: the runtime missed at least one schedule slot, actual FPS is significantly low, or jitter is larger than one target interval.
+
+This is a Windows/Npcap runtime health indicator, not certified PTP or hardware timestamp evidence. Use it to determine whether the PC/NIC is strong enough for the selected SV profile.

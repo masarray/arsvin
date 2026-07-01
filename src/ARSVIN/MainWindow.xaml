@@ -630,6 +630,8 @@
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -779,21 +781,51 @@
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="11" Command="{Binding RunLiveCommand}" Style="{StaticResource StartButtonStyle}">
+
+            <Button Grid.Column="11" Command="{Binding ExportGeneratedPcapCommand}" Style="{StaticResource RibbonButton}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Viewbox Width="24" Height="24">
+                        <Canvas Width="24" Height="24">
+                            <Path Data="M6 3 H15 L20 8 V21 H6 Z" Stroke="#334155" StrokeThickness="1.9" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            <Path Data="M15 3 V8 H20" Stroke="#334155" StrokeThickness="1.9" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            <Path Data="M9 13 H17" Stroke="#2563EB" StrokeThickness="1.9" StrokeStartLineCap="Round"/>
+                            <Path Data="M9 17 H14" Stroke="#2563EB" StrokeThickness="1.9" StrokeStartLineCap="Round"/>
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="PCAP" Style="{StaticResource RibbonCaption}" />
+                </StackPanel>
+            </Button>
+
+            <Button Grid.Column="12" Command="{Binding ExportPublisherEvidenceReportCommand}" Style="{StaticResource RibbonButton}">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Viewbox Width="24" Height="24">
+                        <Canvas Width="24" Height="24">
+                            <Path Data="M5 3 H15 L20 8 V21 H5 Z" Stroke="#334155" StrokeThickness="1.9" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            <Path Data="M15 3 V8 H20" Stroke="#334155" StrokeThickness="1.9" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                            <Path Data="M8 12 H17" Stroke="#2563EB" StrokeThickness="1.9" StrokeStartLineCap="Round"/>
+                            <Path Data="M8 16 H17" Stroke="#2563EB" StrokeThickness="1.9" StrokeStartLineCap="Round"/>
+                            <Path Data="M8 19 H13" Stroke="#2563EB" StrokeThickness="1.9" StrokeStartLineCap="Round"/>
+                        </Canvas>
+                    </Viewbox>
+                    <TextBlock Text="Report" Style="{StaticResource RibbonCaption}" />
+                </StackPanel>
+            </Button>
+
+            <Button Grid.Column="13" Command="{Binding RunLiveCommand}" Style="{StaticResource StartButtonStyle}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Path Data="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" Stroke="#FFFFFF" StrokeThickness="1.9" Fill="Transparent" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/></Canvas></Viewbox>
                     <TextBlock Text="Start" Style="{StaticResource RibbonCaption}" Foreground="#FFFFFF" />
                 </StackPanel>
             </Button>
 
-            <Button Grid.Column="12" Command="{Binding StopCommand}" Style="{StaticResource StopButtonStyle}">
+            <Button Grid.Column="14" Command="{Binding StopCommand}" Style="{StaticResource StopButtonStyle}">
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Viewbox Width="24" Height="24"><Canvas Width="24" Height="24"><Rectangle Canvas.Left="3.5" Canvas.Top="3.5" Width="17" Height="17" RadiusX="2" RadiusY="2" Stroke="#FFFFFF" StrokeThickness="1.9" Fill="Transparent"/></Canvas></Viewbox>
                     <TextBlock Text="Stop" Style="{StaticResource RibbonCaption}" Foreground="#FFFFFF" />
                 </StackPanel>
             </Button>
 
-            <Border Grid.Column="13" Background="#F8FBFF" BorderBrush="#D7E2F0" BorderThickness="1" CornerRadius="14" Padding="12,8" Margin="12,0,0,0" VerticalAlignment="Stretch">
+            <Border Grid.Column="15" Background="#F8FBFF" BorderBrush="#D7E2F0" BorderThickness="1" CornerRadius="14" Padding="12,8" Margin="12,0,0,0" VerticalAlignment="Stretch">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="190" />
@@ -886,6 +918,20 @@
                                 <TextBlock Grid.Column="2" Text="Nom. Hz" Style="{StaticResource LabelText}" Margin="10,0,0,0" />
                                 <TextBox Grid.Column="3" Text="{Binding NominalFrequencyHz, UpdateSourceTrigger=PropertyChanged}" />
                             </Grid>
+
+                            <Grid Margin="0,8,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="84" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="70" />
+                                    <ColumnDefinition Width="86" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="SV quality" Style="{StaticResource LabelText}" />
+                                <ComboBox Grid.Column="1" ItemsSource="{Binding SampleQualityChoices}" SelectedItem="{Binding SelectedSampleQualityChoice}" />
+                                <TextBlock Grid.Column="2" Text="TX q" Style="{StaticResource LabelText}" Margin="10,0,0,0" />
+                                <TextBlock Grid.Column="3" Text="{Binding SampleQualityStatusText}" VerticalAlignment="Center" HorizontalAlignment="Center" FontWeight="SemiBold" Foreground="{StaticResource TextMuted}" />
+                            </Grid>
+                            <TextBlock Text="{Binding SampleQualityHelpText}" Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" Margin="84,4,0,0" />
                         </StackPanel>
 
                         <DataGrid x:Name="ManualOutputsGrid"
@@ -1505,15 +1551,17 @@
             </Border.Background>
             <Grid Margin="12,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="170" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="150" />
+                    <ColumnDefinition Width="0.95*" />
                     <ColumnDefinition Width="1.15*" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="1.45*" />
+                    <ColumnDefinition Width="0.95*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Foreground="#334155" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                 <TextBlock Grid.Column="1" Text="{Binding SyncStatusBarText}" VerticalAlignment="Center" Foreground="#1D4ED8" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
                 <TextBlock Grid.Column="2" Text="{Binding AdapterStatusText}" VerticalAlignment="Center" Foreground="#475569" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
-                <TextBlock Grid.Column="3" Text="{Binding LiveSafetyStatusText}" VerticalAlignment="Center" Foreground="#64748B" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
+                <TextBlock Grid.Column="3" Text="{Binding TxTimingHealthText}" VerticalAlignment="Center" Foreground="#0F766E" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
+                <TextBlock Grid.Column="4" Text="{Binding LiveSafetyStatusText}" VerticalAlignment="Center" Foreground="#64748B" TextTrimming="CharacterEllipsis" Margin="12,0,0,0" />
             </Grid>
         </Border>
     </Grid>
