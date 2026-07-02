@@ -76,3 +76,12 @@ This roadmap keeps ARSVIN focused as a professional public IEC 61850 Sampled Val
 - CT saturation stress with DC offset, harmonic, and clipping approximation.
 - Harmonic injection and DC offset transient presets.
 
+
+
+## ArSubsv Roadmap
+
+- Add PCAPNG import.
+- Add manual stream definitions when SCL is unavailable.
+- Add cursor drag interaction in the oscilloscope plot.
+- Add per-stream export of CSV waveform samples.
+- Add richer IEC 61869-9 dataset presentation.

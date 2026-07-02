@@ -314,6 +314,8 @@ public sealed class SvPublisherSlotViewModel : ObservableObject
         ? "disabled"
         : SelectedStream is null ? "needs stream" : "enabled";
 
+    public override string ToString() => $"MU{Index} · {StreamIdOrFallback}";
+
     public string SummaryText
     {
         get

@@ -1,4 +1,5 @@
 <Solution>
   <Project Path="src/ARSVIN/ARSVIN.csproj" />
+  <Project Path="src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj" />
   <Project Path="tests/ARSVIN.Tests/ARSVIN.Tests.csproj" />
 </Solution>

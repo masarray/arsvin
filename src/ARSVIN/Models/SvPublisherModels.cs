@@ -68,6 +68,8 @@ public sealed class SvStreamChoice
 
     private static string TextOrDash(string value)
         => string.IsNullOrWhiteSpace(value) ? "-" : value;
+
+    public override string ToString() => Label;
 }
 
 
@@ -133,6 +135,8 @@ public sealed class AdapterChoice
     public required string Selector { get; init; }
     public required string DisplayName { get; init; }
     public string MacAddress { get; init; } = string.Empty;
+
+    public override string ToString() => DisplayName;
 }
 
 public sealed class SignalChannelSnapshot

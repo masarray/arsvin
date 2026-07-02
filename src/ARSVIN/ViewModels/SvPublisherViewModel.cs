@@ -2222,9 +2222,7 @@ public sealed class SvPublisherViewModel : ObservableObject
                     var smpSynch = ResolveSampleSynchronization(latestPtpReport);
                     var samplePayloads = new List<byte[]>(state.NoAsdu);
                     var asdus = new List<SampledValueAsdu>(state.NoAsdu);
-                    var baseChannelsForFrame = state.IsSelectedSlot && AutoApplyWhileRunning
-                        ? CaptureBaseEffectiveChannels()
-                        : state.FrozenChannels;
+                    var baseChannelsForFrame = ResolveRuntimeBaseChannels(state);
 
                     for (var asduIndex = 0; asduIndex < state.NoAsdu; asduIndex++)
                     {
@@ -2241,9 +2239,7 @@ public sealed class SvPublisherViewModel : ObservableObject
                         }
                         else
                         {
-                            var effectiveChannels = state.IsSelectedSlot
-                                ? sessionPlan.ResolveChannels(baseChannelsForFrame, elapsedSeconds)
-                                : baseChannelsForFrame;
+                            var effectiveChannels = sessionPlan.ResolveChannels(baseChannelsForFrame, elapsedSeconds);
                             var phasedChannels = ApplyOscillatorPhases(effectiveChannels, state.OscillatorStates, state.SampleRateHz);
                             payload = BuildSamplePayload(state.Stream, sampleTime, phasedChannels, state.CurrentDlsb, state.VoltageDlsb, state.Quality);
                         }
@@ -2387,15 +2383,7 @@ public sealed class SvPublisherViewModel : ObservableObject
             if (slot.SelectedStream?.Stream is not { } stream)
                 continue;
 
-            var channels = slot.Channels.Count > 0
-                ? slot.Channels.ToDictionary(
-                    c => c.Key,
-                    c => new EffectiveChannel(ResolveChannelKind(c.Key), c.IsEnabled, c.Magnitude, c.AngleDegrees, c.FrequencyHz, c.AngleDegrees * Math.PI / 180.0, c.DcOffsetPercent, c.HarmonicPercent, Math.Clamp(c.HarmonicOrder, 2, 63), c.ClipPercent),
-                    StringComparer.OrdinalIgnoreCase)
-                : Channels.ToDictionary(
-                    c => c.Key,
-                    c => new EffectiveChannel(c.Kind, c.IsEnabled, c.Magnitude, c.AngleDegrees, c.FrequencyHz, c.AngleDegrees * Math.PI / 180.0, c.DcOffsetPercent, c.HarmonicPercent, Math.Clamp(c.HarmonicOrder, 2, 63), c.ClipPercent),
-                    StringComparer.OrdinalIgnoreCase);
+            var channels = CaptureEffectiveChannelsFromSlot(slot);
 
             states.Add(new PublisherRuntimeState
             {
@@ -2859,25 +2847,37 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
         };
 
     private IReadOnlyDictionary<string, EffectiveChannel> CaptureBaseEffectiveChannels()
-    {
-        var channels = new Dictionary<string, EffectiveChannel>(StringComparer.OrdinalIgnoreCase);
-        foreach (var channel in Channels)
-        {
-            var frequency = channel.FrequencyHz >= 0 ? channel.FrequencyHz : NominalFrequencyHz;
-            channels[channel.Key] = new EffectiveChannel(
-                channel.Kind,
-                channel.IsEnabled,
-                channel.Magnitude,
-                channel.AngleDegrees,
-                frequency,
-                channel.AngleDegrees * Math.PI / 180.0,
-                channel.DcOffsetPercent,
-                channel.HarmonicPercent,
-                channel.HarmonicOrder,
-                channel.ClipPercent);
-        }
+        => CaptureEffectiveChannelsFromSlot(SelectedPublisherSlot);
 
-        return channels;
+    private IReadOnlyDictionary<string, EffectiveChannel> CaptureEffectiveChannelsFromSlot(SvPublisherSlotViewModel? slot)
+    {
+        var snapshots = slot?.Channels is { Count: > 0 }
+            ? slot.Channels
+            : Channels.Select(c => c.ToSnapshot()).ToArray();
+
+        return snapshots.ToDictionary(
+            c => c.Key,
+            c => new EffectiveChannel(
+                ResolveChannelKind(c.Key),
+                c.IsEnabled,
+                c.Magnitude,
+                c.AngleDegrees,
+                c.FrequencyHz >= 0 ? c.FrequencyHz : (slot?.NominalFrequencyHz ?? NominalFrequencyHz),
+                c.AngleDegrees * Math.PI / 180.0,
+                c.DcOffsetPercent,
+                c.HarmonicPercent,
+                Math.Clamp(c.HarmonicOrder, 2, 63),
+                c.ClipPercent),
+            StringComparer.OrdinalIgnoreCase);
+    }
+
+    private IReadOnlyDictionary<string, EffectiveChannel> ResolveRuntimeBaseChannels(PublisherRuntimeState state)
+    {
+        if (!AutoApplyWhileRunning)
+            return state.FrozenChannels;
+
+        var slot = PublisherSlots.FirstOrDefault(item => item.Index == state.SlotIndex);
+        return slot is null ? state.FrozenChannels : CaptureEffectiveChannelsFromSlot(slot);
     }
 
     private PublisherSessionPlan BuildPublisherSessionPlan()
@@ -4413,7 +4413,11 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
 
     private void AppendEvent(string message)
     {
-        if (!Application.Current.Dispatcher.CheckAccess())
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+            return;
+
+        if (!dispatcher.CheckAccess())
         {
             Dispatch(() => AppendEvent(message));
             return;
@@ -4428,11 +4432,17 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
 
     private static void Dispatch(Action action)
     {
-        var dispatcher = Application.Current.Dispatcher;
+        var dispatcher = Application.Current?.Dispatcher;
+        if (dispatcher is null || dispatcher.HasShutdownStarted || dispatcher.HasShutdownFinished)
+            return;
+
         if (dispatcher.CheckAccess())
+        {
             action();
-        else
-            dispatcher.Invoke(action);
+            return;
+        }
+
+        dispatcher.InvokeAsync(action);
     }
 
     private static IReadOnlyDictionary<string, EffectiveChannel> ApplyOscillatorPhases(

@@ -26,6 +26,7 @@
     <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Mms\MmsBinaryTime.cs" Link="Engine\Mms\MmsBinaryTime.cs" />
     <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Mms\MmsDataKind.cs" Link="Engine\Mms\MmsDataKind.cs" />
     <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Mms\MmsDataValue.cs" Link="Engine\Mms\MmsDataValue.cs" />
+    <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Transports\*.cs" LinkBase="Engine\Transports" />
     <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\SampledValues\*.cs" LinkBase="Engine\SampledValues" />
     <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Scl\SclModels.cs" Link="Engine\Scl\SclModels.cs" />
     <Compile Include="..\..\src\ARSVIN\Engine\AR.Iec61850\Scl\SclProfileException.cs" Link="Engine\Scl\SclProfileException.cs" />

@@ -1,3 +1,22 @@
+## 2026-07-02 — Publisher close + subscriber phasor/header fix
+
+- Fixed publisher shutdown dispatch so late background UI events do not throw `NullReferenceException` after `Application.Current` starts closing.
+- Normalized ArSubsv phasor angles to `Va = 0°` so the subscriber phasor matches the publisher reference direction.
+- Cleaned the ArSubsv header: removed the duplicate header icon and made toolbar alignment more compact and modern.
+
+
+## 2026-07-02 — ArSubsv lean UI buildfix 3
+
+- Fixed ArSubsv auto-payload decoding to use `byte[].AsSpan()` instead of the non-existent `byte[].Span` property.
+- Added the shared in-memory process-bus transport sources to the test project so publisher session tests compile with the linked engine source.
+- Added an explicit `assembly=ARSVIN.Subscriber` hint for the ArSubsv custom controls namespace to reduce WPF designer resolution issues.
+
+## ARSVIN Subscriber companion app
+
+- Added `src/ARSVIN.Subscriber`, a separate WPF IEC 61850 Sampled Values subscriber and verification companion.
+- Added Npcap capture, SV APDU decode, SCL binding, stream health, sample-counter continuity checks, decoded value display, and Markdown verification report export.
+- Kept publisher and subscriber as separate applications so ARSVIN Publisher remains focused on SV generation.
+
 # Changelog
 
 
@@ -76,3 +95,38 @@ This project follows a simple public-release style:
 - COMTRADE replay support.
 - Lab PTP and `smpSynch` compatibility controls.
 - GitHub Actions CI, CodeQL, Pages, and release packaging.
+
+
+## ArSubsv SV Scout Companion
+
+- Added ArSubsv branding for the subscriber companion application.
+- Added live SV discovery workflow, Scope/Phasor/Values/Frame/Diagnostics tabs.
+- Added oscilloscope-style waveform preview for SCL-decoded current/voltage samples.
+- Added phasor/RMS/peak/angle calculation from decoded waveform history.
+- Added classic PCAP import for offline stream verification.
+- Expanded receiver-side Markdown evidence report with phasor and quality summary.
+
+### ArSubsv buildfix 2
+- Fixed Subscriber frame parser call to pass `ReadOnlyMemory<byte>` directly instead of `ReadOnlySpan<byte>`.
+- Keeps custom oscilloscope/phasor controls compiled in the Subscriber project; remaining XAML designer warnings should clear after clean/rebuild.
+
+## Unreleased — ArSubsv DigSubAnalyzer-style receiver UI hotfix
+
+- Reworked ArSubsv into a dark, engineering workspace inspired by DigSubAnalyzer's process-bus analyzer shell.
+- Replaced the light prototype layout with a compact stream explorer, selected stream inspector, scope, phasor, values, frame, and diagnostics workspace.
+- Added auto fixed payload decoding for 9-2LE/UCA-style 4I+4V streams and common value+quality sample layouts so waveform/phasor views work without SCL when the payload profile is recognizable.
+- Updated oscilloscope and phasor controls to use a dark process-bus visual style and live traces instead of the previous blank prototype scope.
+
+## Unreleased — ArSubsv Lean Engineering UI
+
+- Reworked ArSubsv into a lean Linear/shadcn-inspired engineering workspace.
+- Removed the dashboard metric card row; live counts now live in a compact status bar.
+- Made SV Explorer the persistent left rail.
+- Made waveform the dominant center workspace and phasor the persistent right rail.
+- Kept values, frame details, diagnostics, and cursor compare as secondary tabs.
+- Refined oscilloscope and phasor colors to match the lean dark shell.
+
+## Publisher slot selection hotfix
+
+- Fixed live auto-apply routing so editing SV2/SV3 while publishing updates the currently selected publisher slot instead of the slot that was selected when publishing started.
+- Manual edits are now saved to the selected slot and the live loop resolves the selected slot dynamically per frame.

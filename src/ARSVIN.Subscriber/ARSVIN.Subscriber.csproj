@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <AssemblyName>ARSVIN.Subscriber</AssemblyName>
+    <RootNamespace>ARSVIN.Subscriber</RootNamespace>
+    <ApplicationIcon>Assets\arsvin.ico</ApplicationIcon>
+    <Company>Ari Sulistiono</Company>
+    <Authors>Ari Sulistiono</Authors>
+    <Product>ArSubsv - IEC 61850 Sampled Values Subscriber</Product>
+    <Description>Lean IEC 61850 Sampled Values subscriber with stream explorer, waveform, phasor, RMS values, SCL verification, and PCAP replay.</Description>
+    <Copyright>Copyright © 2026 Ari Sulistiono</Copyright>
+    <PackageTags>IEC 61850;Sampled Values;SV subscriber;SV visualizer;phasor;oscilloscope;process bus;digital substation;relay testing</PackageTags>
+    <Version>0.2.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="SharpPcap" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\ARSVIN\Engine\**\*.cs" Link="Engine\%(RecursiveDir)%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\arsvin.ico" />
+    <Content Include="Assets\arsvin.png" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\**\*.*" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

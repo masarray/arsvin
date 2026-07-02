@@ -40,3 +40,8 @@ ARSVIN is a focused IEC 61850 Sampled Values Publisher for Windows. This index g
 - `samples/comtrade` — simple COMTRADE replay files.
 - `samples/evidence` — sample Markdown evidence report.
 - `samples/scenarios` — P2 full scenario preset notes and scenario matrix.
+
+- [ARSVIN Subscriber verification app](subscriber-verification-app.md)
+
+
+- [ArSubsv — IEC 61850 Sampled Values Scout Companion](arsubsv-sv-scout-companion.md)

@@ -87,6 +87,18 @@ It does **not** try to replace StationScout, Wireshark, IEDScout, Omicron-class 
 4. Export generated PCAP.
 5. Export Markdown evidence report.
 
+## Companion app: ARSVIN Subscriber
+
+This repository now includes **ARSVIN Subscriber**, a separate WPF receiver-side verification companion for ARSVIN Publisher. It listens to IEC 61850 Sampled Values on an Npcap adapter, binds received streams to SCL when available, verifies APPID/VLAN/svID/confRev/nofASDU/sample-rate/payload layout, tracks `smpCnt` health, decodes values, and exports a receiver-side evidence report.
+
+Build it with:
+
+```powershell
+dotnet build .\src\ARSVIN.Subscriber\ARSVIN.Subscriber.csproj -c Release
+```
+
+The subscriber proves that **this PC/NIC** receives and decodes the stream. It does not prove that a relay or IED consumed the multicast SV stream. See [`docs/subscriber-verification-app.md`](docs/subscriber-verification-app.md).
+
 ## Quick start
 
 ### Download portable release
@@ -221,3 +233,10 @@ GitHub: [github.com/masarray](https://github.com/masarray)
 Apache License 2.0. See [LICENSE](LICENSE).
 
 Third-party dependency notes are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+
+## ArSubsv — Sampled Values Scout Companion
+
+The repository now includes **ArSubsv**, a separate WPF receiver-side SV scout app. It provides live stream discovery, SCL-bound decoding, oscilloscope waveform visualization, phasor/RMS indicators, classic PCAP import, stream health checks, and Markdown evidence reports. It is not an OMICRON product and does not copy OMICRON branding; it targets the same engineering class of Sampled Values visualization while keeping the ARSVIN visual identity.
+
+See [`docs/arsubsv-sv-scout-companion.md`](docs/arsubsv-sv-scout-companion.md).
