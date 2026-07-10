@@ -1,11 +1,11 @@
 # ARSVIN Documentation
 
-ARSVIN is a focused IEC 61850 Sampled Values Publisher for Windows. This index groups the documentation by workflow so users can find the right page quickly.
+ARSVIN is a focused IEC 61850 Sampled Values engineering suite for Windows. It includes ARSVIN Publisher for stream generation and ArSubsv Subscriber for live/PCAP reception, decoding, visualization, and receiver-side evidence.
 
 ## Start here
 
-- [Quick Start](quick-start.md) — install, open SCL, choose a stream, and publish safely.
-- [Safety Boundaries](safety-boundaries.md) — lab-only assumptions and responsible use.
+- [Quick Start](quick-start.md) — install the suite, choose Publisher or Subscriber, and begin with a safe workflow.
+- [Safety Boundaries](safety-boundaries.md) — laboratory assumptions and responsible use.
 - [Known Limitations](known-limitations.md) — current protocol and runtime boundaries.
 
 ## Publisher workflows
@@ -16,14 +16,19 @@ ARSVIN is a focused IEC 61850 Sampled Values Publisher for Windows. This index g
 - [Live Preflight Diagnostics](live-preflight-diagnostics.md) — preflight checks before live TX.
 - [P0 Publisher Protocol Roadmap](p0-publisher-protocol-roadmap.md) — nofASDU, quality, timing, and PCAP foundation.
 - [P1 Publisher Evidence Workflow](p1-publisher-evidence-workflow.md) — generated PCAP and Markdown evidence export.
-- [P2 Full Publisher Scenario Engine](p2-full-publisher-scenarios.md)
-- [Waveform Shape Panel](waveform-shape-panel.md) — per-phase and waveform-shaped publisher scenario presets.
+- [P2 Full Publisher Scenario Engine](p2-full-publisher-scenarios.md) — repeatable protection and process-bus scenarios.
+- [Waveform Shape Panel](waveform-shape-panel.md) — per-phase and waveform-shaped publisher scenarios.
+
+## Subscriber workflows
+
+- [Subscriber Verification App](subscriber-verification-app.md) — receiver-side stream binding, validation, health, and evidence.
+- [ArSubsv SV Scout Companion](arsubsv-sv-scout-companion.md) — discovery, waveform, phasor, RMS, and PCAP analysis.
 
 ## Data sources and timing
 
 - [COMTRADE Replay](comtrade-replay.md) — replaying analog records as Sampled Values.
-- [PTP and smpSynch Compatibility](ptp-and-smpsynch.md) — timing and synchronization boundaries.
-- [Sync Compatibility Mode](sync-compatibility-mode.md) — lab smpSynch behavior.
+- [PTP and `smpSynch` Compatibility](ptp-and-smpsynch.md) — timing and synchronization boundaries.
+- [Sync Compatibility Mode](sync-compatibility-mode.md) — laboratory `smpSynch` behavior.
 
 ## Build, release, and public repository
 
@@ -36,12 +41,7 @@ ARSVIN is a focused IEC 61850 Sampled Values Publisher for Windows. This index g
 
 ## Samples
 
-- `samples/scl` — minimal and nofASDU sample SCL files.
-- `samples/comtrade` — simple COMTRADE replay files.
-- `samples/evidence` — sample Markdown evidence report.
-- `samples/scenarios` — P2 full scenario preset notes and scenario matrix.
-
-- [ARSVIN Subscriber verification app](subscriber-verification-app.md)
-
-
-- [ArSubsv — IEC 61850 Sampled Values Scout Companion](arsubsv-sv-scout-companion.md)
+- `samples/scl` — minimal and `nofASDU` sample SCL files.
+- `samples/comtrade` — COMTRADE replay files.
+- `samples/evidence` — sample Markdown evidence reports.
+- `samples/scenarios` — publisher scenario notes and matrices.
