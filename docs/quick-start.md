@@ -1,86 +1,124 @@
 # Quick Start
 
-## 1. Install prerequisites
+ARSVIN contains two focused Windows applications:
 
-- Windows 10/11
-- Npcap for live Ethernet publishing
-- Administrator rights for live packet transmission
-- A lab network or isolated point-to-point setup when using live publish mode
+- **ARSVIN Publisher** for generating IEC 61850 Sampled Values.
+- **ArSubsv Subscriber** for live/PCAP capture, decoding, visualization, and receiver-side evidence.
 
-## 2. Start ARSVIN
+## 1. Install or run portable
 
-Run `ARSVIN.exe`.
+### Installer
 
-For live packet publishing, launch it as **Administrator**.
+Download `ARSVIN-Suite-Setup-win-x64.exe` from the latest GitHub Release and install the suite. Start Menu shortcuts are created for Publisher and Subscriber.
 
-## 3. Open SCL
+### Portable
 
-Use **Config** to open an SCL file and select an SV stream.
+Download either:
 
-The imported stream can provide APPID, VLAN, destination MAC, `svID`, dataset reference, and other network details.
+- `ARSVIN-Publisher-win-x64.exe`
+- `ArSubsv-Subscriber-win-x64.exe`
 
-## 4. Select a publisher slot
+The applications are self-contained single-file Windows x64 executables.
 
-Use the Publisher selector to switch between:
+## 2. Install live-network prerequisite
 
-- Publisher 1
-- Publisher 2
-- Publisher 3
+Install Npcap separately from its official website when live Ethernet capture or transmission is required.
 
-Each publisher can have its own stream, APPID, MAC, VLAN, sample rate, and values.
+Npcap is not bundled or silently installed by ARSVIN. Offline PCAP import, configuration, documentation, and Publisher dry-run workflows do not require live network access.
 
-## 5. Choose a publishing workflow
+## 3. Use an authorized test environment
 
-ARSVIN supports several practical lab workflows:
+For live traffic, use only:
 
-- **Manual Continue** — continuous steady-state publishing until stopped
-- **Ramp** — state-based magnitude / angle changes using the configured ramp timing
-- **Sequencer** — timed state sequence publishing using the configured state durations
-- **COMTRADE Replay** — replay analog records as Sampled Values
+- an isolated laboratory network,
+- a point-to-point engineering link, or
+- another network where you have explicit authorization.
 
-## 6. Review network settings
+Administrator rights may be required by the local Npcap/network configuration.
 
-Before using live mode, confirm:
+# Publisher workflow
 
-- selected adapter
-- destination MAC
-- source MAC
-- APPID
-- VLAN ID and priority
-- sample rate / `smpCnt` progression expectation
-- selected `smpSynch` behavior / compatibility mode
+## 4. Open SCL
 
-## 7. Publish
+Open **ARSVIN Publisher**, then use **Config** to load an SCL/SCD file and select an SV stream.
 
-Use **Check** for optional live diagnostics, then **Start** for live publishing. ARSVIN uses a KM Looptest friendly preflight model: warnings do not block live publish, but fatal errors still stop invalid traffic.
+Imported engineering data can provide APPID, VLAN, destination MAC, `svID`, dataset reference, `confRev`, sample rate, `smpMod`, and `nofASDU`.
 
-You can also run a dry test for validation without transmitting on the network.
+## 5. Select a publisher slot
 
-## 8. Verify
+Switch between Publisher 1, Publisher 2, and Publisher 3. Each slot can use its own stream, APPID, MAC, VLAN, sample rate, source mode, and values.
 
-Use Wireshark and the relay / subscriber status to confirm the stream is visible and readable.
+## 6. Choose a source mode
 
-Useful checks include:
+Available workflows include:
 
-- Ethernet type `0x88BA`
-- correct destination multicast MAC
-- correct APPID
-- correct VLAN tag
-- expected `svID`
-- expected `smpSynch` behavior, especially whether the relay requires global compatibility mode
+- **Manual Continue** — continuous steady-state publishing.
+- **Ramp** — magnitude/angle changes using configured timing.
+- **Sequencer** — timed states and repeatable per-phase scenarios.
+- **COMTRADE Replay** — analog record replay as Sampled Values.
+- **Waveform shaping** — harmonic, DC-offset, clipping, and related laboratory scenarios.
+
+## 7. Review and preflight
+
+Before live transmission, confirm:
+
+- selected adapter,
+- destination and source MAC,
+- APPID,
+- VLAN ID and priority,
+- `svID`, dataset, and `confRev`,
+- sample rate and `nofASDU`,
+- expected `smpCnt` progression,
+- selected quality mode,
+- `smpSynch` compatibility behavior.
+
+Run a dry test first. Warnings remain visible but do not block valid laboratory traffic; fatal configuration errors do.
+
+## 8. Publish and preserve evidence
+
+Start live publishing only after preflight and network authorization.
+
+Use TX Timing Health to inspect target/actual FPS, jitter, late frames, missed schedules, and send duration. Export generated PCAP and the Markdown publisher report when evidence is needed.
+
+# Subscriber workflow
+
+## 9. Select live capture or PCAP import
+
+Open **ArSubsv Subscriber** and choose:
+
+- a live Npcap adapter, or
+- a classic PCAP file for offline analysis.
+
+When SCL is available, load it to assist stream binding and expected-configuration checks.
+
+## 10. Inspect the stream
+
+Review:
+
+- discovered streams,
+- APPID, VLAN, `svID`, and `confRev`,
+- `nofASDU`, sample rate, and payload layout,
+- `smpCnt` continuity and stream health,
+- decoded values,
+- waveform,
+- phasor and RMS views.
+
+Export the receiver-side Markdown report when a repeatable record is required.
+
+## 11. Verify independently
+
+Use Wireshark, relay diagnostics, vendor tools, or certified equipment when independent verification is required.
+
+Useful packet checks include:
+
+- Ethernet type `0x88BA`,
+- correct multicast destination MAC,
+- correct APPID and VLAN tag,
+- expected `svID`, dataset, and `confRev`,
+- expected ASDU packing and sample counter behavior.
+
+Publisher evidence shows what the PC generated. Subscriber evidence shows what the selected PC/NIC received and decoded. Neither alone proves that a protection IED consumed the multicast stream.
 
 ## Sync compatibility note
 
-For point-to-point relay readability checks, **Global compatibility — smpSynch=2** is usually the most practical starting point. It helps strict subscribers accept the SV stream, but it does not prove real PTP timing accuracy.
-
-
-## 9. Use the modern SV setup workflow
-
-The **SV Setup** window is organized for quick looptest work:
-
-- use the left **SV streams** navigator to select SV1, SV2, or SV3
-- edit the selected stream in the main panel
-- choose **Manual**, **Ramp**, **Sequence**, or **COMTRADE** source mode
-- press **Check** to open the Preflight Results window when you need details
-
-Warnings are shown in the Preflight Results window and event log. They do not block live publishing. Only fatal configuration errors block live publishing.
+For point-to-point relay readability checks, **Global compatibility — `smpSynch=2`** can be a practical starting point for strict subscribers. It does not prove IEC 61850-9-3 timing accuracy or make the Windows PC a certified PTP grandmaster.
