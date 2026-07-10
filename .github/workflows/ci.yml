@@ -23,17 +23,26 @@ jobs:
         with:
           dotnet-version: 8.0.x
 
-      - name: Restore app
+      - name: Restore Publisher
         run: dotnet restore src/ARSVIN/ARSVIN.csproj
+
+      - name: Restore Subscriber
+        run: dotnet restore src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj
 
       - name: Restore tests
         run: dotnet restore tests/ARSVIN.Tests/ARSVIN.Tests.csproj
 
-      - name: Build app
+      - name: Build Publisher
         run: dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore
+
+      - name: Build Subscriber
+        run: dotnet build src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj -c Release --no-restore
 
       - name: Test
         run: dotnet test tests/ARSVIN.Tests/ARSVIN.Tests.csproj -c Release --no-restore --logger trx
 
-      - name: Dependency vulnerability report
+      - name: Publisher dependency vulnerability report
         run: dotnet list src/ARSVIN/ARSVIN.csproj package --vulnerable --include-transitive
+
+      - name: Subscriber dependency vulnerability report
+        run: dotnet list src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj package --vulnerable --include-transitive
