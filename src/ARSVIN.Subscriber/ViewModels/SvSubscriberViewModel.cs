@@ -368,6 +368,7 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
 
         RefreshSelectedValues();
         UpdateGlobalCards(snapshots);
+        ExportReportCommand.RaiseCanExecuteChanged();
     }
 
     private void RefreshSelectedValues()
@@ -419,6 +420,7 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
         SelectedStream = null;
         HealthText = "IDLE";
         StatusText = "Cleared subscriber statistics.";
+        ExportReportCommand.RaiseCanExecuteChanged();
     }
 
     private void ClearRuntimeOnly()
@@ -434,6 +436,7 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
         Interlocked.Exchange(ref _droppedByFilter, 0);
         _captureStarted = null;
         UpdateGlobalCards(Array.Empty<SvStreamSnapshot>());
+        ExportReportCommand.RaiseCanExecuteChanged();
     }
 
     private async Task ExportReportAsync()

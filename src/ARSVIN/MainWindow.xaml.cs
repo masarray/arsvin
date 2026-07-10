@@ -18,6 +18,12 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
     }
 
+    protected override void OnClosed(EventArgs e)
+    {
+        _viewModel.SaveLastUsedState();
+        base.OnClosed(e);
+    }
+
 
     private void Window_PreviewMouseDown(object sender, MouseButtonEventArgs e)
     {

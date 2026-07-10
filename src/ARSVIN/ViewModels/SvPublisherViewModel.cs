@@ -31,6 +31,9 @@ public sealed class SvPublisherViewModel : ObservableObject
     private const string DirectSetMode = "Direct";
     private const string LineLineSetMode = "Line-Line";
     private const string SymmetricalSetMode = "Symmetrical components";
+    private const string DefaultSclRelativePath = @"samples\scl\01_SV_Stream_4I+4V_(9-2LE).scd";
+    private const string LastUsedDirectoryName = "ARSVIN";
+    private const string LastUsedFileName = "last-used.svpub.json";
     private const string PtpCaptureFilter = "ether proto 0x88f7";
     private const double NominalVoltageLn = 57.735;
     private const double NominalVoltageLl = 100.0;
@@ -78,18 +81,20 @@ public sealed class SvPublisherViewModel : ObservableObject
     private bool _isPublishing;
     private bool _autoApplyWhileRunning = true;
     private bool _linkFrequencies = true;
-    private SvSyncPolicyMode _syncPolicyMode = SvSyncPolicyMode.GlobalCompatibility;
+    private SvSyncPolicyMode _syncPolicyMode = SvSyncPolicyMode.LocalCompatibility;
     private SvSyncPolicyChoice? _selectedSyncPolicyChoice;
     private int _expectedPtpDomain;
     private bool _ptpAllowLocalFallback = true;
-    private PtpPublisherMode _ptpPublisherMode = AR.Iec61850.SvPublisher.Models.PtpPublisherMode.MonitorOnly;
+    private PtpPublisherMode _ptpPublisherMode = AR.Iec61850.SvPublisher.Models.PtpPublisherMode.LabPublisher;
     private string _ptpClockIdentityText = "02:00:00:FF:FE:00:00:01";
     private int _ptpAnnounceIntervalMs = 1000;
     private int _ptpSyncIntervalMs = 250;
     private bool _ptpRespondToPeerDelay = true;
-    private string _ptpPublisherStatusText = "PTP TX: off";
+    private string _ptpPublisherStatusText = "PTP TX: lab traffic armed";
     private string _ptpStatusText = "PTP RX: idle";
-    private string _smpSynchStatusText = "smpSynch=2 compatibility";
+    private string _smpSynchStatusText = "smpSynch=1 local compatibility";
+    private bool _isRestoringLastUsed;
+    private bool _hasCompletedStartupRestore;
     private bool _isUpdatingManualRows;
     private ManualOutputRowViewModel? _contextManualRow;
     private string _contextColumnHeader = string.Empty;
@@ -115,6 +120,8 @@ public sealed class SvPublisherViewModel : ObservableObject
             new SignalChannelViewModel("Vc", "V L3-E", "V", "V", NominalVoltageLn, 120, _nominalFrequencyHz),
             new SignalChannelViewModel("Vn", "V N", "V", "V", 0.000, 0, _nominalFrequencyHz) { IsEnabled = false }
         ];
+        foreach (var channel in Channels)
+            channel.PropertyChanged += Channel_PropertyChanged;
 
         ManualRows = new ObservableCollection<ManualOutputRowViewModel>();
         PublisherSlots = new ObservableCollection<SvPublisherSlotViewModel>
@@ -125,6 +132,7 @@ public sealed class SvPublisherViewModel : ObservableObject
         };
         foreach (var slot in PublisherSlots)
         {
+            slot.IsEnabled = slot.Index <= 3;
             slot.Channels = Channels.Select(c => c.ToSnapshot()).ToArray();
             slot.PropertyChanged += OnPublisherSlotPropertyChanged;
         }
@@ -203,7 +211,7 @@ public sealed class SvPublisherViewModel : ObservableObject
         RebuildManualRowsFromChannels();
         UpdateRampPreview();
         UpdateSequencePreview();
-        RefreshAdapters();
+        _ = RestoreStartupStateAsync();
     }
 
     public ObservableCollection<SignalChannelViewModel> Channels { get; }
@@ -787,7 +795,7 @@ public sealed class SvPublisherViewModel : ObservableObject
             if (SetProperty(ref _selectedStream, value))
             {
                 ApplySelectedStream(value);
-                if (!_isLoadingPublisherSlot)
+                if (!_isLoadingPublisherSlot && !_isRestoringLastUsed)
                     SaveCurrentPublisherSlot();
             }
         }
@@ -1268,6 +1276,32 @@ public sealed class SvPublisherViewModel : ObservableObject
             UpdateSequencePreview();
     }
 
+    private void Channel_PropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (_isLoadingPublisherSlot || _isRestoringLastUsed || !IsRuntimeChannelProperty(e.PropertyName))
+            return;
+
+        UpdateRampPreview();
+        SaveCurrentPublisherSlot();
+
+        if (sender is SignalChannelViewModel channel)
+        {
+            LiveApplyText = IsPublishing
+                ? $"RUN auto-applied: {channel.DisplayName} waveform updated."
+                : $"Ready: {channel.DisplayName} waveform updated.";
+        }
+    }
+
+    private static bool IsRuntimeChannelProperty(string? propertyName)
+        => propertyName is nameof(SignalChannelViewModel.IsEnabled)
+            or nameof(SignalChannelViewModel.Magnitude)
+            or nameof(SignalChannelViewModel.AngleDegrees)
+            or nameof(SignalChannelViewModel.FrequencyHz)
+            or nameof(SignalChannelViewModel.DcOffsetPercent)
+            or nameof(SignalChannelViewModel.HarmonicPercent)
+            or nameof(SignalChannelViewModel.HarmonicOrder)
+            or nameof(SignalChannelViewModel.ClipPercent);
+
     private void SelectSequenceState(SequenceStateViewModel? state)
     {
         if (state is not null)
@@ -1418,13 +1452,26 @@ public sealed class SvPublisherViewModel : ObservableObject
 
         try
         {
-            var document = await Task.Run(() => new SclParser().Load(dialog.FileName)).ConfigureAwait(true);
-            SclPath = dialog.FileName;
-            Streams.Clear();
+            await LoadSclFileAsync(dialog.FileName, applyStreamsToSlots: true, statusPrefix: "SCL opened").ConfigureAwait(true);
+        }
+        catch (Exception ex)
+        {
+            StatusText = "Open SCL failed.";
+            AppendEvent(ex.Message);
+        }
+    }
 
-            for (var i = 0; i < document.SampledValuesStreams.Count; i++)
-                Streams.Add(new SvStreamChoice { Index = i + 1, Stream = document.SampledValuesStreams[i] });
+    private async Task LoadSclFileAsync(string path, bool applyStreamsToSlots, string statusPrefix)
+    {
+        var document = await Task.Run(() => new SclParser().Load(path)).ConfigureAwait(true);
+        SclPath = path;
+        Streams.Clear();
 
+        for (var i = 0; i < document.SampledValuesStreams.Count; i++)
+            Streams.Add(new SvStreamChoice { Index = i + 1, Stream = document.SampledValuesStreams[i] });
+
+        if (applyStreamsToSlots)
+        {
             for (var i = 0; i < PublisherSlots.Count; i++)
             {
                 var slot = PublisherSlots[i];
@@ -1433,22 +1480,311 @@ public sealed class SvPublisherViewModel : ObservableObject
             }
 
             SelectedStream = Streams.FirstOrDefault();
-            SclSummary = $"IED={document.Ieds.Count}  DataSets={document.DataSets.Count}  SV={document.SampledValuesStreams.Count}  Warnings={document.Warnings.Count}";
-            StatusText = document.SampledValuesStreams.Count == 0 ? "SCL opened, no SV streams found." : "SCL opened.";
-            AppendEvent($"Opened SCL: {Path.GetFileName(dialog.FileName)}");
+        }
 
-            foreach (var warning in document.Warnings.Take(6))
-                AppendEvent($"SCL warning: {warning}");
+        SclSummary = $"IED={document.Ieds.Count}  DataSets={document.DataSets.Count}  SV={document.SampledValuesStreams.Count}  Warnings={document.Warnings.Count}";
+        StatusText = document.SampledValuesStreams.Count == 0 ? $"{statusPrefix}, no SV streams found." : $"{statusPrefix}.";
+        AppendEvent($"Opened SCL: {Path.GetFileName(path)}");
 
-            foreach (var conflict in document.Conflicts.Take(6))
-                AppendEvent($"SCL conflict: {conflict.Description}");
+        foreach (var warning in document.Warnings.Take(6))
+            AppendEvent($"SCL warning: {warning}");
+
+        foreach (var conflict in document.Conflicts.Take(6))
+            AppendEvent($"SCL conflict: {conflict.Description}");
+    }
+
+    private async Task RestoreStartupStateAsync()
+    {
+        _isRestoringLastUsed = true;
+        try
+        {
+            var snapshot = TryLoadLastUsedSnapshot();
+            RefreshAdapters(snapshot?.AdapterSelector, snapshot?.AdapterMacAddress);
+
+            var startupSclPath = ResolveStartupSclPath(snapshot?.SclPath);
+            if (!string.IsNullOrWhiteSpace(startupSclPath) && File.Exists(startupSclPath))
+            {
+                await LoadSclFileAsync(
+                    startupSclPath,
+                    applyStreamsToSlots: snapshot is null,
+                    statusPrefix: snapshot is null ? "Default SCL loaded" : "Last-used SCL restored").ConfigureAwait(true);
+            }
+            else
+            {
+                SclPath = string.Empty;
+                SclSummary = "Default SCL not found; open an SCL file to resolve SV streams.";
+                AppendEvent($"Default SCL missing: {ResolveDefaultSclPath()}");
+            }
+
+            if (snapshot is null)
+            {
+                ApplyStartupDefaults();
+                StatusText = "Default lab workflow ready.";
+                AppendEvent("Default lab workflow: 3 SV active, smpSynch=1, PTP LabPublisher, LAN adapter preferred.");
+            }
+            else
+            {
+                ApplyLastUsedSnapshot(snapshot);
+                StatusText = "Last-used workflow restored.";
+                AppendEvent("Last-used workflow restored.");
+            }
+
+            SelectedPublisherSlot = PublisherSlots.FirstOrDefault(slot => slot.IsEnabled) ?? PublisherSlots.FirstOrDefault();
+            if (SelectedPublisherSlot is not null)
+                LoadPublisherSlot(SelectedPublisherSlot);
+
+            UpdateRampPreview();
+            UpdateSequencePreview();
+            RaiseConfigWorkspaceStateChanged();
         }
         catch (Exception ex)
         {
-            StatusText = "Open SCL failed.";
-            AppendEvent(ex.Message);
+            RefreshAdapters();
+            ApplyStartupDefaults();
+            SelectedPublisherSlot = PublisherSlots.FirstOrDefault(slot => slot.IsEnabled) ?? PublisherSlots.FirstOrDefault();
+            if (SelectedPublisherSlot is not null)
+                LoadPublisherSlot(SelectedPublisherSlot);
+
+            StatusText = "Startup restore failed; default workflow applied.";
+            AppendEvent($"Startup restore failed: {ex.Message}");
+        }
+        finally
+        {
+            _isRestoringLastUsed = false;
+            _hasCompletedStartupRestore = true;
+            SaveCurrentPublisherSlot();
         }
     }
+
+    private void ApplyStartupDefaults()
+    {
+        SyncPolicyMode = SvSyncPolicyMode.LocalCompatibility;
+        PtpPublisherMode = AR.Iec61850.SvPublisher.Models.PtpPublisherMode.LabPublisher;
+        PtpAllowLocalFallback = true;
+        SelectedSampleQualityChoice = ResolveSampleQualityChoice("good");
+        ApplyDefaultPublisherSlots();
+        SmpSynchStatusText = FormatSmpSynchStatus(ResolveSampleSynchronization(null));
+    }
+
+    private void ApplyDefaultPublisherSlots()
+    {
+        for (var i = 0; i < PublisherSlots.Count; i++)
+        {
+            var slot = PublisherSlots[i];
+            var choice = Streams.ElementAtOrDefault(i) ?? Streams.FirstOrDefault();
+            ApplyStreamMetadataToSlot(slot, choice);
+            slot.IsEnabled = slot.Index <= 3;
+            slot.SignalSource = PublisherSignalSource.Manual;
+            slot.ComtradeDataset = null;
+            slot.ComtradeChannelMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            slot.ComtradePath = string.Empty;
+            slot.ComtradeSummary = "No COMTRADE loaded.";
+            slot.ComtradeLoop = false;
+            slot.SampleQualityKey = "good";
+            slot.Channels = Channels.Select(c => c.ToSnapshot()).ToArray();
+        }
+    }
+
+    private void ApplyLastUsedSnapshot(SvPublisherConfigSnapshot snapshot)
+    {
+        AutoApplyWhileRunning = snapshot.AutoApplyWhileRunning;
+        LinkFrequencies = snapshot.LinkFrequencies;
+        SyncPolicyMode = snapshot.SyncPolicyMode;
+        ExpectedPtpDomain = snapshot.ExpectedPtpDomain;
+        PtpAllowLocalFallback = snapshot.PtpAllowLocalFallback;
+        PtpPublisherMode = snapshot.PtpPublisherMode;
+        PtpClockIdentityText = string.IsNullOrWhiteSpace(snapshot.PtpClockIdentity) ? PtpClockIdentityText : snapshot.PtpClockIdentity;
+        PtpAnnounceIntervalMs = snapshot.PtpAnnounceIntervalMs;
+        PtpSyncIntervalMs = snapshot.PtpSyncIntervalMs;
+        PtpRespondToPeerDelay = snapshot.PtpRespondToPeerDelay;
+        Continuous = snapshot.Continuous;
+        LoopSequence = snapshot.LoopSequence;
+        Mode = snapshot.Mode;
+        DurationSeconds = snapshot.DurationSeconds > 0 ? snapshot.DurationSeconds : DurationSeconds;
+        ManualSetMode = string.IsNullOrWhiteSpace(snapshot.ManualSetMode) ? DirectSetMode : snapshot.ManualSetMode;
+        SelectedSampleQualityChoice = ResolveSampleQualityChoice(snapshot.SampleQualityKey);
+
+        var publisherSnapshots = snapshot.Publishers ?? Array.Empty<SvPublisherSlotConfigSnapshot>();
+        if (publisherSnapshots.Count > 0)
+        {
+            foreach (var slot in PublisherSlots)
+            {
+                var saved = publisherSnapshots.FirstOrDefault(item => item.Index == slot.Index);
+                if (saved is null)
+                {
+                    slot.IsEnabled = false;
+                    continue;
+                }
+
+                ApplySavedPublisherSlot(slot, saved);
+            }
+        }
+        else
+        {
+            ApplyDefaultPublisherSlots();
+            if (snapshot.Channels is { Count: > 0 })
+                PublisherSlots[0].Channels = snapshot.Channels.ToArray();
+        }
+
+        if (snapshot.SequenceStates is { Count: > 0 })
+            RestoreSequenceStates(snapshot.SequenceStates);
+
+        if (!string.IsNullOrWhiteSpace(snapshot.RampSignalKey))
+        {
+            SelectedRampSignalChoice = RampSignalChoices.FirstOrDefault(choice =>
+                string.Equals(choice.KeyCsv, snapshot.RampSignalKey, StringComparison.OrdinalIgnoreCase))
+                ?? SelectedRampSignalChoice;
+        }
+
+        if (snapshot.RampTargetMagnitude > 0)
+            RampTargetMagnitude = snapshot.RampTargetMagnitude;
+        if (snapshot.RampDurationSeconds > 0)
+            RampDurationSeconds = snapshot.RampDurationSeconds;
+    }
+
+    private void ApplySavedPublisherSlot(SvPublisherSlotViewModel slot, SvPublisherSlotConfigSnapshot snapshot)
+    {
+        var choice = ResolveStreamChoice(snapshot) ?? Streams.ElementAtOrDefault(slot.Index - 1) ?? Streams.FirstOrDefault();
+        ApplyStreamMetadataToSlot(slot, choice);
+
+        slot.IsEnabled = snapshot.IsEnabled;
+        slot.StreamId = string.IsNullOrWhiteSpace(snapshot.StreamId) ? slot.StreamId : snapshot.StreamId;
+        slot.StreamControlBlock = string.IsNullOrWhiteSpace(snapshot.StreamControlBlock) ? slot.StreamControlBlock : snapshot.StreamControlBlock;
+        slot.DataSetReference = string.IsNullOrWhiteSpace(snapshot.DataSetReference) ? slot.DataSetReference : snapshot.DataSetReference;
+        slot.AppIdText = string.IsNullOrWhiteSpace(snapshot.AppId) ? slot.AppIdText : snapshot.AppId;
+        slot.DestinationMac = string.IsNullOrWhiteSpace(snapshot.DestinationMac) ? slot.DestinationMac : snapshot.DestinationMac;
+        slot.UseVlan = snapshot.UseVlan;
+        slot.VlanId = snapshot.VlanId;
+        slot.VlanPriority = snapshot.VlanPriority;
+        slot.SourceMac = !string.IsNullOrWhiteSpace(snapshot.SourceMac)
+            ? snapshot.SourceMac
+            : SelectedAdapter?.MacAddress ?? slot.SourceMac;
+        slot.SampleRateHz = snapshot.SampleRateHz > 0 ? snapshot.SampleRateHz : slot.SampleRateHz;
+        slot.NominalFrequencyHz = snapshot.NominalFrequencyHz > 0 ? snapshot.NominalFrequencyHz : slot.NominalFrequencyHz;
+        slot.SampleRatePresetKey = string.IsNullOrWhiteSpace(snapshot.SampleRatePresetKey) ? slot.SampleRatePresetKey : snapshot.SampleRatePresetKey;
+        slot.CurrentDlsb = snapshot.CurrentDlsb > 0 ? snapshot.CurrentDlsb : slot.CurrentDlsb;
+        slot.VoltageDlsb = snapshot.VoltageDlsb > 0 ? snapshot.VoltageDlsb : slot.VoltageDlsb;
+        slot.ManualSetMode = string.IsNullOrWhiteSpace(snapshot.ManualSetMode) ? DirectSetMode : snapshot.ManualSetMode;
+        slot.SampleQualityKey = string.IsNullOrWhiteSpace(snapshot.SampleQualityKey) ? "good" : snapshot.SampleQualityKey;
+        slot.SignalSource = snapshot.SignalSource;
+        slot.ComtradePath = snapshot.ComtradePath;
+        slot.ComtradeLoop = snapshot.ComtradeLoop;
+        slot.Channels = snapshot.Channels is { Count: > 0 }
+            ? snapshot.Channels.ToArray()
+            : Channels.Select(c => c.ToSnapshot()).ToArray();
+
+        RestoreComtradeForSlot(slot);
+    }
+
+    private void RestoreComtradeForSlot(SvPublisherSlotViewModel slot)
+    {
+        slot.ComtradeDataset = null;
+        slot.ComtradeChannelMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+
+        if (slot.SignalSource != PublisherSignalSource.ComtradeReplay)
+        {
+            slot.ComtradeSummary = "No COMTRADE loaded.";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(slot.ComtradePath) || !File.Exists(slot.ComtradePath))
+        {
+            slot.ComtradeSummary = "COMTRADE file not found.";
+            return;
+        }
+
+        try
+        {
+            var dataset = new ComtradeReader().Load(slot.ComtradePath);
+            slot.ComtradeDataset = dataset;
+            slot.ComtradeChannelMap = dataset.DefaultChannelMap;
+            slot.ComtradeSummary = dataset.Summary;
+        }
+        catch (Exception ex)
+        {
+            slot.ComtradeSummary = $"COMTRADE restore failed: {ex.Message}";
+        }
+    }
+
+    private SvStreamChoice? ResolveStreamChoice(SvPublisherSlotConfigSnapshot snapshot)
+        => Streams.FirstOrDefault(choice => string.Equals(choice.Stream.ControlBlockReference, snapshot.StreamControlBlock, StringComparison.OrdinalIgnoreCase))
+           ?? Streams.FirstOrDefault(choice => string.Equals(choice.Stream.SvId, snapshot.StreamId, StringComparison.OrdinalIgnoreCase))
+           ?? Streams.FirstOrDefault(choice => string.Equals(choice.Stream.DataSetReference, snapshot.DataSetReference, StringComparison.OrdinalIgnoreCase))
+           ?? Streams.FirstOrDefault(choice => string.Equals(choice.Stream.Address.AppIdText, snapshot.AppId, StringComparison.OrdinalIgnoreCase));
+
+    private void RestoreSequenceStates(IReadOnlyList<SequenceStateSnapshot> snapshots)
+    {
+        foreach (var state in SequenceStates)
+            DetachSequenceState(state);
+
+        SequenceStates.Clear();
+        foreach (var snapshot in snapshots)
+        {
+            var state = CreateSequenceState(snapshot);
+            AttachSequenceState(state);
+            SequenceStates.Add(state);
+        }
+
+        SelectedSequenceState = SequenceStates.FirstOrDefault();
+    }
+
+    private SvPublisherConfigSnapshot? TryLoadLastUsedSnapshot()
+    {
+        try
+        {
+            var path = LastUsedPath;
+            if (!File.Exists(path))
+                return null;
+
+            var json = File.ReadAllText(path);
+            return JsonSerializer.Deserialize<SvPublisherConfigSnapshot>(json);
+        }
+        catch (Exception ex)
+        {
+            AppendEvent($"Last-used restore skipped: {ex.Message}");
+            return null;
+        }
+    }
+
+    private string ResolveStartupSclPath(string? savedPath)
+    {
+        var saved = ResolveExistingPath(savedPath);
+        return saved ?? ResolveDefaultSclPath();
+    }
+
+    private static string? ResolveExistingPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+            return null;
+
+        var candidates = Path.IsPathRooted(path)
+            ? new[] { path }
+            : new[]
+            {
+                Path.Combine(Environment.CurrentDirectory, path),
+                Path.Combine(AppContext.BaseDirectory, path)
+            };
+
+        return candidates.FirstOrDefault(File.Exists);
+    }
+
+    private static string ResolveDefaultSclPath()
+    {
+        var candidates = new[]
+        {
+            Path.Combine(AppContext.BaseDirectory, DefaultSclRelativePath),
+            Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", DefaultSclRelativePath)),
+            Path.Combine(Environment.CurrentDirectory, DefaultSclRelativePath)
+        };
+
+        return candidates.FirstOrDefault(File.Exists) ?? candidates[0];
+    }
+
+    private static string LastUsedPath =>
+        Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            LastUsedDirectoryName,
+            LastUsedFileName);
 
 
     private async Task ImportComtradeAsync()
@@ -1519,9 +1855,14 @@ public sealed class SvPublisherViewModel : ObservableObject
     }
 
     private void RefreshAdapters()
+        => RefreshAdapters(null, null);
+
+    private void RefreshAdapters(string? preferredSelector, string? preferredMacAddress)
     {
         try
         {
+            var currentSelector = preferredSelector ?? SelectedAdapter?.Selector;
+            var currentMac = preferredMacAddress ?? SelectedAdapter?.MacAddress;
             Adapters.Clear();
             foreach (var adapter in NpcapAdapterCatalog.ListAdapters())
             {
@@ -1535,7 +1876,7 @@ public sealed class SvPublisherViewModel : ObservableObject
                 });
             }
 
-            SelectedAdapter ??= Adapters.FirstOrDefault();
+            SelectedAdapter = ResolvePreferredAdapter(currentSelector, currentMac) ?? Adapters.FirstOrDefault();
             AppendEvent(Adapters.Count == 0 ? "No Npcap adapters found." : $"Adapters found: {Adapters.Count}");
         }
         catch (Exception ex)
@@ -1544,6 +1885,53 @@ public sealed class SvPublisherViewModel : ObservableObject
             AppendEvent($"Adapter list unavailable: {ex.Message}");
         }
     }
+
+    private AdapterChoice? ResolvePreferredAdapter(string? preferredSelector, string? preferredMacAddress)
+    {
+        if (!string.IsNullOrWhiteSpace(preferredSelector))
+        {
+            var exact = Adapters.FirstOrDefault(adapter => string.Equals(adapter.Selector, preferredSelector, StringComparison.OrdinalIgnoreCase));
+            if (exact is not null)
+                return exact;
+        }
+
+        if (!string.IsNullOrWhiteSpace(preferredMacAddress))
+        {
+            var normalizedMac = NormalizeMacText(preferredMacAddress);
+            var exact = Adapters.FirstOrDefault(adapter => string.Equals(NormalizeMacText(adapter.MacAddress), normalizedMac, StringComparison.OrdinalIgnoreCase));
+            if (exact is not null)
+                return exact;
+        }
+
+        return Adapters
+            .OrderByDescending(AdapterPreferenceScore)
+            .FirstOrDefault(adapter => AdapterPreferenceScore(adapter) > 0)
+            ?? Adapters.FirstOrDefault(adapter => !LooksLikeWirelessOrVirtualAdapter(adapter))
+            ?? Adapters.FirstOrDefault();
+    }
+
+    private static int AdapterPreferenceScore(AdapterChoice adapter)
+    {
+        var text = adapter.DisplayName;
+        if (LooksLikeWirelessOrVirtualAdapter(adapter))
+            return -100;
+
+        var score = string.IsNullOrWhiteSpace(adapter.MacAddress) ? 0 : 10;
+        if (ContainsAny(text, "ethernet", "lan", "gbe", "gigabit", "realtek", "intel", "i219", "i225", "i226", "rj45", "killer e"))
+            score += 40;
+        if (ContainsAny(text, "npcap", "loopback", "bluetooth", "wireless", "wi-fi", "wifi", "wlan", "virtual", "vmware", "hyper-v", "vethernet", "vpn", "tap", "tunnel", "pseudo"))
+            score -= 60;
+        return score;
+    }
+
+    private static bool LooksLikeWirelessOrVirtualAdapter(AdapterChoice adapter)
+        => ContainsAny(adapter.DisplayName, "npcap loopback", "loopback", "wireless", "wi-fi", "wifi", "wlan", "bluetooth", "virtual", "vmware", "hyper-v", "vethernet", "vpn", "tap", "tunnel", "pseudo");
+
+    private static bool ContainsAny(string text, params string[] needles)
+        => needles.Any(needle => text.Contains(needle, StringComparison.OrdinalIgnoreCase));
+
+    private static string NormalizeMacText(string value)
+        => value.Replace("-", ":", StringComparison.Ordinal).Trim();
 
     private void RunLivePreflight()
     {
@@ -1842,6 +2230,28 @@ public sealed class SvPublisherViewModel : ObservableObject
         {
             StatusText = "Save failed.";
             AppendEvent(ex.Message);
+        }
+    }
+
+    public void SaveLastUsedState()
+    {
+        if (_isRestoringLastUsed || !_hasCompletedStartupRestore)
+            return;
+
+        try
+        {
+            SaveCurrentPublisherSlot();
+            var path = LastUsedPath;
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrWhiteSpace(directory))
+                Directory.CreateDirectory(directory);
+
+            var json = JsonSerializer.Serialize(CreateSnapshot(), new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(path, json);
+        }
+        catch (Exception ex)
+        {
+            AppendEvent($"Last-used save failed: {ex.Message}");
         }
     }
 
@@ -3009,7 +3419,7 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
 
     private void SaveCurrentPublisherSlot()
     {
-        if (_isLoadingPublisherSlot || _selectedPublisherSlot is not { } slot)
+        if (_isLoadingPublisherSlot || _isRestoringLastUsed || _selectedPublisherSlot is not { } slot)
             return;
 
         slot.SelectedStream = SelectedStream;
@@ -4403,6 +4813,8 @@ private static SvSyncPolicyMode NormalizeSyncPolicyMode(SvSyncPolicyMode mode)
             PtpAnnounceIntervalMs = PtpAnnounceIntervalMs,
             PtpSyncIntervalMs = PtpSyncIntervalMs,
             PtpRespondToPeerDelay = PtpRespondToPeerDelay,
+            AdapterSelector = SelectedAdapter?.Selector ?? string.Empty,
+            AdapterMacAddress = SelectedAdapter?.MacAddress ?? string.Empty,
             RampSignalKey = SelectedRampSignalChoice?.KeyCsv ?? SelectedRampState?.SignalKey ?? string.Empty,
             ScenarioPresetKey = SelectedScenarioPresetChoice?.Key ?? string.Empty,
             RampTargetMagnitude = RampTargetMagnitude,

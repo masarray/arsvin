@@ -51,6 +51,26 @@ public readonly record struct MacAddress
     public byte[] ToArray()
         => _bytes?.ToArray() ?? new byte[6];
 
+    public bool Equals(MacAddress other)
+    {
+        for (var i = 0; i < 6; i++)
+        {
+            if (ByteAt(i) != other.ByteAt(i))
+                return false;
+        }
+
+        return true;
+    }
+
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        for (var i = 0; i < 6; i++)
+            hash.Add(ByteAt(i));
+
+        return hash.ToHashCode();
+    }
+
     public void CopyTo(Span<byte> destination)
     {
         if (destination.Length < 6)
@@ -64,4 +84,7 @@ public readonly record struct MacAddress
         var bytes = _bytes ?? new byte[6];
         return string.Join(":", bytes.Select(b => b.ToString("X2", CultureInfo.InvariantCulture)));
     }
+
+    private byte ByteAt(int index)
+        => _bytes is null ? (byte)0 : _bytes[index];
 }

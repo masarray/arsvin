@@ -9,6 +9,7 @@
         <SolidColorBrush x:Key="PanelSoft" Color="#FBFDFF" />
         <SolidColorBrush x:Key="PanelDeep" Color="#F8FBFF" />
         <SolidColorBrush x:Key="PanelHover" Color="#F1F6FF" />
+        <SolidColorBrush x:Key="PanelPressed" Color="#EAF2FF" />
         <SolidColorBrush x:Key="Line" Color="#D8E2EF" />
         <SolidColorBrush x:Key="LineStrong" Color="#C9D7E8" />
         <SolidColorBrush x:Key="Ink" Color="#111827" />
@@ -30,12 +31,24 @@
             <Setter Property="Foreground" Value="{StaticResource Muted}" />
             <Setter Property="FontSize" Value="10.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
         </Style>
 
         <Style x:Key="SectionTitle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource Ink}" />
             <Setter Property="FontSize" Value="12.5" />
             <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="PageTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Ink}" />
+            <Setter Property="FontSize" Value="16" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <Style x:Key="CaptionText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="FontSize" Value="11" />
         </Style>
 
         <Style x:Key="MonoText" TargetType="TextBlock">
@@ -48,14 +61,36 @@
             <Setter Property="Background" Value="{StaticResource Panel}" />
             <Setter Property="BorderBrush" Value="{StaticResource Line}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="CornerRadius" Value="8" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="2" Direction="270" Opacity="0.10" Color="#183B70" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="PanelHeader" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelDeep}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="CornerRadius" Value="8,8,0,0" />
+            <Setter Property="Padding" Value="12,0" />
+        </Style>
+
+        <Style x:Key="MetricPill" TargetType="Border">
+            <Setter Property="Background" Value="{StaticResource PanelSoft}" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Margin" Value="0,0,6,0" />
         </Style>
 
         <Style x:Key="ToolbarButton" TargetType="Button">
-            <Setter Property="Height" Value="34" />
-            <Setter Property="MinWidth" Value="78" />
-            <Setter Property="Padding" Value="12,0" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="MinWidth" Value="84" />
+            <Setter Property="Padding" Value="13,0" />
             <Setter Property="FontSize" Value="12" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Foreground" Value="{StaticResource Ink}" />
@@ -63,19 +98,34 @@
             <Setter Property="BorderBrush" Value="{StaticResource LineStrong}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Chrome" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <Border x:Name="Chrome"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}"
+                                TextElement.Foreground="{TemplateBinding Foreground}">
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="10" ShadowDepth="1" Direction="270" Opacity="0.08" Color="#172554" />
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Chrome" Property="BorderBrush" Value="#7DD3FC" />
                                 <Setter TargetName="Chrome" Property="Background" Value="#F8FBFF" />
+                                <Setter TargetName="Chrome" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="18" ShadowDepth="3" Direction="270" Opacity="0.16" Color="#2563EB" />
+                                    </Setter.Value>
+                                </Setter>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Chrome" Property="Background" Value="#EEF4FF" />
+                                <Setter TargetName="Chrome" Property="Background" Value="{StaticResource PanelPressed}" />
                                 <Setter TargetName="Chrome" Property="BorderBrush" Value="#2563EB" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
@@ -91,6 +141,146 @@
             <Setter Property="Background" Value="#2563EB" />
             <Setter Property="BorderBrush" Value="#2563EB" />
             <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Chrome"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}"
+                                TextElement.Foreground="{TemplateBinding Foreground}">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#3B82F6" Offset="0" />
+                                    <GradientStop Color="#2563EB" Offset="1" />
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.22" Color="#2563EB" />
+                            </Border.Effect>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Chrome" Property="BorderBrush" Value="#1D4ED8" />
+                                <Setter TargetName="Chrome" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="24" ShadowDepth="5" Direction="270" Opacity="0.28" Color="#2563EB" />
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.88" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="CaptureToggleButton" TargetType="Button">
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Width" Value="104" />
+            <Setter Property="MinWidth" Value="104" />
+            <Setter Property="Padding" Value="14,0" />
+            <Setter Property="FontSize" Value="12.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="Background" Value="#0F9F6E" />
+            <Setter Property="BorderBrush" Value="#0B7E59" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid x:Name="Root" RenderTransformOrigin="0.5,0.5">
+                            <Grid.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform ScaleX="1" ScaleY="1" />
+                                    <TranslateTransform Y="0" />
+                                </TransformGroup>
+                            </Grid.RenderTransform>
+                            <Border x:Name="Chrome"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="8"
+                                    Padding="{TemplateBinding Padding}"
+                                    TextElement.Foreground="{TemplateBinding Foreground}">
+                                <Border.Effect>
+                                    <DropShadowEffect BlurRadius="16" ShadowDepth="3" Direction="270" Opacity="0.20" Color="#0B7E59" />
+                                </Border.Effect>
+                                <Grid>
+                                    <Border x:Name="HoverSheen" CornerRadius="7" Opacity="0" IsHitTestVisible="False">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                <GradientStop Color="#55FFFFFF" Offset="0" />
+                                                <GradientStop Color="#08FFFFFF" Offset="1" />
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                    </Border>
+                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" TextElement.Foreground="{TemplateBinding Foreground}" />
+                                </Grid>
+                            </Border>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="HoverSheen" Property="Opacity" Value="1" />
+                                <Setter TargetName="Chrome" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="22" ShadowDepth="5" Direction="270" Opacity="0.26" Color="#0B7E59" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Root" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="1.02" ScaleY="1.02" />
+                                            <TranslateTransform Y="-1" />
+                                        </TransformGroup>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="HoverSheen" Property="Opacity" Value="0.35" />
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.92" />
+                                <Setter TargetName="Chrome" Property="Effect">
+                                    <Setter.Value>
+                                        <DropShadowEffect BlurRadius="7" ShadowDepth="1" Direction="270" Opacity="0.16" Color="#0F172A" />
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="Root" Property="RenderTransform">
+                                    <Setter.Value>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="0.98" ScaleY="0.98" />
+                                            <TranslateTransform Y="1" />
+                                        </TransformGroup>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Chrome" Property="Opacity" Value="0.45" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsCapturing}" Value="False">
+                    <Setter Property="Background" Value="#0F9F6E" />
+                    <Setter Property="BorderBrush" Value="#0B7E59" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding IsCapturing}" Value="True">
+                    <Setter Property="Background" Value="#DC2626" />
+                    <Setter Property="BorderBrush" Value="#B91C1C" />
+                    <Setter Property="Foreground" Value="#FFFFFF" />
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
 
         <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource ToolbarButton}">
@@ -100,7 +290,7 @@
         </Style>
 
         <Style TargetType="ComboBox">
-            <Setter Property="Height" Value="34" />
+            <Setter Property="Height" Value="36" />
             <Setter Property="Padding" Value="8,0" />
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="{StaticResource LineStrong}" />
@@ -109,7 +299,7 @@
         </Style>
 
         <Style TargetType="TextBox">
-            <Setter Property="Height" Value="34" />
+            <Setter Property="Height" Value="36" />
             <Setter Property="Padding" Value="9,4" />
             <Setter Property="Background" Value="#FFFFFF" />
             <Setter Property="BorderBrush" Value="{StaticResource LineStrong}" />
@@ -135,6 +325,7 @@
             <Setter Property="AlternatingRowBackground" Value="#FBFDFF" />
             <Setter Property="HorizontalGridLinesBrush" Value="#E6EEF8" />
             <Setter Property="VerticalGridLinesBrush" Value="#EEF4FB" />
+            <Setter Property="ScrollViewer.CanContentScroll" Value="True" />
             <Setter Property="ColumnHeaderStyle">
                 <Setter.Value>
                     <Style TargetType="DataGridColumnHeader">
@@ -212,8 +403,85 @@
             </Setter>
         </Style>
 
+        <Style x:Key="InvisibleScrollRepeatButton" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border Background="Transparent" />
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SlimScrollThumb" TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="ThumbChrome" Margin="3,2" Background="#CBD5E1" CornerRadius="5" />
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ThumbChrome" Property="Background" Value="#94A3B8" />
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="ThumbChrome" Property="Background" Value="#64748B" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style TargetType="ScrollBar">
+            <Setter Property="Width" Value="10" />
+            <Setter Property="MinWidth" Value="10" />
+            <Setter Property="Height" Value="Auto" />
+            <Setter Property="MinHeight" Value="10" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid x:Name="Root" Width="10" Background="Transparent">
+                            <Track x:Name="PART_Track" IsDirectionReversed="True" Focusable="False">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton x:Name="DecreaseButton" Command="{x:Static ScrollBar.PageUpCommand}" Style="{StaticResource InvisibleScrollRepeatButton}" />
+                                </Track.DecreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource SlimScrollThumb}" />
+                                </Track.Thumb>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton x:Name="IncreaseButton" Command="{x:Static ScrollBar.PageDownCommand}" Style="{StaticResource InvisibleScrollRepeatButton}" />
+                                </Track.IncreaseRepeatButton>
+                            </Track>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="Orientation" Value="Horizontal">
+                                <Setter TargetName="Root" Property="Width" Value="Auto" />
+                                <Setter TargetName="Root" Property="Height" Value="10" />
+                                <Setter TargetName="PART_Track" Property="IsDirectionReversed" Value="False" />
+                                <Setter TargetName="DecreaseButton" Property="Command" Value="{x:Static ScrollBar.PageLeftCommand}" />
+                                <Setter TargetName="IncreaseButton" Property="Command" Value="{x:Static ScrollBar.PageRightCommand}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style TargetType="GridSplitter">
             <Setter Property="Background" Value="Transparent" />
+        </Style>
+
+        <Style TargetType="TabControl">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+
+        <Style TargetType="TabItem">
+            <Setter Property="Padding" Value="10,6" />
+            <Setter Property="Foreground" Value="{StaticResource Muted}" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
     </Application.Resources>
 </Application>

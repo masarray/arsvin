@@ -261,6 +261,8 @@ public sealed class SvPublisherConfigSnapshot
     public int PtpAnnounceIntervalMs { get; init; } = 1000;
     public int PtpSyncIntervalMs { get; init; } = 250;
     public bool PtpRespondToPeerDelay { get; init; } = true;
+    public string AdapterSelector { get; init; } = string.Empty;
+    public string AdapterMacAddress { get; init; } = string.Empty;
     public string RampSignalKey { get; init; } = string.Empty;
     public string ScenarioPresetKey { get; init; } = string.Empty;
     public double RampTargetMagnitude { get; init; }
