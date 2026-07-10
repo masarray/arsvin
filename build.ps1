@@ -1,24 +1,35 @@
 $ErrorActionPreference = 'Stop'
+Set-StrictMode -Version Latest
 
 $root = $PSScriptRoot
 $appProject = Join-Path $root 'src\ARSVIN\ARSVIN.csproj'
 $subscriberProject = Join-Path $root 'src\ARSVIN.Subscriber\ARSVIN.Subscriber.csproj'
 $testProject = Join-Path $root 'tests\ARSVIN.Tests\ARSVIN.Tests.csproj'
 
-Write-Host '==> Restoring ARSVIN Publisher'
-dotnet restore $appProject
+function Invoke-DotNet {
+    param(
+        [Parameter(Mandatory)]
+        [string[]] $Arguments
+    )
 
-Write-Host '==> Restoring ARSVIN Subscriber'
-dotnet restore $subscriberProject
+    & dotnet @Arguments
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
+    }
+}
 
-Write-Host '==> Restoring ARSVIN tests'
-dotnet restore $testProject
+Write-Host '==> Restoring solution projects'
+Invoke-DotNet -Arguments @('restore', $appProject)
+Invoke-DotNet -Arguments @('restore', $subscriberProject)
+Invoke-DotNet -Arguments @('restore', $testProject)
 
 Write-Host '==> Building ARSVIN Publisher'
-dotnet build $appProject -c Release --no-restore
+Invoke-DotNet -Arguments @('build', $appProject, '-c', 'Release', '--no-restore')
 
-Write-Host '==> Building ARSVIN Subscriber'
-dotnet build $subscriberProject -c Release --no-restore
+Write-Host '==> Building ArSubsv Subscriber'
+Invoke-DotNet -Arguments @('build', $subscriberProject, '-c', 'Release', '--no-restore')
 
 Write-Host '==> Running tests'
-dotnet test $testProject -c Release --no-restore
+Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '--no-restore')
+
+Write-Host '==> Build completed successfully'
