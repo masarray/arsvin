@@ -10,7 +10,7 @@
 **ARSVIN** is a focused, Apache-2.0 engineering suite for IEC 61850 Sampled Values on Windows. It combines an SCL-driven **SV Publisher** with **ArSubsv**, a live/PCAP **SV Subscriber and analysis companion** for transparent, repeatable laboratory workflows.
 
 <p align="center">
-  <img src="docs/assets/arsvin-sv-publisher-preview.png" alt="ARSVIN IEC 61850 Sampled Values Publisher interface with SCL stream setup, TX timing health, scenario controls, and evidence export" width="920" />
+  <img src="site/assets/arsvin-publisher-sv-setup.webp" alt="ARSVIN Publisher SV Setup interface with SCL stream selection, network parameters, source modes, and manual output controls" width="920" />
 </p>
 
 <p align="center">
@@ -23,6 +23,14 @@
 
 > [!CAUTION]
 > ARSVIN can capture and transmit raw Ethernet traffic. Use it only on isolated laboratory networks, point-to-point test links, or networks where you have explicit authorization. It is not a certified relay test set, calibrated merging unit, protection trip-time platform, production process-bus monitor, or IEC 61850 conformance tool.
+
+## Real application views
+
+| ArSubsv stream monitor | ArSubsv live analysis |
+|---|---|
+| <img src="site/assets/arsvin-subscriber-waveform-phasor.webp" alt="ArSubsv stream monitor with voltage and current waveforms, phasor view, RMS values, and discovered Sampled Values streams" width="100%" /> | <img src="site/assets/arsvin-subscriber-live-analysis.webp" alt="ArSubsv live analysis workspace with channel table, phasor display, voltage waveform, and current waveform" width="100%" /> |
+
+The screenshots above are captured from the actual Windows applications. They show the Publisher setup workflow and the Subscriber waveform, phasor, channel, RMS, and stream-analysis views.
 
 ## Two focused applications
 
