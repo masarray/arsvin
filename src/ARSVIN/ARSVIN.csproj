@@ -13,7 +13,6 @@
     <Description>Lightweight IEC 61850 Sampled Values publisher simulator with SCL-based setup, lab PTP compatibility traffic, and COMTRADE replay.</Description>
     <Copyright>Copyright © 2026 Ari Sulistiono</Copyright>
     <PackageTags>IEC 61850;Sampled Values;SV publisher;SV injector;COMTRADE;process bus;digital substation;relay testing</PackageTags>
-    <Version>0.1.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
