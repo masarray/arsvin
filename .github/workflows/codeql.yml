@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze C#
+    name: Analyze C# solution
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -31,10 +31,11 @@ jobs:
           languages: csharp
           build-mode: manual
 
-      - name: Build
-        run: |
-          dotnet restore src/ARSVIN/ARSVIN.csproj
-          dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore
+      - name: Restore solution
+        run: dotnet restore ARSVIN.sln
+
+      - name: Build solution
+        run: dotnet build ARSVIN.sln -c Release --no-restore
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
