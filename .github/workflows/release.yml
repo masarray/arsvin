@@ -154,23 +154,41 @@ jobs:
         run: |
           $setup = (Resolve-Path '.\artifacts\release\ARSVIN-Suite-Setup-win-x64.exe').Path
           $installDir = Join-Path $env:RUNNER_TEMP 'ARSVIN-SmokeInstall'
+          $installLog = Join-Path $env:RUNNER_TEMP 'arsvin-install.log'
+          $uninstallLog = Join-Path $env:RUNNER_TEMP 'arsvin-uninstall.log'
 
           if (Test-Path $installDir) {
             Remove-Item $installDir -Recurse -Force
           }
+          Remove-Item $installLog, $uninstallLog -Force -ErrorAction SilentlyContinue
 
-          & $setup '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' "/DIR=$installDir"
-          if ($LASTEXITCODE -ne 0) {
-            throw "Silent installer failed with exit code $LASTEXITCODE."
+          $installArgs = @(
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART',
+            "/DIR=`"$installDir`"",
+            "/LOG=`"$installLog`""
+          )
+          $installProcess = Start-Process -FilePath $setup -ArgumentList $installArgs -Wait -PassThru
+
+          if (Test-Path $installLog) {
+            Get-Content $installLog
           }
+          if ($installProcess.ExitCode -ne 0) {
+            throw "Silent installer failed with exit code $($installProcess.ExitCode)."
+          }
+
+          Write-Host 'Installed files:'
+          Get-ChildItem $installDir -Recurse -Force |
+            Select-Object FullName, Length |
+            Format-Table -AutoSize
 
           $installedFiles = @(
             'ARSVIN.exe',
             'ArSubsv.exe',
             'README.md',
             'LICENSE.txt',
-            'VERSION.txt',
-            'unins000.exe'
+            'VERSION.txt'
           )
 
           foreach ($name in $installedFiles) {
@@ -180,10 +198,25 @@ jobs:
             }
           }
 
-          $uninstaller = Join-Path $installDir 'unins000.exe'
-          & $uninstaller '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART'
-          if ($LASTEXITCODE -ne 0) {
-            throw "Silent uninstaller failed with exit code $LASTEXITCODE."
+          $uninstaller = Get-ChildItem $installDir -Filter 'unins*.exe' -File |
+            Select-Object -First 1
+          if (-not $uninstaller) {
+            throw "Installer smoke test could not find an uninstaller in: $installDir"
+          }
+
+          $uninstallArgs = @(
+            '/VERYSILENT',
+            '/SUPPRESSMSGBOXES',
+            '/NORESTART',
+            "/LOG=`"$uninstallLog`""
+          )
+          $uninstallProcess = Start-Process -FilePath $uninstaller.FullName -ArgumentList $uninstallArgs -Wait -PassThru
+
+          if (Test-Path $uninstallLog) {
+            Get-Content $uninstallLog
+          }
+          if ($uninstallProcess.ExitCode -ne 0) {
+            throw "Silent uninstaller failed with exit code $($uninstallProcess.ExitCode)."
           }
 
       - name: Generate SHA-256 checksums
