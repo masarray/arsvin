@@ -65,7 +65,7 @@ The tools are intentionally separated. Publisher evidence proves what the PC gen
 
 ## Release downloads
 
-Every tagged release builds reproducible Windows x64 artifacts:
+Every tagged release builds validated Windows x64 artifacts with stable filenames:
 
 | Artifact | Use |
 |---|---|
