@@ -31,6 +31,14 @@ The script restores, builds, and tests:
 
 External command exit codes are checked, so CI and local builds stop immediately when a `dotnet` command fails.
 
+## Validate the public site
+
+```powershell
+.\scripts\validate-public-site.ps1
+```
+
+The validator checks required landing-page files, local asset references, JSON-LD blocks, web-manifest icons, sitemap canonical URL, release download filenames, and the sitemap reference in `robots.txt`.
+
 ## Build portable release artifacts
 
 ```powershell
@@ -91,11 +99,28 @@ The installer:
 - offers an optional Publisher desktop shortcut,
 - includes an uninstaller,
 - preserves Apache-2.0 and third-party notices,
-- warns when Npcap is not detected.
+- warns interactively when Npcap is not detected,
+- supports unattended installation and removal without an Npcap message box.
 
 ## GitHub Actions release flow
 
 Workflow: `.github/workflows/release.yml`
+
+### Pull-request validation
+
+When release tooling, installer definitions, project files, or build configuration change, the workflow runs on the pull request and:
+
+1. restores, builds, and tests the solution,
+2. publishes both portable single-file applications,
+3. creates the portable suite ZIP,
+4. compiles the Inno Setup installer,
+5. checks all expected artifact names and non-empty files,
+6. silently installs the suite into a temporary directory,
+7. verifies Publisher, Subscriber, documentation, version file, and uninstaller,
+8. silently uninstalls the temporary installation,
+9. generates checksums and uploads a private workflow artifact.
+
+A pull-request run never creates a public GitHub Release.
 
 ### Tagged release
 
@@ -106,16 +131,7 @@ git tag v0.3.0
 git push origin v0.3.0
 ```
 
-The workflow then:
-
-1. restores, builds, and tests the solution,
-2. publishes both self-contained single-file applications,
-3. creates the portable suite ZIP,
-4. installs Inno Setup on the Windows runner,
-5. compiles the suite installer,
-6. generates `SHA256SUMS.txt`,
-7. uploads the files as a workflow artifact,
-8. creates a GitHub Release and attaches all public artifacts.
+The workflow repeats the validated packaging path, downloads the validated workflow artifact in a separate least-privilege release job, and publishes all public files to a GitHub Release.
 
 ### Manual artifact build
 
@@ -151,7 +167,7 @@ When a trusted code-signing certificate becomes available, sign the portable exe
 
 Before tagging a public release:
 
-- Confirm `main` CI and CodeQL are green.
+- Confirm `main` CI, release validation, and CodeQL are green.
 - Test Publisher dry run.
 - Test live publishing only on an isolated lab link.
 - Test Subscriber live capture and PCAP import.

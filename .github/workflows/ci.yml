@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   build-test:
-    name: Build and test
+    name: Build, test, and validate site
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -22,6 +22,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+
+      - name: Validate public site
+        shell: pwsh
+        run: .\scripts\validate-public-site.ps1
 
       - name: Restore Publisher
         run: dotnet restore src/ARSVIN/ARSVIN.csproj
