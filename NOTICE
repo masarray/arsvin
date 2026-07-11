@@ -1,9 +1,12 @@
-ARSVIN - IEC 61850 Sampled Values Publisher & Process Bus Traffic Tester
+ARSVIN - IEC 61850 Sampled Values Engineering Suite
 Copyright 2026 Ari Sulistiono
 
 Licensed under the Apache License, Version 2.0.
 
 Author: Ari Sulistiono
 GitHub: https://github.com/masarray
+Project: https://github.com/masarray/arsvin
 
-ARSVIN can transmit raw Ethernet frames and is intended only for isolated lab networks, point-to-point engineering tests, and educational use.
+ARSVIN includes a Sampled Values Publisher and the ArSubsv Subscriber companion. The software can capture and transmit raw Ethernet frames and is intended only for isolated laboratory networks, authorized point-to-point engineering tests, development, troubleshooting support, and education.
+
+ARSVIN is not a certified IEC 61850 conformance tool, calibrated merging unit, protection test set, deterministic real-time platform, or production process-bus monitoring system.

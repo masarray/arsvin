@@ -1,18 +1,32 @@
-name: Release Portable Windows EXE
+name: Build Windows Release
 
 on:
   push:
     tags:
       - 'v*.*.*'
   workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version used for manual artifact builds (for example 0.3.0)'
+        required: false
+        default: '0.0.0-dev'
 
 permissions:
   contents: write
 
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+  DOTNET_NOLOGO: '1'
+
 jobs:
-  publish:
-    name: Publish win-x64 portable package
+  release:
+    name: Portable EXEs and installer
     runs-on: windows-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -21,24 +35,111 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 8.0.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            Directory.Packages.props
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $version = '${{ github.ref_name }}' -replace '^[vV]', ''
+          }
+          else {
+            $version = '${{ inputs.version }}'
+            if ([string]::IsNullOrWhiteSpace($version)) {
+              $version = '0.0.0-dev'
+            }
+            $version = $version -replace '^[vV]', ''
+          }
+
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
+            throw "Unsupported release version: $version"
+          }
+
+          "value=$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Release version: $version"
 
       - name: Build and test
         shell: pwsh
         run: .\build.ps1
 
-      - name: Publish portable ZIP
+      - name: Publish single-file portable applications
         shell: pwsh
-        run: .\publish-win-x64.ps1
+        run: .\scripts\publish-release.ps1 -Version '${{ steps.version.outputs.value }}' -SkipTests
 
-      - name: Upload workflow artifact
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build Windows installer
+        shell: pwsh
+        run: |
+          $iscc = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
+            "${env:ProgramFiles}\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+          if (-not $iscc) {
+            throw 'Inno Setup compiler (ISCC.exe) was not found.'
+          }
+
+          $sourceDir = (Resolve-Path '.\artifacts\installer-input').Path
+          $outputDir = (Resolve-Path '.\artifacts\release').Path
+          $version = '${{ steps.version.outputs.value }}'
+
+          & $iscc `
+            "/DMyAppVersion=$version" `
+            "/DSourceDir=$sourceDir" `
+            "/DOutputDir=$outputDir" `
+            '.\installer\ARSVIN.iss'
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Generate SHA-256 checksums
+        shell: pwsh
+        run: |
+          $releaseRoot = Resolve-Path '.\artifacts\release'
+          $lines = Get-ChildItem $releaseRoot -File |
+            Where-Object { $_.Name -ne 'SHA256SUMS.txt' } |
+            Sort-Object Name |
+            ForEach-Object {
+              $hash = (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+              "$hash  $($_.Name)"
+            }
+
+          [System.IO.File]::WriteAllLines(
+            (Join-Path $releaseRoot 'SHA256SUMS.txt'),
+            $lines,
+            [System.Text.UTF8Encoding]::new($false)
+          )
+
+          Get-Content (Join-Path $releaseRoot 'SHA256SUMS.txt')
+
+      - name: Upload release workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ARSVIN-win-x64-portable
-          path: artifacts/ARSVIN-win-x64-portable.zip
+          name: ARSVIN-${{ steps.version.outputs.value }}-windows-x64
+          path: |
+            artifacts/release/*.exe
+            artifacts/release/*.zip
+            artifacts/release/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 30
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
         with:
-          files: artifacts/ARSVIN-win-x64-portable.zip
           generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            artifacts/release/ARSVIN-Publisher-win-x64.exe
+            artifacts/release/ArSubsv-Subscriber-win-x64.exe
+            artifacts/release/ARSVIN-Suite-Setup-win-x64.exe
+            artifacts/release/ARSVIN-win-x64-portable.zip
+            artifacts/release/SHA256SUMS.txt
