@@ -44,6 +44,11 @@
     "codeRepository": "https://github.com/masarray/arsvin",
     "url": "https://masarray.github.io/arsvin/",
     "downloadUrl": "https://github.com/masarray/arsvin/releases/latest",
+    "screenshot": [
+      "https://masarray.github.io/arsvin/assets/arsvin-publisher-sv-setup.webp",
+      "https://masarray.github.io/arsvin/assets/arsvin-subscriber-live-analysis.webp",
+      "https://masarray.github.io/arsvin/assets/arsvin-subscriber-waveform-phasor.webp"
+    ],
     "image": "https://masarray.github.io/arsvin/assets/arsvin-social-preview.png",
     "author": {
       "@type": "Person",
@@ -104,10 +109,10 @@
 
     <nav aria-label="Primary navigation">
       <a href="#products">Products</a>
+      <a href="#screenshots">Screenshots</a>
       <a href="#capabilities">Capabilities</a>
       <a href="#downloads">Downloads</a>
       <a href="#safety">Safety</a>
-      <a href="#faq">FAQ</a>
     </nav>
 
     <a class="header-link" href="https://github.com/masarray/arsvin">GitHub</a>
@@ -135,8 +140,8 @@
       </div>
 
       <figure class="product-shot">
-        <img src="assets/arsvin-iec-61850-sampled-values-publisher-preview.png" alt="ARSVIN Publisher interface showing SCL configuration, Sampled Values controls, TX timing health, and evidence export" />
-        <figcaption>Publisher workspace — clear configuration, visible TX health, exportable evidence.</figcaption>
+        <img src="assets/arsvin-subscriber-live-analysis.webp" alt="ArSubsv live analysis interface showing channel values, a phasor display, voltage waveform, and current waveform" width="478" height="256" />
+        <figcaption>Real ArSubsv workspace — channel data, phasor, voltage, and current analysis.</figcaption>
       </figure>
     </section>
 
@@ -178,56 +183,83 @@
       </div>
     </section>
 
-    <section id="capabilities" class="section section-soft">
+    <section id="screenshots" class="section section-soft">
       <div class="shell">
-        <div class="section-heading compact">
-          <p class="eyebrow">Engineering workflow</p>
-          <h2>Useful visibility from configuration to evidence.</h2>
+        <div class="section-heading">
+          <p class="eyebrow">Actual Windows interfaces</p>
+          <h2>See the engineering workflow before downloading.</h2>
+          <p>These are real captures from the Publisher and Subscriber applications—not generic product mockups.</p>
         </div>
 
-        <div class="capability-grid">
-          <article><span>01</span><h3>Configure from SCL</h3><p>Reuse APPID, destination MAC, VLAN, <code>svID</code>, dataset, <code>confRev</code>, sample rate, and frame packing.</p></article>
-          <article><span>02</span><h3>Generate scenarios</h3><p>Use manual values, ramps, sequencers, faults, sequence components, harmonics, DC offset, phase jumps, or COMTRADE replay.</p></article>
-          <article><span>03</span><h3>Watch health</h3><p>Expose publisher timing, receiver continuity, late frames, missed schedules, sample counters, payload layout, and decoded values.</p></article>
-          <article><span>04</span><h3>Preserve evidence</h3><p>Export generated PCAP and Markdown reports for independent review, troubleshooting, and repeatable laboratory records.</p></article>
+        <div class="product-grid">
+          <figure class="product-shot">
+            <img src="assets/arsvin-publisher-sv-setup.webp" alt="ARSVIN Publisher SV Setup with SCL stream selection, source modes, network fields, and manual output controls" width="478" height="313" loading="lazy" />
+            <figcaption>Publisher SV Setup — stream, adapter, network, mode, and output configuration.</figcaption>
+          </figure>
+
+          <figure class="product-shot">
+            <img src="assets/arsvin-subscriber-live-analysis.webp" alt="ArSubsv live analysis with channel table, phasor plot, voltage waveform, and current waveform" width="478" height="256" loading="lazy" />
+            <figcaption>Subscriber analysis — decoded channels, phasor, voltage, and current views.</figcaption>
+          </figure>
         </div>
+
+        <figure class="product-shot" style="max-width:760px;margin:15px auto 0">
+          <img src="assets/arsvin-subscriber-waveform-phasor.webp" alt="ArSubsv stream monitor with discovered SV streams, voltage and current waveforms, phasor view, and RMS values" width="478" height="281" loading="lazy" />
+          <figcaption>Stream monitor — discovered Sampled Values streams, waveform, phasor, and RMS inspection.</figcaption>
+        </figure>
       </div>
     </section>
 
-    <section id="downloads" class="section shell">
-      <div class="section-heading">
-        <p class="eyebrow">Windows release options</p>
-        <h2>Installer or direct portable applications.</h2>
-        <p>All public release files use stable names so the latest download links remain predictable.</p>
+    <section id="capabilities" class="section shell">
+      <div class="section-heading compact">
+        <p class="eyebrow">Engineering workflow</p>
+        <h2>Useful visibility from configuration to evidence.</h2>
       </div>
 
-      <div class="download-list">
-        <a class="download-item featured" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Suite-Setup-win-x64.exe">
-          <span class="file-type">EXE</span>
-          <span><strong>ARSVIN Suite Installer</strong><small>Publisher + Subscriber + shortcuts + uninstaller</small></span>
-          <span class="download-action">Download</span>
-        </a>
-
-        <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Publisher-win-x64.exe">
-          <span class="file-type">EXE</span>
-          <span><strong>Publisher Portable</strong><small>Self-contained single-file application</small></span>
-          <span class="download-action">Download</span>
-        </a>
-
-        <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ArSubsv-Subscriber-win-x64.exe">
-          <span class="file-type">EXE</span>
-          <span><strong>Subscriber Portable</strong><small>Self-contained single-file application</small></span>
-          <span class="download-action">Download</span>
-        </a>
-
-        <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-win-x64-portable.zip">
-          <span class="file-type">ZIP</span>
-          <span><strong>Portable Suite</strong><small>Both applications, docs, notices, and samples</small></span>
-          <span class="download-action">Download</span>
-        </a>
+      <div class="capability-grid">
+        <article><span>01</span><h3>Configure from SCL</h3><p>Reuse APPID, destination MAC, VLAN, <code>svID</code>, dataset, <code>confRev</code>, sample rate, and frame packing.</p></article>
+        <article><span>02</span><h3>Generate scenarios</h3><p>Use manual values, ramps, sequencers, faults, sequence components, harmonics, DC offset, phase jumps, or COMTRADE replay.</p></article>
+        <article><span>03</span><h3>Watch health</h3><p>Expose publisher timing, receiver continuity, late frames, missed schedules, sample counters, payload layout, and decoded values.</p></article>
+        <article><span>04</span><h3>Preserve evidence</h3><p>Export generated PCAP and Markdown reports for independent review, troubleshooting, and repeatable laboratory records.</p></article>
       </div>
+    </section>
 
-      <p class="download-note">Current binaries are unsigned and may trigger a Windows SmartScreen warning. Npcap is not bundled; install it separately from the official Npcap website for live network features. Verify downloads with <a href="https://github.com/masarray/arsvin/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>.</p>
+    <section id="downloads" class="section section-soft">
+      <div class="shell">
+        <div class="section-heading">
+          <p class="eyebrow">Windows release options</p>
+          <h2>Installer or direct portable applications.</h2>
+          <p>All public release files use stable names so the latest download links remain predictable.</p>
+        </div>
+
+        <div class="download-list">
+          <a class="download-item featured" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Suite-Setup-win-x64.exe">
+            <span class="file-type">EXE</span>
+            <span><strong>ARSVIN Suite Installer</strong><small>Publisher + Subscriber + shortcuts + uninstaller</small></span>
+            <span class="download-action">Download</span>
+          </a>
+
+          <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Publisher-win-x64.exe">
+            <span class="file-type">EXE</span>
+            <span><strong>Publisher Portable</strong><small>Self-contained single-file application</small></span>
+            <span class="download-action">Download</span>
+          </a>
+
+          <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ArSubsv-Subscriber-win-x64.exe">
+            <span class="file-type">EXE</span>
+            <span><strong>Subscriber Portable</strong><small>Self-contained single-file application</small></span>
+            <span class="download-action">Download</span>
+          </a>
+
+          <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-win-x64-portable.zip">
+            <span class="file-type">ZIP</span>
+            <span><strong>Portable Suite</strong><small>Both applications, docs, notices, and samples</small></span>
+            <span class="download-action">Download</span>
+          </a>
+        </div>
+
+        <p class="download-note">Current binaries are unsigned and may trigger a Windows SmartScreen warning. Npcap is not bundled; install it separately from the official Npcap website for live network features. Verify downloads with <a href="https://github.com/masarray/arsvin/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>.</p>
+      </div>
     </section>
 
     <section id="safety" class="section safety-section">
