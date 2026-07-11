@@ -67,15 +67,15 @@ jobs:
           if ('${{ github.ref_type }}' -eq 'tag') {
             $version = '${{ github.ref_name }}' -replace '^[vV]', ''
           }
-          elseif ('${{ github.ref }}'.StartsWith('refs/heads/release/v')) {
-            $version = '${{ github.ref_name }}' -replace '^release/[vV]', ''
-          }
           elseif ('${{ github.event_name }}' -eq 'workflow_dispatch') {
             $version = '${{ inputs.version }}'
             if ([string]::IsNullOrWhiteSpace($version)) {
               $version = '0.0.0-dev'
             }
             $version = $version -replace '^[vV]', ''
+          }
+          elseif (('${{ github.event_name }}' -eq 'push') -and '${{ github.ref }}'.StartsWith('refs/heads/release/v')) {
+            $version = '${{ github.ref_name }}' -replace '^release/[vV]', ''
           }
           else {
             $version = "0.0.0-pr.$env:GITHUB_RUN_NUMBER"
@@ -265,7 +265,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    if: github.ref_type == 'tag' || startsWith(github.ref, 'refs/heads/release/v')
+    if: github.ref_type == 'tag' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/v'))
     needs: package
     runs-on: ubuntu-latest
     permissions:
