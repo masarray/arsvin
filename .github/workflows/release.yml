@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*.*.*'
-    branches:
-      - 'release/v*.*.*'
   pull_request:
     branches: [ main ]
     paths:
@@ -23,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version used for manual artifact builds (for example 0.3.0)'
+        description: 'Version used for a private workflow artifact build (for example 0.4.0-dev.1)'
         required: false
         default: '0.0.0-dev'
 
@@ -46,15 +44,18 @@ jobs:
       version: ${{ steps.version.outputs.value }}
       tag_name: ${{ steps.version.outputs.tag_name }}
       artifact_name: ${{ steps.version.outputs.artifact_name }}
+      is_prerelease: ${{ steps.version.outputs.is_prerelease }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: 8.0.x
+          dotnet-version: 8.0.4xx
           cache: true
           cache-dependency-path: |
             **/*.csproj
@@ -64,18 +65,15 @@ jobs:
         id: version
         shell: pwsh
         run: |
-          if ('${{ github.ref_type }}' -eq 'tag') {
-            $version = '${{ github.ref_name }}' -replace '^[vV]', ''
-          }
-          elseif ('${{ github.event_name }}' -eq 'workflow_dispatch') {
+          if ('${{ github.event_name }}' -eq 'workflow_dispatch') {
             $version = '${{ inputs.version }}'
             if ([string]::IsNullOrWhiteSpace($version)) {
               $version = '0.0.0-dev'
             }
             $version = $version -replace '^[vV]', ''
           }
-          elseif (('${{ github.event_name }}' -eq 'push') -and '${{ github.ref }}'.StartsWith('refs/heads/release/v')) {
-            $version = '${{ github.ref_name }}' -replace '^release/[vV]', ''
+          elseif ('${{ github.ref_type }}' -eq 'tag') {
+            $version = '${{ github.ref_name }}' -replace '^[vV]', ''
           }
           else {
             $version = "0.0.0-pr.$env:GITHUB_RUN_NUMBER"
@@ -87,11 +85,26 @@ jobs:
 
           $tagName = "v$version"
           $artifactName = "ARSVIN-$version-windows-x64"
+          $isPrerelease = $version.Contains('-').ToString().ToLowerInvariant()
+
           "value=$version" >> $env:GITHUB_OUTPUT
           "tag_name=$tagName" >> $env:GITHUB_OUTPUT
           "artifact_name=$artifactName" >> $env:GITHUB_OUTPUT
+          "is_prerelease=$isPrerelease" >> $env:GITHUB_OUTPUT
+
           Write-Host "Release version: $version"
           Write-Host "Release tag: $tagName"
+          Write-Host "Prerelease: $isPrerelease"
+
+      - name: Verify tagged commit belongs to main
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor "$env:GITHUB_SHA" 'origin/main'
+          if ($LASTEXITCODE -ne 0) {
+            throw "Tag ${{ github.ref_name }} does not point to a commit contained in main. Merge the release commit before tagging."
+          }
 
       - name: Build and test
         shell: pwsh
@@ -265,7 +278,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    if: github.ref_type == 'tag' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/v'))
+    if: github.ref_type == 'tag'
     needs: package
     runs-on: ubuntu-latest
     permissions:
@@ -284,7 +297,8 @@ jobs:
           tag_name: ${{ needs.package.outputs.tag_name }}
           target_commitish: ${{ github.sha }}
           name: ARSVIN ${{ needs.package.outputs.tag_name }}
-          make_latest: true
+          prerelease: ${{ needs.package.outputs.is_prerelease }}
+          make_latest: ${{ needs.package.outputs.is_prerelease == 'false' }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
