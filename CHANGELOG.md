@@ -4,12 +4,17 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ## Unreleased
 
+### Security
+
+- Pinned all GitHub Actions used by CI, CodeQL, Pages, and release workflows to immutable commit SHAs while retaining version comments for maintainability and Dependabot updates.
+
 ### Planned
 
-- Supply-chain pinning for GitHub Actions and installer tooling.
+- Exact-version and integrity pinning for installer tooling.
 - Shared `ARSVIN.Engine` class library extraction.
 - Code coverage and analyzer quality gates.
 - Search-indexable HTML engineering documentation.
+- SBOM and release provenance/attestation.
 
 ## 0.3.0 — 2026-07-11
 
