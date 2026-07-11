@@ -7,7 +7,7 @@ ARSVIN uses a tag-driven GitHub Actions workflow to build two self-contained por
 For local source builds:
 
 - Windows 10/11 x64
-- .NET 8 SDK
+- .NET 8 SDK, feature band 8.0.4xx
 - PowerShell 7+ recommended
 
 For local installer builds:
@@ -38,6 +38,8 @@ External command exit codes are checked, so CI and local builds stop immediately
 ```
 
 The validator checks required landing-page files, local asset references, JSON-LD blocks, web-manifest icons, sitemap canonical URL, release download filenames, and the sitemap reference in `robots.txt`.
+
+The same validator runs directly inside the GitHub Pages deployment job. A broken landing page cannot be deployed merely because a separate CI job has not finished yet.
 
 ## Build portable release artifacts
 
@@ -122,22 +124,37 @@ When release tooling, installer definitions, project files, or build configurati
 
 A pull-request run never creates a public GitHub Release.
 
-### Tagged release
+### Stable tagged release
 
-Create and push a semantic version tag:
+A public release is created only by pushing a semantic version tag. The tagged commit must already be contained in `main`; the workflow rejects a tag created from an unmerged feature or release branch.
 
 ```powershell
-git tag v0.3.0
-git push origin v0.3.0
+git switch main
+git pull --ff-only origin main
+git tag -a v0.4.0 -m "ARSVIN v0.4.0"
+git push origin v0.4.0
 ```
 
-The workflow repeats the validated packaging path, downloads the validated workflow artifact in a separate least-privilege release job, and publishes all public files to a GitHub Release.
+The workflow repeats the validated packaging path, downloads the validated workflow artifact in a separate least-privilege release job, and publishes all public files to GitHub Releases. Stable tags are eligible to become the repository's latest release.
+
+### Prerelease tag
+
+Semantic versions containing a suffix are published as GitHub prereleases and do not replace the latest stable release:
+
+```powershell
+git switch main
+git pull --ff-only origin main
+git tag -a v0.4.0-rc.1 -m "ARSVIN v0.4.0-rc.1"
+git push origin v0.4.0-rc.1
+```
+
+Examples recognized as prereleases include `-alpha.1`, `-beta.1`, and `-rc.1`.
 
 ### Manual artifact build
 
-Run **Build Windows Release** from the Actions tab and provide a version such as `0.3.0-dev.1`.
+Run **Build Windows Release** from the Actions tab and provide a version such as `0.4.0-dev.1`.
 
-Manual runs upload workflow artifacts but do not create a GitHub Release because no tag is present.
+Manual runs upload private workflow artifacts only. They never create or replace a public GitHub Release, even when started while viewing another branch.
 
 ## Release assets
 
@@ -167,7 +184,9 @@ When a trusted code-signing certificate becomes available, sign the portable exe
 
 Before tagging a public release:
 
+- Confirm the intended release commit is already on `main`.
 - Confirm `main` CI, release validation, and CodeQL are green.
+- Update `VersionPrefix` and `CHANGELOG.md`.
 - Test Publisher dry run.
 - Test live publishing only on an isolated lab link.
 - Test Subscriber live capture and PCAP import.
