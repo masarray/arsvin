@@ -4,6 +4,20 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/release.yml'
+      - 'installer/**'
+      - 'scripts/publish-release.ps1'
+      - 'publish-win-x64.ps1'
+      - 'build.ps1'
+      - 'src/**'
+      - 'tests/**'
+      - 'ARSVIN.sln'
+      - 'Directory.Build.props'
+      - 'Directory.Packages.props'
+      - 'global.json'
   workflow_dispatch:
     inputs:
       version:
@@ -12,10 +26,10 @@ on:
         default: '0.0.0-dev'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: false
 
 env:
@@ -23,9 +37,12 @@ env:
   DOTNET_NOLOGO: '1'
 
 jobs:
-  release:
-    name: Portable EXEs and installer
+  package:
+    name: Validate portable EXEs and installer
     runs-on: windows-latest
+    outputs:
+      version: ${{ steps.version.outputs.value }}
+      artifact_name: ${{ steps.version.outputs.artifact_name }}
 
     steps:
       - name: Checkout
@@ -47,19 +64,24 @@ jobs:
           if ('${{ github.ref_type }}' -eq 'tag') {
             $version = '${{ github.ref_name }}' -replace '^[vV]', ''
           }
-          else {
+          elseif ('${{ github.event_name }}' -eq 'workflow_dispatch') {
             $version = '${{ inputs.version }}'
             if ([string]::IsNullOrWhiteSpace($version)) {
               $version = '0.0.0-dev'
             }
             $version = $version -replace '^[vV]', ''
           }
+          else {
+            $version = "0.0.0-pr.$env:GITHUB_RUN_NUMBER"
+          }
 
           if ($version -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
             throw "Unsupported release version: $version"
           }
 
+          $artifactName = "ARSVIN-$version-windows-x64"
           "value=$version" >> $env:GITHUB_OUTPUT
+          "artifact_name=$artifactName" >> $env:GITHUB_OUTPUT
           Write-Host "Release version: $version"
 
       - name: Build and test
@@ -100,6 +122,70 @@ jobs:
             throw "Inno Setup failed with exit code $LASTEXITCODE."
           }
 
+      - name: Validate release artifacts
+        shell: pwsh
+        run: |
+          $releaseRoot = (Resolve-Path '.\artifacts\release').Path
+          $expected = @(
+            'ARSVIN-Publisher-win-x64.exe',
+            'ArSubsv-Subscriber-win-x64.exe',
+            'ARSVIN-Suite-Setup-win-x64.exe',
+            'ARSVIN-win-x64-portable.zip'
+          )
+
+          foreach ($name in $expected) {
+            $path = Join-Path $releaseRoot $name
+            if (-not (Test-Path $path -PathType Leaf)) {
+              throw "Expected release artifact was not found: $path"
+            }
+
+            if ((Get-Item $path).Length -le 0) {
+              throw "Release artifact is empty: $path"
+            }
+          }
+
+          Get-ChildItem $releaseRoot -File |
+            Select-Object Name, Length |
+            Sort-Object Name |
+            Format-Table -AutoSize
+
+      - name: Smoke-test silent installer
+        shell: pwsh
+        run: |
+          $setup = (Resolve-Path '.\artifacts\release\ARSVIN-Suite-Setup-win-x64.exe').Path
+          $installDir = Join-Path $env:RUNNER_TEMP 'ARSVIN-SmokeInstall'
+
+          if (Test-Path $installDir) {
+            Remove-Item $installDir -Recurse -Force
+          }
+
+          & $setup '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART' "/DIR=$installDir"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Silent installer failed with exit code $LASTEXITCODE."
+          }
+
+          $installedFiles = @(
+            'ARSVIN.exe',
+            'ArSubsv.exe',
+            'README.md',
+            'LICENSE.txt',
+            'VERSION.txt',
+            'unins000.exe'
+          )
+
+          foreach ($name in $installedFiles) {
+            $path = Join-Path $installDir $name
+            if (-not (Test-Path $path -PathType Leaf)) {
+              throw "Installer smoke test could not find: $path"
+            }
+          }
+
+          $uninstaller = Join-Path $installDir 'unins000.exe'
+          & $uninstaller '/VERYSILENT' '/SUPPRESSMSGBOXES' '/NORESTART'
+          if ($LASTEXITCODE -ne 0) {
+            throw "Silent uninstaller failed with exit code $LASTEXITCODE."
+          }
+
       - name: Generate SHA-256 checksums
         shell: pwsh
         run: |
@@ -118,12 +204,16 @@ jobs:
             [System.Text.UTF8Encoding]::new($false)
           )
 
+          if ($lines.Count -ne 4) {
+            throw "Expected four checksummed release artifacts, found $($lines.Count)."
+          }
+
           Get-Content (Join-Path $releaseRoot 'SHA256SUMS.txt')
 
       - name: Upload release workflow artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ARSVIN-${{ steps.version.outputs.value }}-windows-x64
+          name: ${{ steps.version.outputs.artifact_name }}
           path: |
             artifacts/release/*.exe
             artifacts/release/*.zip
@@ -131,8 +221,22 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  release:
+    name: Publish GitHub Release
+    if: github.ref_type == 'tag'
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download validated release artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ needs.package.outputs.artifact_name }}
+          path: artifacts/release
+
       - name: Create GitHub Release
-        if: github.ref_type == 'tag'
         uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
