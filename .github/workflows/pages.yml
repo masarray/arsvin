@@ -6,6 +6,7 @@ on:
     paths:
       - 'site/**'
       - 'docs/**'
+      - 'scripts/validate-public-site.ps1'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -27,6 +28,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Validate public site
+        shell: pwsh
+        run: ./scripts/validate-public-site.ps1
 
       - name: Prepare site
         run: |
