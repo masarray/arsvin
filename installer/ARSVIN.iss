@@ -84,14 +84,15 @@ end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
 begin
-  if (CurStep = ssPostInstall) and (not NpcapInstalled()) then
+  if (CurStep = ssPostInstall) and (not WizardSilent) and (not NpcapInstalled()) then
   begin
-    MsgBox(
+    SuppressibleMsgBox(
       'ARSVIN was installed successfully.' + #13#10 + #13#10 +
       'Live IEC 61850 Sampled Values capture and transmission require Npcap. ' +
       'Install Npcap separately from its official website before using live network features.',
       mbInformation,
-      MB_OK
+      MB_OK,
+      IDOK
     );
   end;
 end;
