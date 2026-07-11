@@ -121,7 +121,7 @@ jobs:
           Get-Content (Join-Path $releaseRoot 'SHA256SUMS.txt')
 
       - name: Upload release workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ARSVIN-${{ steps.version.outputs.value }}-windows-x64
           path: |
