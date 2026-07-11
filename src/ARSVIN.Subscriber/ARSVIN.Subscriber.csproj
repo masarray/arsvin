@@ -13,7 +13,6 @@
     <Description>Lean IEC 61850 Sampled Values subscriber with stream explorer, waveform, phasor, RMS values, SCL verification, and PCAP replay.</Description>
     <Copyright>Copyright © 2026 Ari Sulistiono</Copyright>
     <PackageTags>IEC 61850;Sampled Values;SV subscriber;SV visualizer;phasor;oscilloscope;process bus;digital substation;relay testing</PackageTags>
-    <Version>0.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
