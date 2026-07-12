@@ -11,7 +11,16 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $root = Split-Path -Parent $PSScriptRoot
-$solution = Join-Path $root 'ARSVIN.sln'
+$applicationProjects = @(
+    [ordered]@{
+        Name = 'ARSVIN Publisher'
+        Path = Join-Path $root 'src\ARSVIN\ARSVIN.csproj'
+    },
+    [ordered]@{
+        Name = 'ArSubsv Subscriber'
+        Path = Join-Path $root 'src\ARSVIN.Subscriber\ARSVIN.Subscriber.csproj'
+    }
+)
 
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path $root 'artifacts\release\ARSVIN-SBOM.cdx.json'
@@ -23,49 +32,77 @@ elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
 $outputDirectory = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
-Write-Host '==> Resolving complete NuGet dependency graph'
-$commandOutput = & dotnet list $solution package --include-transitive --format json --output-version 1 2>&1
+$sourceCommitOutput = & git -C $root rev-parse HEAD 2>&1
 if ($LASTEXITCODE -ne 0) {
-    throw "dotnet list package failed with exit code $LASTEXITCODE.`n$($commandOutput -join [Environment]::NewLine)"
+    throw "Could not resolve the source commit.`n$($sourceCommitOutput -join [Environment]::NewLine)"
 }
+$sourceCommit = ($sourceCommitOutput -join '').Trim()
 
-$jsonText = $commandOutput -join [Environment]::NewLine
-$jsonStart = $jsonText.IndexOf('{')
-$jsonEnd = $jsonText.LastIndexOf('}')
-if ($jsonStart -lt 0 -or $jsonEnd -le $jsonStart) {
-    throw 'Could not locate the JSON dependency graph in dotnet list package output.'
+$sourceTimestampOutput = & git -C $root show -s --format=%cI HEAD 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not resolve the source commit timestamp.`n$($sourceTimestampOutput -join [Environment]::NewLine)"
 }
+$sourceTimestamp = [DateTimeOffset]::Parse(
+    ($sourceTimestampOutput -join '').Trim(),
+    [System.Globalization.CultureInfo]::InvariantCulture
+).ToUniversalTime().ToString('o')
 
-$dependencyGraph = $jsonText.Substring($jsonStart, $jsonEnd - $jsonStart + 1) | ConvertFrom-Json
 $packages = @{}
 
-foreach ($project in @($dependencyGraph.projects)) {
-    foreach ($framework in @($project.frameworks)) {
-        foreach ($scope in @('topLevelPackages', 'transitivePackages')) {
-            $property = $framework.PSObject.Properties[$scope]
-            if (-not $property) {
-                continue
-            }
+foreach ($applicationProject in $applicationProjects) {
+    $projectName = [string] $applicationProject.Name
+    $projectPath = [string] $applicationProject.Path
 
-            foreach ($package in @($property.Value)) {
-                $id = [string] $package.id
-                $resolvedVersion = [string] $package.resolvedVersion
-                if ([string]::IsNullOrWhiteSpace($resolvedVersion)) {
-                    $resolvedVersion = [string] $package.version
-                }
+    Write-Host "==> Resolving NuGet dependencies: $projectName"
+    $commandOutput = & dotnet list $projectPath package --include-transitive --format json --output-version 1 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "dotnet list package failed for $projectName with exit code $LASTEXITCODE.`n$($commandOutput -join [Environment]::NewLine)"
+    }
 
-                if ([string]::IsNullOrWhiteSpace($id) -or [string]::IsNullOrWhiteSpace($resolvedVersion)) {
+    $jsonText = $commandOutput -join [Environment]::NewLine
+    $jsonStart = $jsonText.IndexOf('{')
+    $jsonEnd = $jsonText.LastIndexOf('}')
+    if ($jsonStart -lt 0 -or $jsonEnd -le $jsonStart) {
+        throw "Could not locate the JSON dependency graph for $projectName."
+    }
+
+    $dependencyGraph = $jsonText.Substring($jsonStart, $jsonEnd - $jsonStart + 1) | ConvertFrom-Json
+
+    foreach ($project in @($dependencyGraph.projects)) {
+        foreach ($framework in @($project.frameworks)) {
+            foreach ($scopeName in @('topLevelPackages', 'transitivePackages')) {
+                $property = $framework.PSObject.Properties[$scopeName]
+                if (-not $property) {
                     continue
                 }
 
-                $key = "$($id.ToLowerInvariant())|$resolvedVersion"
-                $isTopLevel = $scope -eq 'topLevelPackages'
-                if (-not $packages.ContainsKey($key) -or $isTopLevel) {
-                    $packages[$key] = [ordered]@{
-                        Id = $id
-                        Version = $resolvedVersion
-                        Scope = if ($isTopLevel) { 'direct' } else { 'transitive' }
+                foreach ($package in @($property.Value)) {
+                    $id = [string] $package.id
+                    $resolvedVersion = [string] $package.resolvedVersion
+                    if ([string]::IsNullOrWhiteSpace($resolvedVersion)) {
+                        $resolvedVersion = [string] $package.version
                     }
+
+                    if ([string]::IsNullOrWhiteSpace($id) -or [string]::IsNullOrWhiteSpace($resolvedVersion)) {
+                        continue
+                    }
+
+                    $key = "$($id.ToLowerInvariant())|$resolvedVersion"
+                    $isTopLevel = $scopeName -eq 'topLevelPackages'
+
+                    if (-not $packages.ContainsKey($key)) {
+                        $packages[$key] = [pscustomobject]@{
+                            Id = $id
+                            Version = $resolvedVersion
+                            Scope = if ($isTopLevel) { 'direct' } else { 'transitive' }
+                            UsedBy = [System.Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
+                        }
+                    }
+                    elseif ($isTopLevel) {
+                        $packages[$key].Scope = 'direct'
+                    }
+
+                    $null = $packages[$key].UsedBy.Add($projectName)
                 }
             }
         }
@@ -73,13 +110,21 @@ foreach ($project in @($dependencyGraph.projects)) {
 }
 
 if ($packages.Count -eq 0) {
-    throw 'The dependency graph did not contain any resolved NuGet packages.'
+    throw 'The application dependency graphs did not contain any resolved NuGet packages.'
 }
 
-$components = foreach ($package in $packages.Values | Sort-Object Id, Version) {
+$sortedPackages = @(
+    $packages.Values |
+        Sort-Object `
+            @{ Expression = { ([string] $_.Id).ToLowerInvariant() } }, `
+            @{ Expression = { [string] $_.Version } }
+)
+
+$components = foreach ($package in $sortedPackages) {
     $escapedId = [Uri]::EscapeDataString([string] $package.Id)
     $escapedVersion = [Uri]::EscapeDataString([string] $package.Version)
     $purl = "pkg:nuget/$escapedId@$escapedVersion"
+    $usedBy = @($package.UsedBy | Sort-Object) -join ', '
 
     [ordered]@{
         type = 'library'
@@ -91,16 +136,12 @@ $components = foreach ($package in $packages.Values | Sort-Object Id, Version) {
             [ordered]@{
                 name = 'arsvin:dependency-scope'
                 value = [string] $package.Scope
+            },
+            [ordered]@{
+                name = 'arsvin:used-by'
+                value = $usedBy
             }
         )
-    }
-}
-
-$metadataProperties = @()
-if (-not [string]::IsNullOrWhiteSpace($env:GITHUB_SHA)) {
-    $metadataProperties += [ordered]@{
-        name = 'arsvin:source-commit'
-        value = $env:GITHUB_SHA
     }
 }
 
@@ -109,14 +150,14 @@ $sbom = [ordered]@{
     specVersion = '1.5'
     version = 1
     metadata = [ordered]@{
-        timestamp = [DateTimeOffset]::UtcNow.ToString('o')
+        timestamp = $sourceTimestamp
         tools = [ordered]@{
             components = @(
                 [ordered]@{
                     type = 'application'
                     author = 'ARSVIN project'
                     name = 'generate-sbom.ps1'
-                    version = '1.0.0'
+                    version = '1.1.0'
                 }
             )
         }
@@ -132,7 +173,16 @@ $sbom = [ordered]@{
                     }
                 }
             )
-            properties = $metadataProperties
+            properties = @(
+                [ordered]@{
+                    name = 'arsvin:source-commit'
+                    value = $sourceCommit
+                },
+                [ordered]@{
+                    name = 'arsvin:included-applications'
+                    value = ($applicationProjects.Name -join ', ')
+                }
+            )
         }
     }
     components = @($components)
@@ -147,5 +197,6 @@ $json = $sbom | ConvertTo-Json -Depth 20
 
 $written = Get-Item $OutputPath
 Write-Host "==> CycloneDX SBOM written: $($written.FullName)"
+Write-Host "    Source commit: $sourceCommit"
 Write-Host "    Components: $($components.Count)"
 Write-Host "    Size: $($written.Length) bytes"
