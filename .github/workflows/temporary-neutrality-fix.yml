@@ -1,0 +1,70 @@
+name: Temporary Public Terminology Cleanup
+
+on:
+  push:
+    branches: [ agent/sv-profile-infrastructure ]
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: agent/sv-profile-infrastructure
+          fetch-depth: 0
+
+      - name: Replace proprietary comparison wording
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path('docs/arsubsv-sv-scout-companion.md'): [
+                  (
+                      'ArSubsv is not an OMICRON product and does not copy OMICRON branding or UI. Its feature target is the same engineering class: discover SV streams, subscribe to one or more streams, visualize current/voltage waveforms, calculate RMS/phase indicators, compare stream timing and counters, and export receiver-side evidence.',
+                      'ArSubsv uses its own branding and interface. Its engineering purpose is to discover SV streams, subscribe to one or more streams, visualize current and voltage waveforms, calculate RMS and phase indicators, compare stream timing and counters, and export receiver-side evidence.'
+                  )
+              ],
+              Path('docs/p1-publisher-evidence-workflow.md'): [
+                  (
+                      'The report tells the operator to export generated PCAP and inspect it in Wireshark or an external process-bus tool.',
+                      'The report tells the operator to export generated PCAP and inspect it with an independent packet dissector or process-bus analyzer.'
+                  ),
+                  (
+                      'P1 does not add a subscriber, network scanner, GOOSE/SV analyzer, or StationScout-like live mismatch engine.',
+                      'P1 does not add a subscriber, network scanner, GOOSE/SV analyzer, or live configuration-versus-wire mismatch engine.'
+                  )
+              ],
+              Path('site/index.html'): [
+                  (
+                      'Can ARSVIN replace an Omicron-class test set or certified analyzer?',
+                      'Can ARSVIN replace a calibrated test set or certified analyzer?'
+                  )
+              ]
+          }
+
+          for path, changes in replacements.items():
+              text = path.read_text(encoding='utf-8')
+              for old, new in changes:
+                  if old not in text:
+                      raise SystemExit(f'Expected text not found in {path}: {old}')
+                  text = text.replace(old, new, 1)
+              path.write_text(text, encoding='utf-8', newline='\n')
+          PY
+
+          python3 scripts/validate-public-neutrality.py
+          rm -rf artifacts
+          git rm .github/workflows/temporary-neutrality-fix.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/arsubsv-sv-scout-companion.md docs/p1-publisher-evidence-workflow.md site/index.html
+          git commit -m 'Use neutral public engineering terminology'
+          git push origin HEAD:agent/sv-profile-infrastructure
