@@ -4,10 +4,21 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ## Unreleased
 
+### Planned
+
+- Move the engine source directory physically under `src/ARSVIN.Engine` after the shared-assembly transition has proven stable.
+- Expand protocol regression tests and raise the whole-engine coverage baseline progressively.
+- Publish search-indexable HTML engineering documentation with a multi-page sitemap.
+- Add Windows Authenticode signing when a trusted certificate becomes available.
+
+## 0.3.1 — 2026-07-12
+
 ### Added
 
-- Added pinned Coverlet MSBuild instrumentation, TRX/Cobertura/log evidence upload, and a verified 50% line-coverage regression floor for the production IEC 61850 engine.
-- Established a measured baseline of 57.85% line coverage across 1,535 instrumented production lines, with 888 lines covered and all 26 tests passing.
+- Added pinned Coverlet MSBuild instrumentation with TRX, Cobertura, and complete test-log evidence upload.
+- Added a verified 50% line-coverage regression floor for the established IEC 61850 protocol-core test surface.
+- Added transparent whole-engine coverage reporting: 15,726 production lines at the current 5.64% full-engine baseline.
+- Established a protocol-core baseline of 57.89% line coverage across 1,534 instrumented lines, with 888 lines covered and all 26 tests passing.
 - Added a repository-owned CycloneDX 1.5 SBOM generator for direct and transitive Publisher/Subscriber NuGet dependencies while excluding test-only packages.
 - Added `ARSVIN-SBOM.cdx.json` to validated workflow artifacts, release downloads, and SHA-256 checksums.
 - Added signed GitHub build-provenance and SBOM attestations for tagged release artifacts.
@@ -15,23 +26,20 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ### Changed
 
+- Public releases now require semantic-version tags whose commits are already contained in `main`.
+- Alpha, beta, and release-candidate tags are published as prereleases without replacing the latest stable release.
+- Centralized Publisher and Subscriber source version metadata.
+- GitHub Pages now validates the public site immediately before deployment.
 - Publisher and Subscriber now reference one engine assembly instead of compiling duplicate copies of the protocol source.
 - Protocol tests now exercise the same `ARSVIN.Engine` assembly shipped with both applications.
-- Coverage instrumentation now targets `ARSVIN.Engine` directly.
+- Coverage instrumentation now measures the complete shared engine while preserving the tested protocol-core regression gate.
 
 ### Security
 
 - Pinned all GitHub Actions used by CI, CodeQL, Pages, and release workflows to immutable commit SHAs while retaining version comments for maintainability and Dependabot updates.
-- Pinned automated installer compilation to the exact Inno Setup 6.7.1 Chocolatey package and retain resolved compiler metadata in workflow evidence.
+- Pinned automated installer compilation to the exact Inno Setup 6.7.1 Chocolatey package and retained resolved compiler metadata in workflow evidence.
 - Treat compiler warnings as errors in validated Publisher, Subscriber, test, release, and CodeQL build paths.
 - Stabilized SBOM component ordering, source commit, and metadata timestamp for repeatable review from the same commit.
-
-### Planned
-
-- Move the engine source directory physically under `src/ARSVIN.Engine` after the shared-assembly transition has proven stable.
-- Higher coverage thresholds and expanded protocol regression tests.
-- Search-indexable HTML engineering documentation.
-- Windows Authenticode signing when a trusted certificate becomes available.
 
 ## 0.3.0 — 2026-07-11
 
