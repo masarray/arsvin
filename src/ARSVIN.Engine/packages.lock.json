@@ -36,6 +36,13 @@
         "resolved": "9.0.5",
         "contentHash": "P6gqCJcVjdWA50Eai95eYdG4ryrb1xCd770NhQrvj847C7m30CJwQqzKykWoEMvV4qvjUazL/m7UMQdMZTp5xw=="
       }
+    },
+    "net8.0/win-x64": {
+      "System.Text.Encoding.CodePages": {
+        "type": "Transitive",
+        "resolved": "9.0.5",
+        "contentHash": "P6gqCJcVjdWA50Eai95eYdG4ryrb1xCd770NhQrvj847C7m30CJwQqzKykWoEMvV4qvjUazL/m7UMQdMZTp5xw=="
+      }
     }
   }
 }
