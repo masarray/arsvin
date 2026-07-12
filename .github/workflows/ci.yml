@@ -36,14 +36,24 @@ jobs:
       - name: Restore tests
         run: dotnet restore tests/ARSVIN.Tests/ARSVIN.Tests.csproj
 
-      - name: Build Publisher
-        run: dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore
+      - name: Build Publisher with warnings as errors
+        run: dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore -warnaserror
 
-      - name: Build Subscriber
-        run: dotnet build src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj -c Release --no-restore
+      - name: Build Subscriber with warnings as errors
+        run: dotnet build src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj -c Release --no-restore -warnaserror
 
-      - name: Test
-        run: dotnet test tests/ARSVIN.Tests/ARSVIN.Tests.csproj -c Release --no-restore --logger trx
+      - name: Test with coverage gate
+        shell: pwsh
+        run: .\scripts\test-with-coverage.ps1 -MinimumLineCoverage 20 -NoRestore
+
+      - name: Upload test and coverage evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: arsvin-test-evidence
+          path: artifacts/test-results
+          if-no-files-found: warn
+          retention-days: 14
 
       - name: Publisher dependency vulnerability report
         run: dotnet list src/ARSVIN/ARSVIN.csproj package --vulnerable --include-transitive
