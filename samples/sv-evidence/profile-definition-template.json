@@ -1,0 +1,28 @@
+{
+  "id": "research-candidate-id",
+  "displayName": "Research candidate profile",
+  "family": "Unverified profile family",
+  "samplingBasis": "Custom",
+  "expectedEtherType": "0x88BA",
+  "allowedAsduPerFrame": [],
+  "expectedPayloadBytesPerAsdu": null,
+  "expectedDataSetElementCount": null,
+  "expectedDataSetSignature": [],
+  "expectedSamplesPerCycle": null,
+  "expectedSamplesPerSecond": null,
+  "allowedNominalFrequenciesHz": [],
+  "expectedCounterWrap": null,
+  "rateTolerancePercent": 1.0,
+  "evidenceStatus": "ResearchCandidate",
+  "sources": [
+    {
+      "sourceId": "replace-with-source-register-id",
+      "description": "Record edition and clause outside protected standard text.",
+      "status": "ResearchCandidate"
+    }
+  ],
+  "notes": [
+    "Do not copy this template into the production profile catalog until the research gate is satisfied.",
+    "Keep unknown values null or empty rather than inferring them."
+  ]
+}
