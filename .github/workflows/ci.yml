@@ -11,8 +11,19 @@ permissions:
   contents: read
 
 jobs:
+  public-content:
+    name: Validate public terminology
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Validate public terminology neutrality
+        run: python3 scripts/validate-public-neutrality.py
+
   build-test:
     name: Build, test, and validate site
+    needs: public-content
     runs-on: windows-2025
     steps:
       - name: Checkout
@@ -27,9 +38,6 @@ jobs:
             Directory.Packages.props
             src/**/packages.lock.json
             tests/**/packages.lock.json
-
-      - name: Validate public terminology neutrality
-        run: python scripts/validate-public-neutrality.py
 
       - name: Build public site and HTML documentation
         run: python scripts/build-public-site.py --output artifacts/public-site
