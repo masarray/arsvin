@@ -24,12 +24,12 @@ Invoke-DotNet -Arguments @('restore', $subscriberProject)
 Invoke-DotNet -Arguments @('restore', $testProject)
 
 Write-Host '==> Building ARSVIN Publisher'
-Invoke-DotNet -Arguments @('build', $appProject, '-c', 'Release', '--no-restore')
+Invoke-DotNet -Arguments @('build', $appProject, '-c', 'Release', '--no-restore', '-warnaserror')
 
 Write-Host '==> Building ArSubsv Subscriber'
-Invoke-DotNet -Arguments @('build', $subscriberProject, '-c', 'Release', '--no-restore')
+Invoke-DotNet -Arguments @('build', $subscriberProject, '-c', 'Release', '--no-restore', '-warnaserror')
 
 Write-Host '==> Running tests'
-Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '--no-restore')
+Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '--no-restore', '/p:TreatWarningsAsErrors=true')
 
 Write-Host '==> Build completed successfully'
