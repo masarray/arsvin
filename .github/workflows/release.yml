@@ -341,6 +341,28 @@ jobs:
           name: ${{ needs.package.outputs.artifact_name }}
           path: artifacts/release
 
+      - name: Refuse to overwrite an existing GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.package.outputs.tag_name }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint="repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}"
+
+          if existing_release="$(gh api "$endpoint" 2>&1)"; then
+            echo "::error::GitHub Release ${RELEASE_TAG} already exists. Published releases are immutable; create a new semantic-version tag instead."
+            exit 1
+          fi
+
+          if ! grep -q 'HTTP 404' <<<"$existing_release"; then
+            echo "$existing_release" >&2
+            echo "::error::Could not verify whether GitHub Release ${RELEASE_TAG} already exists."
+            exit 1
+          fi
+
+          echo "No existing GitHub Release found for ${RELEASE_TAG}; publication may continue."
+
       - name: Attest release build provenance
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
         with:
