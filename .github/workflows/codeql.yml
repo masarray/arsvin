@@ -24,6 +24,11 @@ jobs:
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 8.0.4xx
+          cache: true
+          cache-dependency-path: |
+            Directory.Packages.props
+            src/**/packages.lock.json
+            tests/**/packages.lock.json
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4
@@ -31,8 +36,8 @@ jobs:
           languages: csharp
           build-mode: manual
 
-      - name: Restore solution
-        run: dotnet restore ARSVIN.sln
+      - name: Restore locked solution dependency graph
+        run: dotnet restore ARSVIN.sln --locked-mode
 
       - name: Build solution with warnings as errors
         run: dotnet build ARSVIN.sln -c Release --no-restore -warnaserror
