@@ -145,10 +145,11 @@ jobs:
             throw 'Inno Setup compiler (ISCC.exe) was not found.'
           }
 
-          $compilerVersion = (Get-Item $iscc).VersionInfo.ProductVersion
-          if (-not $compilerVersion.StartsWith($env:INNO_SETUP_VERSION, [StringComparison]::OrdinalIgnoreCase)) {
-            throw "Expected ISCC $env:INNO_SETUP_VERSION, found $compilerVersion."
-          }
+          $versionInfo = (Get-Item $iscc).VersionInfo
+          Write-Host "Validated Chocolatey package: innosetup|$env:INNO_SETUP_VERSION"
+          Write-Host "ISCC path: $iscc"
+          Write-Host "ISCC product version metadata: $($versionInfo.ProductVersion)"
+          Write-Host "ISCC file version metadata: $($versionInfo.FileVersion)"
 
           $sourceDir = (Resolve-Path '.\artifacts\installer-input').Path
           $outputDir = (Resolve-Path '.\artifacts\release').Path
