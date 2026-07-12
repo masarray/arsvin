@@ -1,10 +1,10 @@
 [CmdletBinding()]
 param(
     [ValidateRange(0, 100)]
-    [double] $MinimumLineCoverage = 50,
+    [double] $MinimumLineCoverage = 60,
 
     [ValidateRange(0, 100)]
-    [double] $MinimumWholeEngineLineCoverage = 5.5,
+    [double] $MinimumWholeEngineLineCoverage = 10.5,
 
     [switch] $NoRestore
 )
@@ -33,7 +33,7 @@ if ($NoRestore) {
     $arguments += '--no-restore'
 }
 
-# Instrument the complete production engine. CI now protects both the truthful
+# Instrument the complete production engine. CI protects both the truthful
 # whole-engine baseline and the higher protocol-core regression baseline.
 $arguments += @(
     '/p:RestoreLockedMode=true',
