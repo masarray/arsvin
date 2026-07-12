@@ -56,6 +56,41 @@ public sealed class SvProfileDetectorTests
     }
 
     [Fact]
+    public void SparseGenericEvidenceCannotProduceFalseConfirmation()
+    {
+        var facts = new SvObservedStreamFacts
+        {
+            EtherType = 0x88BA,
+            ObservationCount = 1
+        };
+
+        var result = new SvProfileDetector().Evaluate(facts, SvProfileCatalog.GenericSclLayer2);
+
+        Assert.Equal(100, result.ScorePercent);
+        Assert.Equal(5, result.EvaluatedWeight);
+        Assert.Equal(SvProfileConfidence.Unknown, result.Confidence);
+    }
+
+    [Fact]
+    public void MatchingStaticFieldsWithoutDatasetOrRateRemainOnlyPossible()
+    {
+        var facts = CreateMatchingFacts() with
+        {
+            ObservedSamplesPerSecond = null,
+            DataSetSignature = Array.Empty<SvDatasetElementSignature>(),
+            NominalFrequencyHz = null,
+            ObservedCounterWrap = null
+        };
+
+        var result = new SvProfileDetector().Evaluate(facts, CreateSyntheticProfile());
+
+        Assert.Equal(SvProfileConfidence.Possible, result.Confidence);
+        Assert.DoesNotContain(result.Evidence, item =>
+            item.Field == "Dataset signature" &&
+            item.Outcome == SvProfileEvidenceOutcome.Match);
+    }
+
+    [Fact]
     public void BuiltInCatalogContainsOnlyGenericEvidenceBackedFallback()
     {
         var profile = Assert.Single(SvProfileCatalog.BuiltIn);
