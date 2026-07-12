@@ -11,8 +11,34 @@ permissions:
   contents: read
 
 jobs:
+  public-content:
+    name: Validate public terminology
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Validate public terminology neutrality
+        id: neutrality
+        continue-on-error: true
+        run: python3 scripts/validate-public-neutrality.py
+
+      - name: Upload terminology validation evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: arsvin-public-neutrality-report
+          path: artifacts/public-neutrality-report.txt
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce terminology validation result
+        if: steps.neutrality.outcome == 'failure'
+        run: exit 1
+
   build-test:
     name: Build, test, and validate site
+    needs: public-content
     runs-on: windows-2025
     steps:
       - name: Checkout
@@ -56,7 +82,7 @@ jobs:
 
       - name: Test with whole-engine and protocol-core coverage gates
         shell: pwsh
-        run: .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 10.5 -MinimumLineCoverage 60 -NoRestore
+        run: .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 13 -MinimumLineCoverage 70 -NoRestore
 
       - name: Upload test and coverage evidence
         if: always()

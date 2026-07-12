@@ -7,7 +7,7 @@ This matrix is the working control sheet for ARSVIN profile expansion. It record
 | Status | Meaning |
 |---|---|
 | Verified-standard | Confirmed from a licensed applicable standard and recorded with edition and clause. |
-| Verified-official | Confirmed from an official manufacturer or standards-body public document. |
+| Verified-official | Confirmed from an official standards-body or manufacturer document. |
 | Verified-capture | Confirmed from an anonymized real-device SCL/PCAP pair. |
 | Verified-lab | Confirmed by byte-exact or interoperability testing with a real counterpart. |
 | Implemented-generic | Engine supports the mechanism, but no profile-specific compliance claim is made. |
@@ -39,13 +39,15 @@ This matrix is the working control sheet for ARSVIN profile expansion. It record
 | Dataset reference | SCL-driven | Implemented-generic | Clause mapping and dataset-resolution fixtures. |
 | `confRev` | Parsed and emitted | Implemented-generic | Change/mismatch behavior tests. |
 | `smpCnt` | Parsed, emitted, monitored, and wrap-tested | Implemented-generic | Profile-specific wrap rules. |
-| `smpSynch` | Compatibility modes implemented | Implemented-generic | Licensed semantics and real synchronized/unsynchronized captures. |
+| `smpSynch` | Compatibility modes implemented | Implemented-generic | Licensed semantics and synchronized/unsynchronized captures. |
 | `smpRate` / `smpMod` | Parsed and emitted | Implemented-generic | Edition/profile-specific presence and interpretation rules. |
 | Multiple ASDUs per frame | Engine supports `1..8`; UI/docs historically emphasize `1/2/4/8` | Implemented-generic | Profile-specific allowed values and `nofASDU=6` evidence. |
 | Dataset-driven payload | Multiple integer, float, quality, time, enum, bit-string, and string kinds supported | Implemented-generic | Validate permitted SV bTypes, widths, order, and nesting. |
 | Unknown payload element | Preflight can reject unsupported layouts | Implemented-generic | Compatible-mode raw preservation design. |
 | PCAP read/write | Implemented and regression-tested | Implemented-generic | Golden external captures. |
-| Timing health | Local TX and receiver statistics exist | Implemented-generic | Define measurement method and limitations against DANEO-like outcomes. |
+| Observation window | Transport-independent facts, rate estimation, stable-field checks, and counter-wrap detection implemented | Implemented-generic | Integrate with live and PCAP Subscriber pipelines. |
+| Profile matching | Evidence-aware weighted detector with explained matches, conflicts, and unknowns implemented | Implemented-generic | Add verified profile definitions after source review. |
+| Configuration versus wire | Strict and compatible comparison engine implemented | Implemented-generic | Connect SCL bindings to observed stream facts in the UI. |
 
 ## 9-2LE-style profile research
 
@@ -57,10 +59,10 @@ This matrix is the working control sheet for ARSVIN profile expansion. It record
 | Quality ordering and encoding | Engine supports quality fields | Provisional | Guideline vectors and device capture. |
 | Protection sampling variant | Product assumption exists | Provisional | Standard/guideline source plus 50 Hz and 60 Hz captures. |
 | High-rate variant | Roadmap candidate | Provisional | Standard/guideline source and performance fixture. |
-| Nominal-frequency behavior | Not yet formalized as profile evidence | Unknown | Verify formula, rate, wrap, and frame-rate behavior. |
+| Nominal-frequency behavior | Infrastructure can evaluate samples-per-cycle | Provisional | Verify formula, rate, wrap, and frame-rate behavior. |
 | Scaling convention | Not yet provenance-aware | Unknown | Verify raw-to-secondary convention and expose source. |
-| Publisher interoperability | Generic output works | Provisional | At least one real relay/MU test per claimed variant. |
-| Subscriber detection | SCL-assisted decode exists | Provisional | Confidence classifier and known/unknown/mismatch vectors. |
+| Publisher interoperability | Generic output works | Provisional | At least one real counterpart test per claimed variant. |
+| Subscriber detection | Explainable profile detector foundation exists | Implemented-generic | Add verified definitions and golden known/unknown/mismatch vectors. |
 
 ## IEC 61869-9 profile research
 
@@ -70,59 +72,67 @@ This matrix is the working control sheet for ARSVIN profile expansion. It record
 | Configurable dataset behavior | Generic SCL engine can support it | Provisional | Standard requirement and real SCL evidence. |
 | Protection-oriented variant | Roadmap candidate | Provisional | Licensed rates, packing, payload, and timing requirements. |
 | Measurement/high-rate variant | Roadmap candidate | Provisional | Licensed requirements and sustained-throughput tests. |
-| Sampling basis | Engine supports SCL `smpRate`/`smpMod` | Provisional | Verify samples-per-second versus samples-per-cycle semantics. |
+| Sampling basis | Detector supports samples-per-second and samples-per-cycle definitions | Implemented-generic | Verify profile-specific semantics. |
 | `nofASDU` values | Engine mechanically supports `1..8` | Provisional | Profile-specific normative/recommended values. |
-| Dataset shape and channel order | Must not be assumed fixed 4I+4V | Provisional | Standard plus vendor SCL matrix. |
+| Dataset shape and channel order | Must not be assumed fixed 4I+4V | Provisional | Standard plus device SCL matrix. |
 | Scaling and units | Not yet profile-provenance-aware | Unknown | Standard clause, SCL source, and real values. |
 | Synchronization | Generic `smpSynch` and PTP tooling exist | Provisional | Standard linkage and capture evidence. |
 | Public support claim | Not supported yet | Unknown | All mandatory rows reach verified-standard and fixture/device evidence. |
 
-## OMICRON-derived product benchmark matrix
+## Engineering workflow outcomes
 
-This table records product outcomes, not protocol requirements.
+These are product outcomes, not protocol requirements and not references to any proprietary product implementation.
 
-| Benchmark outcome | StationScout | DANEO 400 | ARSVIN target |
-|---|---:|---:|---|
-| SCL-first system view | Strong | Strong | Import streams and show expected-versus-observed state. |
-| Configuration versus live comparison | Strong | Strong | Side-by-side profile, addressing, dataset, and timing mismatch. |
-| Signal tracing | Strong | Partial for SV analysis | Trace SCL stream to observed stream and decoded channels. |
-| Orphan detection | Not primary public emphasis | Explicit | List observed SV streams absent from SCL and expected streams absent from traffic. |
-| MU parameter verification | Not primary public emphasis | Explicit | Validate stream fields, rate, packing, payload, synchronization, and quality. |
-| Analog input versus SV output | Outside normal ARSVIN PC-only scope | Explicit | Future import/correlation path; do not imply calibrated measurement. |
-| Packet interval/delay statistics | Not primary public emphasis | Explicit | Add interval, jitter, gaps, delay-input limitations, histograms, and evidence export. |
-| Triggered recording | Test-case oriented | Explicit | Add software capture trigger rules after profile detector is stable. |
-| PRP/HSR verification | Not primary public emphasis | Explicit | Separate redundancy milestone after base SV profiles. |
-| Reusable tests and reports | Explicit | Explicit | Machine-readable expected-profile fixtures and repeatable reports. |
+| Outcome | ARSVIN target |
+|---|---|
+| SCL-first system view | Import configured streams and show expected-versus-observed state. |
+| Configuration versus live comparison | Compare addressing, dataset, packing, rates, and profile evidence side by side. |
+| Signal tracing | Trace an SCL stream to observed traffic and decoded channels. |
+| Orphan detection | List observed streams absent from SCL and expected streams absent from traffic. |
+| MU parameter verification | Validate fields, rate, packing, payload, synchronization, and quality. |
+| Packet interval statistics | Add intervals, jitter, gaps, bounded statistics, and evidence export. |
+| Triggered recording | Add software trigger rules after profile detection is stable. |
+| Redundancy verification | Keep PRP/HSR in a separate evidence-backed milestone. |
+| Reusable tests and reports | Use machine-readable expected-profile fixtures and repeatable reports. |
 
 ## Fast-track implementation gates
 
 ### Gate 0 — Research register
 
-Complete when:
+Complete:
 
 - source editions are recorded,
 - licensed-source gaps are visible,
-- every proposed profile constant is marked verified or provisional,
-- and no unsupported public claim is introduced.
+- proposed constants remain verified or provisional,
+- no unsupported public claim is introduced.
 
 ### Gate 1 — Profile infrastructure
 
-Complete when:
+Complete in engine code:
 
 - observed facts are independent of WPF and Npcap,
+- an observation accumulator estimates rate and counter wrap,
 - profile definitions carry source/evidence metadata,
-- confidence scoring explains matches and conflicts,
-- and unknown streams remain observable.
+- confidence scoring explains matches, conflicts, and missing evidence,
+- strict and compatible configuration comparison are available,
+- unknown streams remain observable,
+- built-in production catalog contains only a generic Layer-2 fallback.
+
+Remaining Gate 1 integration:
+
+- feed live and PCAP observations into the accumulator,
+- bind expected SCL configuration to the comparison engine,
+- expose results without visual noise in Subscriber.
 
 ### Gate 2 — Formalized 9-2LE-style support
 
 Complete when:
 
 - the authoritative guideline revision is reviewed,
-- 50 Hz and 60 Hz fixtures exist where applicable,
+- applicable 50 Hz and 60 Hz fixtures exist,
 - byte-exact Publisher and Subscriber tests pass,
 - scaling provenance is visible,
-- and at least one real counterpart has been exercised.
+- at least one real counterpart has been exercised.
 
 ### Gate 3 — IEC 61869-9 protection support
 
@@ -132,7 +142,7 @@ Complete when:
 - preferred variant parameters are frozen,
 - SCL and PCAP fixtures pass,
 - real-device evidence exists,
-- and performance remains stable.
+- performance remains stable.
 
 ### Gate 4 — High-rate and redundancy support
 
@@ -142,7 +152,7 @@ Complete when:
 - queues are bounded,
 - UI rendering is decoupled from packet rate,
 - PRP/HSR behavior has dedicated evidence,
-- and no false sample-gap diagnosis occurs on clean captures.
+- no false sample-gap diagnosis occurs on clean captures.
 
 ## Definition of public `Supported`
 
@@ -157,4 +167,4 @@ A profile can be labeled supported only when all are true:
 - performance baseline documented,
 - real-device evidence recorded,
 - support matrix updated,
-- and claim language reviewed against IEC 61850-10 boundaries.
+- claim language reviewed against IEC 61850-10 boundaries.

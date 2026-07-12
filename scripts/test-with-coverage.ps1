@@ -1,10 +1,10 @@
 [CmdletBinding()]
 param(
     [ValidateRange(0, 100)]
-    [double] $MinimumLineCoverage = 60,
+    [double] $MinimumLineCoverage = 70,
 
     [ValidateRange(0, 100)]
-    [double] $MinimumWholeEngineLineCoverage = 10.5,
+    [double] $MinimumWholeEngineLineCoverage = 13,
 
     [switch] $NoRestore
 )

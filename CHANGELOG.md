@@ -6,14 +6,25 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ### Added
 
-- Added a formal Sampled Values standards and evidence research gate covering authoritative source hierarchy, claim levels, OMICRON benchmark findings, licensed-standard gaps, and implementation acceptance rules.
+- Added a formal Sampled Values standards and evidence research gate covering authoritative source hierarchy, claim levels, licensed-standard gaps, and implementation acceptance rules.
 - Added a conformance and interoperability matrix separating verified, implemented-generic, provisional, unknown, and out-of-scope behavior for Layer-2 SV, 9-2LE-style workflows, IEC 61869-9, timing, scaling, redundancy, and product claims.
 - Added a safe Sampled Values evidence-intake guide for anonymized SCL/PCAP cases, real-device metadata, independent verification, minimum negative tests, and evidence quality levels.
+- Added transport-independent SV frame observations and an accumulator for stable-field checks, rate estimation, and sample-counter wrap detection.
+- Added evidence-aware profile definitions with standards-neutral sampling, dataset, packing, payload, and source metadata.
+- Added an explainable weighted profile detector that reports matches, conflicts, missing evidence, confidence, and score.
+- Added strict and compatible configuration-versus-wire comparison findings without blocking capture or decoding.
+- Added deterministic tests for observation windows, profile detection, evidence explanations, configuration mismatch handling, sparse-evidence confidence, and profile-definition provenance.
+- Added public terminology-neutrality validation to CI and Pages deployment with retained validation evidence.
 
 ### Changed
 
 - Documentation now prevents unverified profile constants from being promoted directly into production support claims.
-- The SV roadmap now treats StationScout as a system-engineering workflow benchmark and DANEO 400 as the stronger benchmark for SCL-versus-wire verification, merging-unit analysis, timing statistics, orphan detection, triggered recording, and evidence reporting.
+- Public engineering workflow targets are described generically without proprietary product comparisons or branding.
+- The built-in profile catalog contains only the generic SCL-driven Layer-2 SV fallback until profile-specific requirements are verified.
+- Sparse evidence can no longer produce a `Confirmed` profile result; confirmation requires sufficient evaluated evidence plus matching dataset and sampling behavior.
+- Expanded the deterministic suite from 54 to 74 tests.
+- Raised whole-engine coverage from 10.74% to 13.35% and the enforced floor from 10.5% to 13%.
+- Raised protocol-core coverage from 64.97% to 70.47% and the enforced floor from 60% to 70%.
 
 ## 0.4.0 — 2026-07-12
 ### Added

@@ -2,7 +2,7 @@
 
 ArSubsv is the receiver-side companion application for ARSVIN. It is designed to make IEC 61850 Sampled Values visible during lab publishing, commissioning preparation, and publisher verification.
 
-ArSubsv is not an OMICRON product and does not copy OMICRON branding or UI. Its feature target is the same engineering class: discover SV streams, subscribe to one or more streams, visualize current/voltage waveforms, calculate RMS/phase indicators, compare stream timing and counters, and export receiver-side evidence.
+ArSubsv uses its own branding and interface. Its engineering purpose is to discover SV streams, subscribe to one or more streams, visualize current and voltage waveforms, calculate RMS and phase indicators, compare stream timing and counters, and export receiver-side evidence.
 
 ## Feature set
 
@@ -21,7 +21,7 @@ ArSubsv is not an OMICRON product and does not copy OMICRON branding or UI. Its 
 
 ArSubsv verifies that this PC and selected NIC receive and decode Sampled Values. It cannot prove that another relay, protection IED, BCU, or fault recorder has consumed the same multicast stream.
 
-SCL binding improves decoding and validation quality. Without SCL, ArSubsv can still discover and count streams, but waveform/phasor/value visualization is limited because the payload layout is not known.
+SCL binding improves decoding and validation quality. Without SCL, ArSubsv can still discover and count streams, but waveform, phasor, and value visualization is limited because the payload layout is not known.
 
 ## Capture file support
 

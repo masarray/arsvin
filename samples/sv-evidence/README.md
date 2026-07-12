@@ -21,6 +21,8 @@ samples/sv-evidence/<case-id>/
 
 Large, proprietary, or restricted captures should remain outside the public repository. Add a synthetic, non-sensitive fixture that reproduces the same protocol behavior and record the private evidence identifier in the case README.
 
+Use `profile-definition-template.json` when preparing a research candidate. Unknown values must remain null or empty until verified.
+
 ## Required metadata
 
 Record:
@@ -39,11 +41,11 @@ Record:
 - observed sample-counter wrap,
 - payload bytes per ASDU,
 - synchronization source and state,
-- independent verification tool,
+- independent verification method,
 - capture method,
 - authorization and redaction status,
 - expected profile claim,
-- and known deviations.
+- known deviations.
 
 ## Redaction rules
 
@@ -65,22 +67,22 @@ Anonymization must not silently change the behavior being tested.
 |---|---|
 | E0 | Engineering hypothesis only. |
 | E1 | Synthetic frame or SCL fixture. |
-| E2 | Independent decoder or Wireshark agrees with the synthetic fixture. |
+| E2 | An independent packet decoder agrees with the synthetic fixture. |
 | E3 | Anonymized real-device capture. |
 | E4 | Real Publisher-to-Subscriber or MU-to-relay interoperability test. |
-| E5 | Repeatable multi-vendor evidence. |
+| E5 | Repeatable multi-implementation evidence. |
 
 Public profile support requires licensed-source review plus at least E3 evidence. Lab-interoperable status requires E4.
 
 ## Independent verification
 
-Where practical, record results from at least one independent tool:
+Where practical, record results from at least one independent path:
 
-- Wireshark packet dissection,
-- a vendor engineering/test tool,
-- OMICRON DANEO or another measurement analyzer,
+- an independent packet dissector,
+- a separate engineering or measurement analyzer,
 - a relay event or diagnostic log,
-- or a separate reference implementation.
+- a separate reference implementation,
+- byte-level comparison against a reviewed fixture.
 
 Independent tools are supporting evidence. They do not replace the applicable standard.
 
@@ -99,7 +101,7 @@ Include:
 - invalid/questionable/test/oldData quality where applicable,
 - synchronization state changes,
 - unknown/orphan stream,
-- and malformed frame handling.
+- malformed frame handling.
 
 ## Capture timing guidance
 
@@ -109,14 +111,14 @@ For rate and jitter analysis, capture long enough to distinguish startup transie
 
 ```json
 {
-  "caseId": "synthetic-9-2le-style-50hz-001",
+  "caseId": "synthetic-profile-001",
   "claimStatus": "research-candidate",
   "sourceEdition": "pending-licensed-review",
   "transport": "layer-2",
   "expected": {
     "appId": "0x4001",
-    "asduPerFrame": 1,
-    "payloadBytesPerAsdu": 64
+    "asduPerFrame": null,
+    "payloadBytesPerAsdu": null
   },
   "observed": {
     "sampleRate": null,

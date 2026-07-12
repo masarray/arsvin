@@ -9,6 +9,7 @@ on:
       - 'scripts/build-public-site.py'
       - 'scripts/validate-public-site.ps1'
       - 'scripts/validate-public-site.py'
+      - 'scripts/validate-public-neutrality.py'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -30,6 +31,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Validate public terminology neutrality
+        run: python3 scripts/validate-public-neutrality.py
 
       - name: Build public site and HTML documentation
         run: python3 scripts/build-public-site.py --output artifacts/public-site
