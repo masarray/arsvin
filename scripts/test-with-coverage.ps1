@@ -35,7 +35,8 @@ $arguments += @(
     '--collect', 'XPlat Code Coverage',
     '--',
     'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura',
-    'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile=**/*.g.cs,**/*.g.i.cs,**/obj/**'
+    'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.IncludeTestAssembly=true',
+    'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile=**/tests/**,**/*Tests.cs,**/*.g.cs,**/*.g.i.cs,**/obj/**'
 )
 
 & dotnet @arguments
@@ -58,8 +59,14 @@ if ($coverageFile.FullName -ne $normalizedCoverage) {
 
 [xml] $coverage = Get-Content $normalizedCoverage -Raw
 $lineRateText = [string] $coverage.coverage.'line-rate'
+$linesValidText = [string] $coverage.coverage.'lines-valid'
 if ([string]::IsNullOrWhiteSpace($lineRateText)) {
     throw 'Cobertura report does not contain a root line-rate value.'
+}
+
+$linesValid = 0
+if (-not [int]::TryParse($linesValidText, [ref] $linesValid) -or $linesValid -le 0) {
+    throw 'Coverage report contains no instrumented source lines. Check Coverlet assembly and file filters.'
 }
 
 $lineRate = [double]::Parse(
@@ -68,6 +75,7 @@ $lineRate = [double]::Parse(
 )
 $lineCoverage = [Math]::Round($lineRate * 100, 2)
 
+Write-Host "Instrumented lines: $linesValid"
 Write-Host "Line coverage: $lineCoverage%"
 Write-Host "Minimum required: $MinimumLineCoverage%"
 Write-Host "Coverage report: $normalizedCoverage"
@@ -78,6 +86,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
 
 | Metric | Result |
 |---|---:|
+| Instrumented lines | **$linesValid** |
 | Line coverage | **$lineCoverage%** |
 | Required minimum | **$MinimumLineCoverage%** |
 | Report | `artifacts/test-results/coverage.cobertura.xml` |
