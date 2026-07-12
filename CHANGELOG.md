@@ -4,6 +4,9 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ## Unreleased
 
+_No unreleased changes._
+
+## 0.4.0 — 2026-07-12
 ### Added
 
 - Added a repository-owned, dependency-free public-site builder that converts every `docs/*.md` guide into a dedicated HTML page.
