@@ -34,18 +34,18 @@ External command exit codes are checked, and compiler warnings are treated as er
 ### Coverage evidence
 
 ```powershell
-.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 20
+.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50
 ```
 
 The script:
 
-1. runs the xUnit suite with the pinned Coverlet collector,
-2. writes TRX evidence under `artifacts/test-results`,
-3. normalizes the Cobertura report to `artifacts/test-results/coverage.cobertura.xml`,
-4. reads the root line-rate value,
-5. fails when line coverage is below the configured threshold.
+1. runs the xUnit suite using pinned Coverlet MSBuild instrumentation,
+2. explicitly instruments the linked production engine source in `ARSVIN.Tests`,
+3. excludes test and generated source files from the reported metric,
+4. writes TRX, the complete `dotnet test` log, and Cobertura evidence under `artifacts/test-results`,
+5. fails when no production lines are instrumented or line coverage is below the configured threshold.
 
-The initial gate is 20%. It is a regression floor, not a claim that the complete WPF application surface is covered. Raise the threshold as engine tests are expanded.
+The verified baseline is 57.85% line coverage over 1,535 instrumented production lines, with 888 lines covered. CI enforces a 50% regression floor. This is not a claim that the complete WPF UI or every live-network path is covered; raise the threshold as the shared engine project and protocol tests expand.
 
 ## Validate the public site
 
@@ -88,7 +88,7 @@ The two direct `.exe` files are self-contained .NET 8 single-file applications. 
 
 ## Generate the CycloneDX SBOM
 
-After restoring the solution, run:
+After restoring the application projects, run:
 
 ```powershell
 .\scripts\generate-sbom.ps1 -Version 0.3.0
@@ -100,7 +100,9 @@ Output:
 artifacts/release/ARSVIN-SBOM.cdx.json
 ```
 
-The generator reads the complete resolved NuGet graph for `ARSVIN.sln`, deduplicates direct and transitive packages, and writes CycloneDX 1.5 JSON. The SBOM covers managed application dependencies. It does not claim to inventory Windows, Npcap, GitHub-hosted runner contents, or every tool used by the build service.
+The generator reads the resolved NuGet graphs for the Publisher and Subscriber projects, deduplicates direct and transitive application packages, records which application uses each package, and writes CycloneDX 1.5 JSON. Test-only packages such as xUnit and Coverlet are intentionally excluded from the release SBOM.
+
+Component order and metadata timestamp are stabilized from the source commit so repeated generation from the same commit and version is reviewable. The SBOM covers managed application dependencies; it does not claim to inventory Windows, Npcap, GitHub-hosted runner contents, or every tool used by the build service.
 
 ## Build the installer locally
 
@@ -125,7 +127,7 @@ Output:
 artifacts/release/ARSVIN-Suite-Setup-win-x64.exe
 ```
 
-The automated workflow installs and verifies the exact Chocolatey package version declared in `INNO_SETUP_VERSION`. It also checks the `ISCC.exe` product version before compiling.
+The automated workflow installs and verifies the exact Chocolatey package version declared in `INNO_SETUP_VERSION`. It records the resolved `ISCC.exe` path and file metadata for evidence, while the exact package version remains the authoritative toolchain pin.
 
 The installer:
 
@@ -149,9 +151,9 @@ When release tooling, installer definitions, project files, or build configurati
 1. restores, builds, and tests the solution with warnings treated as errors,
 2. publishes both portable single-file applications,
 3. creates the portable suite ZIP,
-4. installs the pinned Inno Setup version,
+4. installs and verifies the pinned Inno Setup package,
 5. compiles the installer,
-6. generates and structurally validates the CycloneDX SBOM,
+6. generates and structurally validates the application-only CycloneDX SBOM,
 7. checks all expected artifact names and non-empty files,
 8. silently installs the suite into a temporary directory,
 9. verifies Publisher, Subscriber, documentation, version file, and uninstaller,
@@ -200,7 +202,7 @@ Manual runs upload private workflow artifacts only. They never create or replace
 | `ArSubsv-Subscriber-win-x64.exe` | Portable Subscriber/analysis companion. |
 | `ARSVIN-Suite-Setup-win-x64.exe` | Installer for both applications. |
 | `ARSVIN-win-x64-portable.zip` | Portable suite package. |
-| `ARSVIN-SBOM.cdx.json` | CycloneDX 1.5 managed-dependency SBOM. |
+| `ARSVIN-SBOM.cdx.json` | CycloneDX 1.5 managed application-dependency SBOM. |
 | `SHA256SUMS.txt` | Integrity hashes for all release assets. |
 
 ## Verify a download
@@ -234,7 +236,7 @@ Before tagging a public release:
 - Confirm the intended release commit is already on `main`.
 - Confirm `main` CI, release validation, and CodeQL are green.
 - Update `VersionPrefix` and `CHANGELOG.md`.
-- Review the generated SBOM and checksums.
+- Review the generated application SBOM and checksums.
 - Test Publisher dry run.
 - Test live publishing only on an isolated lab link.
 - Test Subscriber live capture and PCAP import.
