@@ -16,11 +16,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="SharpPcap" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Compile Include="..\ARSVIN\Engine\**\*.cs" Link="Engine\%(RecursiveDir)%(Filename)%(Extension)" />
+    <ProjectReference Include="..\ARSVIN.Engine\ARSVIN.Engine.csproj" />
   </ItemGroup>
 
   <ItemGroup>
