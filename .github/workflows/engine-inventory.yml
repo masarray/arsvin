@@ -1,0 +1,37 @@
+name: Engine Inventory
+
+on:
+  push:
+    branches: [ agent/p2-engine-relocation-tests ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Capture tracked engine and test inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/engine-inventory
+          git ls-files -s src/ARSVIN/Engine tests/ARSVIN.Tests > artifacts/engine-inventory/git-index.txt
+          git ls-files src/ARSVIN/Engine tests/ARSVIN.Tests > artifacts/engine-inventory/paths.txt
+          cp -R src/ARSVIN/Engine artifacts/engine-inventory/Engine
+          cp -R tests/ARSVIN.Tests artifacts/engine-inventory/Tests
+          cp src/ARSVIN.Engine/ARSVIN.Engine.csproj artifacts/engine-inventory/
+          cp src/ARSVIN/ARSVIN.csproj artifacts/engine-inventory/Publisher.csproj
+          cp src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj artifacts/engine-inventory/Subscriber.csproj
+
+      - name: Upload engine inventory
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: arsvin-engine-inventory
+          path: artifacts/engine-inventory
+          if-no-files-found: error
+          retention-days: 7
