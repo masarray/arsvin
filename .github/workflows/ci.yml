@@ -38,12 +38,7 @@ jobs:
       - name: Restore locked NuGet dependency graph
         run: dotnet restore ARSVIN.sln --locked-mode
 
-      - name: Refresh win-x64 application lock graphs
-        run: |
-          dotnet restore src/ARSVIN/ARSVIN.csproj -r win-x64 --force-evaluate
-          dotnet restore src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj -r win-x64 --force-evaluate
-
-      - name: Upload generated NuGet lock evidence
+      - name: Upload committed NuGet lock evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: arsvin-nuget-lockfiles
