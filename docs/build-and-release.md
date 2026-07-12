@@ -48,12 +48,14 @@ The script restores the solution in locked mode, then builds and tests:
 - `src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj`
 - `tests/ARSVIN.Tests/ARSVIN.Tests.csproj`
 
+The shared production source is physically owned by `src/ARSVIN.Engine`, including `AR.Iec61850` and the Npcap transport implementation. Publisher, Subscriber, and Tests all reference that same compiled assembly.
+
 External command exit codes are checked, and compiler warnings are treated as errors for the validated build path.
 
 ### Coverage evidence
 
 ```powershell
-.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50
+.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 10.5 -MinimumLineCoverage 60
 ```
 
 The script:
@@ -61,22 +63,24 @@ The script:
 1. runs the xUnit suite using pinned Coverlet MSBuild instrumentation,
 2. instruments the complete shared production `ARSVIN.Engine` assembly,
 3. writes TRX, the complete `dotnet test` log, and Cobertura evidence under `artifacts/test-results`,
-4. reports whole-engine coverage transparently,
-5. calculates the regression gate over the established protocol-core surface,
-6. fails when no production lines are instrumented or protocol-core coverage falls below the configured threshold.
+4. calculates and enforces the whole-engine regression floor,
+5. calculates and enforces the established protocol-core regression floor,
+6. fails when no production lines are instrumented or either configured floor is missed.
 
-Current verified baselines:
+Current verified baselines from 54 deterministic tests:
 
 | Metric | Result |
 |---|---:|
-| Whole `ARSVIN.Engine` instrumented lines | 15,726 |
-| Whole-engine line coverage | 5.64% |
-| Protocol-core instrumented lines | 1,534 |
-| Protocol-core covered lines | 888 |
-| Protocol-core line coverage | 57.89% |
-| Enforced protocol-core floor | 50% |
+| Whole `ARSVIN.Engine` instrumented lines | 15,742 |
+| Whole-engine covered lines | 1,691 |
+| Whole-engine line coverage | 10.74% |
+| Enforced whole-engine floor | 10.5% |
+| Protocol-core instrumented lines | 1,550 |
+| Protocol-core covered lines | 1,007 |
+| Protocol-core line coverage | 64.97% |
+| Enforced protocol-core floor | 60% |
 
-This is not a claim that the complete WPF UI or every live-network path is covered. Whole-engine coverage is intentionally shown as a transparent baseline and must rise as SCL, COMTRADE, capture, diagnostics, MMS, scheduling, and transport tests are expanded.
+The expanded suite covers deterministic behavior across Sampled Values, SCL parsing, COMTRADE parsing and scaling, PCAP read/write handling, MMS data and object references, diagnostics, Ethernet framing, transport helpers, and publisher session behavior. This is not a claim that the complete WPF UI or every live-network path is covered; live Npcap, timing, and device-interoperability behavior still require controlled laboratory validation.
 
 ## Validate the public site
 
