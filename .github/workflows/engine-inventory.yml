@@ -3,6 +3,8 @@ name: Engine Inventory
 on:
   push:
     branches: [ agent/p2-engine-relocation-tests ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
