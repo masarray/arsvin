@@ -13,7 +13,7 @@ permissions:
 jobs:
   build-test:
     name: Build, test, and validate site
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -54,9 +54,9 @@ jobs:
       - name: Build Subscriber with warnings as errors
         run: dotnet build src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj -c Release --no-restore -warnaserror
 
-      - name: Test with coverage gate
+      - name: Test with whole-engine and protocol-core coverage gates
         shell: pwsh
-        run: .\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50 -NoRestore
+        run: .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 5.5 -MinimumLineCoverage 50 -NoRestore
 
       - name: Upload test and coverage evidence
         if: always()

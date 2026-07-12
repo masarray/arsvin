@@ -8,6 +8,7 @@ on:
       - 'docs/**'
       - 'scripts/build-public-site.py'
       - 'scripts/validate-public-site.ps1'
+      - 'scripts/validate-public-site.py'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -25,7 +26,7 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
