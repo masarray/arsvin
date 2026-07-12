@@ -120,6 +120,22 @@ $sortedPackages = @(
             @{ Expression = { [string] $_.Version } }
 )
 
+$testOnlyPackagePatterns = @(
+    '^coverlet(?:\.|$)',
+    '^xunit(?:\.|$)',
+    '^Microsoft\.NET\.Test\.Sdk$'
+)
+$testOnlyPackages = @(
+    $sortedPackages | Where-Object {
+        $packageId = [string] $_.Id
+        $testOnlyPackagePatterns | Where-Object { $packageId -match $_ }
+    }
+)
+if ($testOnlyPackages.Count -gt 0) {
+    $names = $testOnlyPackages.Id -join ', '
+    throw "Release SBOM unexpectedly contains test-only packages: $names"
+}
+
 $components = foreach ($package in $sortedPackages) {
     $escapedId = [Uri]::EscapeDataString([string] $package.Id)
     $escapedVersion = [Uri]::EscapeDataString([string] $package.Version)
