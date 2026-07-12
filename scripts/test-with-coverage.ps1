@@ -29,6 +29,7 @@ if ($NoRestore) {
 }
 
 $arguments += @(
+    '/p:TreatWarningsAsErrors=true',
     '--logger', 'trx;LogFileName=ARSVIN.Tests.trx',
     '--results-directory', $resultsRoot,
     '--collect', 'XPlat Code Coverage',
