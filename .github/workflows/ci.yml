@@ -82,7 +82,7 @@ jobs:
 
       - name: Test with whole-engine and protocol-core coverage gates
         shell: pwsh
-        run: .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 10.5 -MinimumLineCoverage 60 -NoRestore
+        run: .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 13 -MinimumLineCoverage 70 -NoRestore
 
       - name: Upload test and coverage evidence
         if: always()
