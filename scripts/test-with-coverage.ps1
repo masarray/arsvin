@@ -11,6 +11,7 @@ Set-StrictMode -Version Latest
 
 $root = Split-Path -Parent $PSScriptRoot
 $testProject = Join-Path $root 'tests\ARSVIN.Tests\ARSVIN.Tests.csproj'
+$runSettings = Join-Path $root 'tests\coverage.runsettings'
 $resultsRoot = Join-Path $root 'artifacts\test-results'
 
 if (Test-Path $resultsRoot) {
@@ -30,13 +31,10 @@ if ($NoRestore) {
 
 $arguments += @(
     '/p:TreatWarningsAsErrors=true',
+    '--settings', $runSettings,
     '--logger', 'trx;LogFileName=ARSVIN.Tests.trx',
     '--results-directory', $resultsRoot,
-    '--collect', 'XPlat Code Coverage',
-    '--',
-    'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura',
-    'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.IncludeTestAssembly=true',
-    'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile=**/tests/**,**/*Tests.cs,**/*.g.cs,**/*.g.i.cs,**/obj/**'
+    '--collect', 'XPlat Code Coverage'
 )
 
 & dotnet @arguments
