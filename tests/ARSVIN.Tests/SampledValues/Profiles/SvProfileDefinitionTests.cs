@@ -16,10 +16,8 @@ public sealed class SvProfileDefinitionTests
     [InlineData(-1)]
     public void NonPositiveAsduCountIsRejected(int value)
     {
-        var profile = new SvProfileDefinition
+        var profile = CreateValidDefinition() with
         {
-            Id = "invalid-asdu",
-            DisplayName = "Invalid ASDU",
             AllowedAsduPerFrame = [value]
         };
 
@@ -29,13 +27,68 @@ public sealed class SvProfileDefinitionTests
     [Fact]
     public void InvalidRateToleranceIsRejected()
     {
-        var profile = new SvProfileDefinition
+        var profile = CreateValidDefinition() with
         {
-            Id = "invalid-tolerance",
-            DisplayName = "Invalid tolerance",
             RateTolerancePercent = 101
         };
 
         Assert.Throws<InvalidOperationException>(profile.Validate);
     }
+
+    [Fact]
+    public void EvidenceSourceIsRequired()
+    {
+        var profile = CreateValidDefinition() with
+        {
+            Sources = Array.Empty<SvProfileSourceEvidence>()
+        };
+
+        Assert.Throws<InvalidOperationException>(profile.Validate);
+    }
+
+    [Fact]
+    public void SamplingBasisRequiresMatchingExpectation()
+    {
+        var profile = CreateValidDefinition() with
+        {
+            SamplingBasis = SvSamplingBasis.SamplesPerCycle,
+            ExpectedSamplesPerSecond = null,
+            ExpectedSamplesPerCycle = null
+        };
+
+        Assert.Throws<InvalidOperationException>(profile.Validate);
+    }
+
+    [Fact]
+    public void DatasetCountMustMatchOrderedSignature()
+    {
+        var profile = CreateValidDefinition() with
+        {
+            ExpectedDataSetElementCount = 2,
+            ExpectedDataSetSignature =
+            [
+                new SvDatasetElementSignature { BType = "INT32" }
+            ]
+        };
+
+        Assert.Throws<InvalidOperationException>(profile.Validate);
+    }
+
+    private static SvProfileDefinition CreateValidDefinition()
+        => new()
+        {
+            Id = "valid-test-profile",
+            DisplayName = "Valid test profile",
+            Family = "Test",
+            SamplingBasis = SvSamplingBasis.SamplesPerSecond,
+            ExpectedSamplesPerSecond = 4000,
+            AllowedAsduPerFrame = [1],
+            Sources =
+            [
+                new SvProfileSourceEvidence(
+                    "test-source",
+                    "Synthetic source metadata for deterministic validation tests.",
+                    SvProfileEvidenceStatus.ResearchCandidate)
+            ]
+        };
 }
