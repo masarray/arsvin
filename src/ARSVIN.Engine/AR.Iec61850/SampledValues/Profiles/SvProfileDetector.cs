@@ -10,6 +10,9 @@ public sealed class SvProfileDetector
     private const int SamplingRateWeight = 25;
     private const int NominalFrequencyWeight = 8;
     private const int CounterWrapWeight = 15;
+    private const int MinimumPossibleWeight = 15;
+    private const int MinimumLikelyWeight = 40;
+    private const int MinimumConfirmedWeight = 70;
 
     public IReadOnlyList<SvProfileDetectionResult> Detect(
         SvObservedStreamFacts facts,
@@ -20,8 +23,9 @@ public sealed class SvProfileDetector
 
         return profiles
             .Select(profile => Evaluate(facts, profile))
-            .OrderByDescending(result => result.Confidence == SvProfileConfidence.Conflict ? 0 : 1)
+            .OrderByDescending(result => ConfidenceRank(result.Confidence))
             .ThenByDescending(result => result.ScorePercent)
+            .ThenByDescending(result => result.EvaluatedWeight)
             .ThenBy(result => result.Profile.DisplayName, StringComparer.Ordinal)
             .ToArray();
     }
@@ -103,11 +107,20 @@ public sealed class SvProfileDetector
         var score = evaluatedWeight == 0
             ? 0
             : Math.Round((double)matchedWeight / evaluatedWeight * 100, 2);
+        var hasDataSetSignatureMatch = HasMatch(evidence, "Dataset signature");
+        var hasSamplingMatch = HasMatch(evidence, "Observed samples per second") ||
+                               HasMatch(evidence, "Samples per cycle");
 
         return new SvProfileDetectionResult
         {
             Profile = profile,
-            Confidence = ResolveConfidence(score, matchedWeight, conflictWeight, evaluatedWeight),
+            Confidence = ResolveConfidence(
+                score,
+                matchedWeight,
+                conflictWeight,
+                evaluatedWeight,
+                hasDataSetSignatureMatch,
+                hasSamplingMatch),
             ScorePercent = score,
             MatchedWeight = matchedWeight,
             ConflictWeight = conflictWeight,
@@ -120,22 +133,48 @@ public sealed class SvProfileDetector
         double score,
         int matchedWeight,
         int conflictWeight,
-        int evaluatedWeight)
+        int evaluatedWeight,
+        bool hasDataSetSignatureMatch,
+        bool hasSamplingMatch)
     {
         if (evaluatedWeight == 0)
             return SvProfileConfidence.Unknown;
         if (conflictWeight >= matchedWeight && conflictWeight > 0)
             return SvProfileConfidence.Conflict;
-        if (conflictWeight == 0 && score >= 90)
+        if (conflictWeight == 0 &&
+            score >= 90 &&
+            evaluatedWeight >= MinimumConfirmedWeight &&
+            hasDataSetSignatureMatch &&
+            hasSamplingMatch)
+        {
             return SvProfileConfidence.Confirmed;
-        if (score >= 70)
+        }
+        if (score >= 70 && evaluatedWeight >= MinimumLikelyWeight)
             return SvProfileConfidence.Likely;
-        if (score >= 45)
+        if (score >= 45 && evaluatedWeight >= MinimumPossibleWeight)
             return SvProfileConfidence.Possible;
         if (conflictWeight > 0)
             return SvProfileConfidence.Conflict;
         return SvProfileConfidence.Unknown;
     }
+
+    private static int ConfidenceRank(SvProfileConfidence confidence)
+        => confidence switch
+        {
+            SvProfileConfidence.Confirmed => 4,
+            SvProfileConfidence.Likely => 3,
+            SvProfileConfidence.Possible => 2,
+            SvProfileConfidence.Unknown => 1,
+            SvProfileConfidence.Conflict => 0,
+            _ => 0
+        };
+
+    private static bool HasMatch(
+        IEnumerable<SvProfileMatchEvidence> evidence,
+        string field)
+        => evidence.Any(item =>
+            item.Field.Equals(field, StringComparison.Ordinal) &&
+            item.Outcome == SvProfileEvidenceOutcome.Match);
 
     private static void CompareSampling(
         SvProfileDefinition profile,
