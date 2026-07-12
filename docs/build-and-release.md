@@ -19,7 +19,7 @@ Npcap is required only for live capture/transmission testing. It is not silently
 
 ## Dependency locking
 
-Package versions are centrally managed in `Directory.Packages.props`. Each project also commits a `packages.lock.json` file so the resolved direct and transitive NuGet graph is reviewable and repeatable.
+Package versions are centrally managed in `Directory.Packages.props`. Each project commits a `packages.lock.json` file so the resolved direct and transitive NuGet graph is reviewable and repeatable.
 
 Validated automation restores with locked mode:
 
@@ -48,14 +48,14 @@ The script restores the solution in locked mode, then builds and tests:
 - `src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj`
 - `tests/ARSVIN.Tests/ARSVIN.Tests.csproj`
 
-The shared production source is physically owned by `src/ARSVIN.Engine`, including `AR.Iec61850` and the Npcap transport implementation. Publisher, Subscriber, and Tests all reference that same compiled assembly.
+The shared production source is physically owned by `src/ARSVIN.Engine`, including IEC 61850 protocol code, Sampled Values profile infrastructure, and the Npcap transport implementation. Publisher, Subscriber, and Tests reference the same compiled assembly.
 
 External command exit codes are checked, and compiler warnings are treated as errors for the validated build path.
 
 ### Coverage evidence
 
 ```powershell
-.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 10.5 -MinimumLineCoverage 60
+.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 13 -MinimumLineCoverage 70
 ```
 
 The script:
@@ -64,23 +64,37 @@ The script:
 2. instruments the complete shared production `ARSVIN.Engine` assembly,
 3. writes TRX, the complete `dotnet test` log, and Cobertura evidence under `artifacts/test-results`,
 4. calculates and enforces the whole-engine regression floor,
-5. calculates and enforces the established protocol-core regression floor,
+5. calculates and enforces the protocol-core regression floor,
 6. fails when no production lines are instrumented or either configured floor is missed.
 
-Current verified baselines from 54 deterministic tests:
+Current verified baselines from 74 deterministic tests:
 
 | Metric | Result |
 |---|---:|
-| Whole `ARSVIN.Engine` instrumented lines | 15,742 |
-| Whole-engine covered lines | 1,691 |
-| Whole-engine line coverage | 10.74% |
-| Enforced whole-engine floor | 10.5% |
-| Protocol-core instrumented lines | 1,550 |
-| Protocol-core covered lines | 1,007 |
-| Protocol-core line coverage | 64.97% |
-| Enforced protocol-core floor | 60% |
+| Whole `ARSVIN.Engine` instrumented lines | 16,312 |
+| Whole-engine covered lines | 2,178 |
+| Whole-engine line coverage | 13.35% |
+| Enforced whole-engine floor | 13% |
+| Protocol-core instrumented lines | 2,120 |
+| Protocol-core covered lines | 1,494 |
+| Protocol-core line coverage | 70.47% |
+| Enforced protocol-core floor | 70% |
 
-The expanded suite covers deterministic behavior across Sampled Values, SCL parsing, COMTRADE parsing and scaling, PCAP read/write handling, MMS data and object references, diagnostics, Ethernet framing, transport helpers, and publisher session behavior. This is not a claim that the complete WPF UI or every live-network path is covered; live Npcap, timing, and device-interoperability behavior still require controlled laboratory validation.
+The suite covers deterministic behavior across Sampled Values framing, publisher sessions, profile observations, evidence-aware detection, configuration comparison, SCL parsing, COMTRADE parsing and scaling, PCAP read/write handling, MMS data and object references, diagnostics, Ethernet framing, and transport helpers. It does not claim complete WPF, live-network, timing, or device-interoperability coverage.
+
+## Validate public content
+
+Public documentation uses neutral engineering terminology and avoids proprietary comparison language.
+
+```powershell
+python scripts/validate-public-neutrality.py
+```
+
+CI and Pages deployment run this check before publishing public content. The validator writes evidence to:
+
+```text
+artifacts/public-neutrality-report.txt
+```
 
 ## Validate the public site
 
@@ -109,18 +123,18 @@ The validator recursively checks:
 - release filenames,
 - sitemap metadata in `robots.txt`.
 
-The same builder and validator run directly inside GitHub Pages deployment. A broken page cannot deploy merely because a separate CI job has not finished yet.
+The same builder and validator run inside GitHub Pages deployment. A broken page cannot deploy merely because another CI job has not finished.
 
 ## Build portable release artifacts
 
 ```powershell
-.\scripts\publish-release.ps1 -Version 0.3.1
+.\scripts\publish-release.ps1 -Version 0.4.0
 ```
 
 Compatibility wrapper:
 
 ```powershell
-.\publish-win-x64.ps1 -Version 0.3.1
+.\publish-win-x64.ps1 -Version 0.4.0
 ```
 
 Generated files:
@@ -145,7 +159,7 @@ The two direct `.exe` files are self-contained .NET 8 single-file applications. 
 After restoring the solution, run:
 
 ```powershell
-.\scripts\generate-sbom.ps1 -Version 0.3.1
+.\scripts\generate-sbom.ps1 -Version 0.4.0
 ```
 
 Output:
@@ -154,16 +168,16 @@ Output:
 artifacts/release/ARSVIN-SBOM.cdx.json
 ```
 
-The generator reads the locked, resolved NuGet graphs for Publisher and Subscriber, deduplicates direct and transitive application packages, records which application uses each package, and writes CycloneDX 1.5 JSON. Test-only packages such as xUnit and Coverlet are intentionally excluded.
+The generator reads the locked, resolved NuGet graphs for Publisher and Subscriber, deduplicates direct and transitive application packages, records which application uses each package, and writes CycloneDX 1.5 JSON. Test-only packages are excluded.
 
-The SBOM includes a deterministic UUID URN `serialNumber`, source commit metadata, component version, and stable component ordering. Repeated generation from the same commit and version is reviewable. The SBOM covers managed application dependencies; it does not claim to inventory Windows, Npcap, GitHub-hosted runner contents, or every build-service tool.
+The SBOM includes a deterministic UUID URN `serialNumber`, source commit metadata, component version, and stable component ordering. It covers managed application dependencies; it does not claim to inventory Windows, Npcap, hosted-runner contents, or every build-service tool.
 
 ## Build the installer locally
 
 After running the publish script:
 
 ```powershell
-$version = '0.3.1'
+$version = '0.4.0'
 $sourceDir = (Resolve-Path '.\artifacts\installer-input').Path
 $outputDir = (Resolve-Path '.\artifacts\release').Path
 $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
@@ -181,7 +195,7 @@ Output:
 artifacts/release/ARSVIN-Suite-Setup-win-x64.exe
 ```
 
-The automated workflow installs and verifies the exact Chocolatey package version declared in `INNO_SETUP_VERSION`. It records the resolved `ISCC.exe` path and file metadata for evidence, while the exact package version remains the authoritative toolchain pin.
+The automated workflow installs and verifies the exact package version declared in `INNO_SETUP_VERSION`. It records the compiler path and file metadata for evidence.
 
 The installer:
 
@@ -200,16 +214,16 @@ Workflow: `.github/workflows/release.yml`
 
 ### Pull-request validation
 
-When release tooling, installer definitions, project files, dependency locks, or build configuration change, the workflow runs on the pull request and:
+When release tooling, installer definitions, project files, dependency locks, or build configuration change, the workflow:
 
 1. restores the locked dependency graph,
-2. builds and tests the solution with warnings treated as errors,
-3. publishes both portable single-file applications,
+2. builds and tests with warnings treated as errors,
+3. publishes both portable applications,
 4. creates the portable suite ZIP,
-5. installs and verifies pinned Inno Setup,
+5. installs and verifies pinned installer tooling,
 6. compiles the installer,
-7. generates and structurally validates the application-only CycloneDX SBOM,
-8. checks all expected artifact names and non-empty files,
+7. generates and validates the CycloneDX SBOM,
+8. checks expected artifact names and non-empty files,
 9. silently installs the suite into a temporary directory,
 10. verifies Publisher, Subscriber, documentation, version file, and uninstaller,
 11. silently uninstalls the temporary installation,
@@ -219,7 +233,7 @@ A pull-request run never creates a public GitHub Release or public attestation.
 
 ### Stable tagged release
 
-A public release is created only by pushing a semantic-version tag. The tagged commit must already be contained in `main`; the workflow rejects a tag created from an unmerged feature or release branch.
+A public release is created only by pushing a semantic-version tag. The tagged commit must already be contained in `main`.
 
 ```powershell
 git switch main
@@ -230,28 +244,24 @@ git push origin v0.4.0
 
 The workflow repeats the validated packaging path, downloads the validated artifact in a separate least-privilege release job, verifies that no GitHub Release already exists for the tag, creates signed provenance and SBOM attestations, and publishes the public files.
 
-Published GitHub Releases are immutable in automation. A rerun cannot replace existing assets. Any artifact correction requires a new patch version, such as `v0.4.1`.
-
-Stable tags are eligible to become the repository's latest release.
+Published GitHub Releases are immutable in automation. Any artifact correction requires a new patch version.
 
 ### Prerelease tag
 
-Semantic versions containing a suffix are published as GitHub prereleases and do not replace the latest stable release:
+Semantic versions containing a suffix are published as prereleases and do not replace the latest stable release:
 
 ```powershell
 git switch main
 git pull --ff-only origin main
-git tag -a v0.4.0-rc.1 -m "ARSVIN v0.4.0-rc.1"
-git push origin v0.4.0-rc.1
+git tag -a v0.5.0-rc.1 -m "ARSVIN v0.5.0-rc.1"
+git push origin v0.5.0-rc.1
 ```
-
-Examples recognized as prereleases include `-alpha.1`, `-beta.1`, and `-rc.1`.
 
 ### Manual artifact build
 
-Run **Build Windows Release** from the Actions tab and provide a version such as `0.4.0-dev.1`.
+Run **Build Windows Release** from the Actions tab and provide a version such as `0.5.0-dev.1`.
 
-Manual runs upload private workflow artifacts only. They never create or replace a public GitHub Release, even when started while viewing another branch.
+Manual runs upload private workflow artifacts only. They never create or replace a public GitHub Release.
 
 ## Release assets
 
@@ -272,21 +282,21 @@ Verify the local hash:
 Get-FileHash .\ARSVIN-Suite-Setup-win-x64.exe -Algorithm SHA256
 ```
 
-Compare the result with `SHA256SUMS.txt` from the same GitHub Release.
+Compare the result with `SHA256SUMS.txt` from the same release.
 
-Verify signed GitHub build provenance:
+Verify signed build provenance:
 
 ```powershell
 gh attestation verify .\ARSVIN-Suite-Setup-win-x64.exe --repo masarray/arsvin
 ```
 
-GitHub artifact attestations use a short-lived signing identity issued during the tagged workflow. This validates repository/workflow provenance; it is separate from Windows Authenticode signing.
+Artifact attestations validate repository/workflow provenance; they are separate from Windows Authenticode signing.
 
 ## Code signing status
 
 Release binaries are currently unsigned. Windows SmartScreen may display an unknown-publisher warning. The workflow intentionally does not contain placeholder signing steps or require paid signing secrets.
 
-When a trusted code-signing certificate becomes available, sign the portable executables before compiling the installer, then sign the completed installer before checksum generation.
+When a trusted certificate becomes available, sign the portable executables before compiling the installer, then sign the completed installer before checksum generation.
 
 ## Release checklist
 
