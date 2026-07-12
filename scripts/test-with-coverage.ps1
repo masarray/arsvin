@@ -13,6 +13,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $testProject = Join-Path $root 'tests\ARSVIN.Tests\ARSVIN.Tests.csproj'
 $resultsRoot = Join-Path $root 'artifacts\test-results'
 $coveragePrefix = Join-Path $resultsRoot 'coverage'
+$testLog = Join-Path $resultsRoot 'dotnet-test.log'
 
 if (Test-Path $resultsRoot) {
     Remove-Item $resultsRoot -Recurse -Force
@@ -29,13 +30,15 @@ if ($NoRestore) {
     $arguments += '--no-restore'
 }
 
-# Engine source is currently linked into the test assembly. Coverlet's MSBuild
-# integration can instrument that assembly explicitly; test source files are
-# excluded so the metric reflects the linked production engine surface.
+# Production engine source is currently linked into ARSVIN.Tests. Force that
+# assembly into the instrumentation set, keep source matching permissive for
+# linked documents, and exclude test files from the resulting metric.
 $arguments += @(
     '/p:TreatWarningsAsErrors=true',
     '/p:CollectCoverage=true',
     '/p:IncludeTestAssembly=true',
+    '/p:Include=[ARSVIN.Tests]*',
+    '/p:ExcludeAssembliesWithoutSources=None',
     '/p:CoverletOutputFormat=cobertura',
     "/p:CoverletOutput=$coveragePrefix",
     '/p:DeterministicReport=true',
@@ -44,9 +47,11 @@ $arguments += @(
     '--results-directory', $resultsRoot
 )
 
-& dotnet @arguments
-if ($LASTEXITCODE -ne 0) {
-    throw "dotnet test with coverage failed with exit code $LASTEXITCODE."
+Write-Host "dotnet $($arguments -join ' ')"
+& dotnet @arguments 2>&1 | Tee-Object -FilePath $testLog
+$testExitCode = $LASTEXITCODE
+if ($testExitCode -ne 0) {
+    throw "dotnet test with coverage failed with exit code $testExitCode."
 }
 
 $coverageFile = Join-Path $resultsRoot 'coverage.cobertura.xml'
