@@ -34,6 +34,7 @@ if ($NoRestore) {
 # whole-engine baseline, while the regression gate below is calculated over
 # the protocol-core surface that has an established test baseline.
 $arguments += @(
+    '/p:RestoreLockedMode=true',
     '/p:TreatWarningsAsErrors=true',
     '/p:CollectCoverage=true',
     '/p:Include=[ARSVIN.Engine]*',

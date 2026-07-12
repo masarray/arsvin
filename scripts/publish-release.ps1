@@ -14,6 +14,7 @@ $tempRoot = Join-Path $artifactRoot 'publish-temp'
 $portableRoot = Join-Path $artifactRoot 'ARSVIN-win-x64'
 $installerInput = Join-Path $artifactRoot 'installer-input'
 
+$solution = Join-Path $root 'ARSVIN.sln'
 $publisherProject = Join-Path $root 'src\ARSVIN\ARSVIN.csproj'
 $subscriberProject = Join-Path $root 'src\ARSVIN.Subscriber\ARSVIN.Subscriber.csproj'
 $testProject = Join-Path $root 'tests\ARSVIN.Tests\ARSVIN.Tests.csproj'
@@ -89,17 +90,20 @@ Reset-Directory $portableRoot
 Reset-Directory $installerInput
 
 if (-not $SkipTests) {
-    Write-Host '==> Restoring and testing'
-    Invoke-DotNet -Arguments @('restore', $publisherProject)
-    Invoke-DotNet -Arguments @('restore', $subscriberProject)
-    Invoke-DotNet -Arguments @('restore', $testProject)
-    Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '--no-restore')
+    Write-Host '==> Restoring locked solution graph and testing'
+    Invoke-DotNet -Arguments @('restore', $solution, '--locked-mode')
+    Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '--no-restore', '/p:TreatWarningsAsErrors=true')
 }
+
+Write-Host "==> Restoring locked publish graph for $Runtime"
+Invoke-DotNet -Arguments @('restore', $publisherProject, '-r', $Runtime, '--locked-mode')
+Invoke-DotNet -Arguments @('restore', $subscriberProject, '-r', $Runtime, '--locked-mode')
 
 $commonPublishArguments = @(
     '-c', 'Release',
     '-r', $Runtime,
     '--self-contained', 'true',
+    '--no-restore',
     '-p:PublishSingleFile=true',
     '-p:IncludeNativeLibrariesForSelfExtract=true',
     '-p:EnableCompressionInSingleFile=true',

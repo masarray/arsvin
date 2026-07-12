@@ -11,11 +11,20 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 - Added unique canonical URLs, descriptions, Open Graph metadata, Twitter Card metadata, and `TechArticle` JSON-LD for engineering documentation pages.
 - Added a generated multi-page sitemap containing the product homepage and every published documentation page.
 - Added recursive validation for all HTML metadata, structured data, canonical uniqueness, local references, search-index targets, sitemap coverage, web-manifest icons, and robots metadata.
+- Added committed NuGet lock files for Publisher, Subscriber, the shared engine, and Tests.
+- Added CI evidence upload for the committed dependency lock graph.
 
 ### Changed
 
 - GitHub Pages and Windows CI now build and validate the same staged public-site artifact instead of copying raw Markdown into the deployment directory.
 - The product landing page now links directly to Quick Start, SV Profile Support, COMTRADE Replay, Subscriber Verification, Safety Boundaries, and the complete documentation index.
+- Validated CI, CodeQL, build, test, publish, and release paths now restore NuGet dependencies in locked mode.
+- README, build guidance, contributor guidance, repository structure, release examples, and coverage baselines now match the current shared-engine implementation.
+
+### Security
+
+- Published GitHub Releases are now immutable in automation; a release job fails before attestation or upload when the semantic-version tag already has a GitHub Release.
+- Artifact corrections require a new semantic-version patch instead of replacing previously published binaries, checksums, or SBOMs.
 
 ### Planned
 

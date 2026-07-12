@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <UseWPF>true</UseWPF>
     <AssemblyName>ARSVIN.Subscriber</AssemblyName>
     <RootNamespace>ARSVIN.Subscriber</RootNamespace>

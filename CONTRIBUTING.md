@@ -12,34 +12,52 @@ ARSVIN is an engineering suite for IEC 61850 Sampled Values laboratory workflows
 - Preserve Apache-2.0 compatibility.
 - Prefer explicit engineering wording over marketing claims.
 - Update documentation when behavior, UI, safety assumptions, or release packaging changes.
+- Preserve committed NuGet lock files and immutable public releases.
 
 ## Development setup
 
 Recommended environment:
 
 - Windows 10/11 x64
-- .NET 8 SDK
+- .NET 8 SDK, feature band 8.0.4xx
 - PowerShell 7+
 - Npcap for live packet capture/publishing tests
 - Wireshark for packet inspection
 
-Build:
+Build using the committed dependency graph:
 
 ```powershell
 .\build.ps1
 ```
 
-Run tests:
+Run tests and produce coverage evidence:
 
 ```powershell
-dotnet test tests/ARSVIN.Tests/ARSVIN.Tests.csproj -c Release
+.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50
 ```
 
-Create portable release artifacts:
+Create portable release artifacts for the current source version:
 
 ```powershell
-.\scripts\publish-release.ps1 -Version 0.1.0
+.\scripts\publish-release.ps1 -Version 0.3.1
 ```
+
+## Dependency updates
+
+NuGet versions are centrally managed in `Directory.Packages.props`, and each project commits `packages.lock.json`.
+
+Normal builds and automation restore with locked mode. When deliberately changing a dependency:
+
+1. update the version in `Directory.Packages.props`,
+2. regenerate lock files from the repository root,
+3. review direct and transitive changes,
+4. commit package-version and lock-file changes together.
+
+```powershell
+dotnet restore ARSVIN.sln --force-evaluate
+```
+
+Do not hand-edit `packages.lock.json`. Unrelated lock-file churn should not be included in a pull request.
 
 ## Pull request checklist
 
@@ -48,10 +66,12 @@ Before opening a PR, please check:
 - The change has a narrow engineering purpose.
 - Both affected applications build in Release mode.
 - Relevant unit tests were added or updated where practical.
+- The protocol-core coverage floor still passes, and broader coverage changes are explained.
 - Safety behavior is not weakened.
 - Docs are updated for user-visible changes.
 - Screenshots or Wireshark notes are included for UI / packet behavior changes.
-- New dependencies are necessary, maintained, and license-compatible.
+- New dependencies are necessary, maintained, license-compatible, and represented in lock files.
+- Release-workflow changes preserve tag-only publication and immutable existing releases.
 
 ## Commit and branch style
 

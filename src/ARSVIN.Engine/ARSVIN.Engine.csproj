@@ -2,6 +2,7 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <AssemblyName>ARSVIN.Engine</AssemblyName>
     <RootNamespace>AR.Iec61850</RootNamespace>
     <Description>Shared IEC 61850 protocol, SCL, Sampled Values, capture, and transport engine used by ARSVIN Publisher and Subscriber.</Description>
