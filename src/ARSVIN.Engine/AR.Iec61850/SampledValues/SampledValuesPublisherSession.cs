@@ -55,7 +55,13 @@ public sealed class SampledValuesPublisherSession
         var sampleCount = NextSampleCount;
         NextSampleCount = SampleCounterPolicy.Increment(sampleCount, SampleCounterWrap, samplePayloads.Count);
 
-        var frame = _profile.BuildEthernetFrame(_source, sampleCount, samplePayloads, referenceTime, sampleSynchronization);
+        var frame = _profile.BuildEthernetFrame(
+            _source,
+            sampleCount,
+            samplePayloads,
+            referenceTime,
+            sampleSynchronization,
+            SampleCounterWrap);
         await _transport.SendAsync(frame, cancellationToken).ConfigureAwait(false);
         return frame;
     }
