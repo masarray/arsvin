@@ -30,19 +30,17 @@ if ($NoRestore) {
     $arguments += '--no-restore'
 }
 
-# Production engine source is currently linked into ARSVIN.Tests. Force that
-# assembly into the instrumentation set, keep source matching permissive for
-# linked documents, and exclude test files from the resulting metric.
+# The IEC 61850 implementation now lives in one shared production assembly.
+# Instrument that assembly directly and exclude generated source from the metric.
 $arguments += @(
     '/p:TreatWarningsAsErrors=true',
     '/p:CollectCoverage=true',
-    '/p:IncludeTestAssembly=true',
-    '/p:Include=[ARSVIN.Tests]*',
+    '/p:Include=[ARSVIN.Engine]*',
     '/p:ExcludeAssembliesWithoutSources=None',
     '/p:CoverletOutputFormat=cobertura',
     "/p:CoverletOutput=$coveragePrefix",
     '/p:DeterministicReport=true',
-    '/p:ExcludeByFile=**/tests/**%2c**/*Tests.cs%2c**/*.g.cs%2c**/*.g.i.cs%2c**/obj/**',
+    '/p:ExcludeByFile=**/*.g.cs%2c**/*.g.i.cs%2c**/obj/**',
     '--logger', 'trx;LogFileName=ARSVIN.Tests.trx',
     '--results-directory', $resultsRoot
 )
@@ -88,7 +86,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
 
 | Metric | Result |
 |---|---:|
-| Instrumented production lines | **$linesValid** |
+| Instrumented `ARSVIN.Engine` lines | **$linesValid** |
 | Line coverage | **$lineCoverage%** |
 | Required minimum | **$MinimumLineCoverage%** |
 | Report | `artifacts/test-results/coverage.cobertura.xml` |
