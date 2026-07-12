@@ -4,11 +4,23 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ## Unreleased
 
+### Added
+
+- Added a repository-owned, dependency-free public-site builder that converts every `docs/*.md` guide into a dedicated HTML page.
+- Added compact documentation navigation, topic filtering, breadcrumbs, source links, responsive styling, and a generated search index.
+- Added unique canonical URLs, descriptions, Open Graph metadata, Twitter Card metadata, and `TechArticle` JSON-LD for engineering documentation pages.
+- Added a generated multi-page sitemap containing the product homepage and every published documentation page.
+- Added recursive validation for all HTML metadata, structured data, canonical uniqueness, local references, search-index targets, sitemap coverage, web-manifest icons, and robots metadata.
+
+### Changed
+
+- GitHub Pages and Windows CI now build and validate the same staged public-site artifact instead of copying raw Markdown into the deployment directory.
+- The product landing page now links directly to Quick Start, SV Profile Support, COMTRADE Replay, Subscriber Verification, Safety Boundaries, and the complete documentation index.
+
 ### Planned
 
 - Move the engine source directory physically under `src/ARSVIN.Engine` after the shared-assembly transition has proven stable.
 - Expand protocol regression tests and raise the whole-engine coverage baseline progressively.
-- Publish search-indexable HTML engineering documentation with a multi-page sitemap.
 - Add Windows Authenticode signing when a trusted certificate becomes available.
 
 ## 0.3.1 — 2026-07-12
