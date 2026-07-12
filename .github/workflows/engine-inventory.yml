@@ -1,39 +1,57 @@
-name: Engine Inventory
+name: Temporary Engine Relocation
 
 on:
   push:
     branches: [ agent/p2-engine-relocation-tests ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  inventory:
+  relocate:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout
+      - name: Checkout branch
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: agent/p2-engine-relocation-tests
+          fetch-depth: 0
 
-      - name: Capture tracked engine and test inventory
+      - name: Move shared engine source and update project ownership
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p artifacts/engine-inventory
-          git ls-files -s src/ARSVIN/Engine tests/ARSVIN.Tests > artifacts/engine-inventory/git-index.txt
-          git ls-files src/ARSVIN/Engine tests/ARSVIN.Tests > artifacts/engine-inventory/paths.txt
-          cp -R src/ARSVIN/Engine artifacts/engine-inventory/Engine
-          cp -R tests/ARSVIN.Tests artifacts/engine-inventory/Tests
-          cp src/ARSVIN.Engine/ARSVIN.Engine.csproj artifacts/engine-inventory/
-          cp src/ARSVIN/ARSVIN.csproj artifacts/engine-inventory/Publisher.csproj
-          cp src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj artifacts/engine-inventory/Subscriber.csproj
 
-      - name: Upload engine inventory
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: arsvin-engine-inventory
-          path: artifacts/engine-inventory
-          if-no-files-found: error
-          retention-days: 7
+          if [[ ! -d src/ARSVIN/Engine ]]; then
+            echo 'Engine source is already relocated.'
+            exit 0
+          fi
+
+          git mv src/ARSVIN/Engine/AR.Iec61850 src/ARSVIN.Engine/AR.Iec61850
+          git mv src/ARSVIN/Engine/AR.Iec61850.Transports.Npcap src/ARSVIN.Engine/AR.Iec61850.Transports.Npcap
+          rmdir src/ARSVIN/Engine
+
+          python3 - <<'PY'
+          from pathlib import Path
+
+          engine_project = Path('src/ARSVIN.Engine/ARSVIN.Engine.csproj')
+          text = engine_project.read_text(encoding='utf-8')
+          linked_group = '''  <ItemGroup>\n    <Compile Include="..\\ARSVIN\\Engine\\**\\*.cs" Link="Engine\\%(RecursiveDir)%(Filename)%(Extension)" />\n  </ItemGroup>\n\n'''
+          if linked_group not in text:
+              raise SystemExit('Expected linked engine Compile item was not found.')
+          engine_project.write_text(text.replace(linked_group, ''), encoding='utf-8', newline='\n')
+
+          publisher_project = Path('src/ARSVIN/ARSVIN.csproj')
+          text = publisher_project.read_text(encoding='utf-8')
+          linked_remove = '    <Compile Remove="Engine\\**\\*.cs" />\n'
+          if linked_remove not in text:
+              raise SystemExit('Expected Publisher Compile Remove item was not found.')
+          publisher_project.write_text(text.replace(linked_remove, ''), encoding='utf-8', newline='\n')
+          PY
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Relocate shared engine source under ARSVIN.Engine'
+          git push origin HEAD:agent/p2-engine-relocation-tests
