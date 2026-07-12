@@ -10,7 +10,7 @@ ARSVIN is a focused IEC 61850 Sampled Values engineering suite for Windows. It i
 
 ## Sampled Values standards and interoperability
 
-- [SV Standards and Evidence Research Gate](sv-research-gate.md) — authoritative source hierarchy, OMICRON benchmark findings, claim levels, and research acceptance rules.
+- [SV Standards and Evidence Research Gate](sv-research-gate.md) — authoritative source hierarchy, claim levels, evidence requirements, and research acceptance rules.
 - [SV Conformance and Interoperability Matrix](sv-evidence-matrix.md) — verified, provisional, unknown, and out-of-scope requirements for 9-2LE-style, IEC 61869-9, and generic Layer-2 SV.
 - `samples/sv-evidence` — safe evidence intake, anonymization rules, metadata, and minimum regression cases for real merging-unit captures.
 
