@@ -41,7 +41,7 @@ env:
 jobs:
   package:
     name: Validate portable EXEs and installer
-    runs-on: windows-latest
+    runs-on: windows-2025
     outputs:
       version: ${{ steps.version.outputs.value }}
       tag_name: ${{ steps.version.outputs.tag_name }}
@@ -60,8 +60,9 @@ jobs:
           dotnet-version: 8.0.4xx
           cache: true
           cache-dependency-path: |
-            **/*.csproj
             Directory.Packages.props
+            src/**/packages.lock.json
+            tests/**/packages.lock.json
 
       - name: Resolve version
         id: version
@@ -327,7 +328,7 @@ jobs:
     name: Publish GitHub Release
     if: github.ref_type == 'tag'
     needs: package
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       id-token: write
