@@ -11,6 +11,7 @@ from pathlib import Path
 import sys
 
 ROOT = Path(__file__).resolve().parents[1]
+REPORT = ROOT / "artifacts" / "public-neutrality-report.txt"
 PUBLIC_PATHS = (
     ROOT / "README.md",
     ROOT / "CHANGELOG.md",
@@ -40,6 +41,11 @@ def iter_files(path: Path):
                 yield candidate
 
 
+def write_report(lines: list[str]) -> None:
+    REPORT.parent.mkdir(parents=True, exist_ok=True)
+    REPORT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
 def main() -> int:
     violations: list[str] = []
     for public_path in PUBLIC_PATHS:
@@ -51,13 +57,17 @@ def main() -> int:
                     relative = file_path.relative_to(ROOT).as_posix()
                     violations.append(f"{relative}: prohibited proprietary comparison term")
 
-    if violations:
-        print("Public terminology neutrality validation failed:", file=sys.stderr)
-        for violation in sorted(set(violations)):
-            print(f"- {violation}", file=sys.stderr)
+    unique_violations = sorted(set(violations))
+    if unique_violations:
+        lines = ["Public terminology neutrality validation failed:"]
+        lines.extend(f"- {violation}" for violation in unique_violations)
+        write_report(lines)
+        print("\n".join(lines), file=sys.stderr)
         return 1
 
-    print("Public terminology neutrality validation passed.")
+    success = ["Public terminology neutrality validation passed."]
+    write_report(success)
+    print(success[0])
     return 0
 
 
