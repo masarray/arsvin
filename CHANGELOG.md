@@ -13,13 +13,18 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 - Added evidence-aware profile definitions with standards-neutral sampling, dataset, packing, payload, and source metadata.
 - Added an explainable weighted profile detector that reports matches, conflicts, missing evidence, confidence, and score.
 - Added strict and compatible configuration-versus-wire comparison findings without blocking capture or decoding.
-- Added deterministic tests for observation windows, profile detection, evidence explanations, and configuration mismatch handling.
+- Added deterministic tests for observation windows, profile detection, evidence explanations, configuration mismatch handling, sparse-evidence confidence, and profile-definition provenance.
+- Added public terminology-neutrality validation to CI and Pages deployment with retained validation evidence.
 
 ### Changed
 
 - Documentation now prevents unverified profile constants from being promoted directly into production support claims.
 - Public engineering workflow targets are described generically without proprietary product comparisons or branding.
 - The built-in profile catalog contains only the generic SCL-driven Layer-2 SV fallback until profile-specific requirements are verified.
+- Sparse evidence can no longer produce a `Confirmed` profile result; confirmation requires sufficient evaluated evidence plus matching dataset and sampling behavior.
+- Expanded the deterministic suite from 54 to 74 tests.
+- Raised whole-engine coverage from 10.74% to 13.35% and the enforced floor from 10.5% to 13%.
+- Raised protocol-core coverage from 64.97% to 70.47% and the enforced floor from 60% to 70%.
 
 ## 0.4.0 — 2026-07-12
 ### Added
