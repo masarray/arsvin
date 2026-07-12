@@ -10,6 +10,40 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
+function New-DeterministicUuidUrn {
+    param(
+        [Parameter(Mandatory)]
+        [string] $Value
+    )
+
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $inputBytes = [System.Text.Encoding]::UTF8.GetBytes($Value)
+        $hash = $sha256.ComputeHash($inputBytes)
+    }
+    finally {
+        $sha256.Dispose()
+    }
+
+    $uuidBytes = [byte[]]::new(16)
+    [Array]::Copy($hash, $uuidBytes, $uuidBytes.Length)
+
+    # RFC 4122 variant with a deterministic version-5-style identifier.
+    $uuidBytes[6] = [byte](($uuidBytes[6] -band 0x0F) -bor 0x50)
+    $uuidBytes[8] = [byte](($uuidBytes[8] -band 0x3F) -bor 0x80)
+
+    $hex = -join ($uuidBytes | ForEach-Object { $_.ToString('x2') })
+    $uuid = '{0}-{1}-{2}-{3}-{4}' -f (
+        $hex.Substring(0, 8),
+        $hex.Substring(8, 4),
+        $hex.Substring(12, 4),
+        $hex.Substring(16, 4),
+        $hex.Substring(20, 12)
+    )
+
+    return "urn:uuid:$uuid"
+}
+
 $root = Split-Path -Parent $PSScriptRoot
 $applicationProjects = @(
     [ordered]@{
@@ -46,6 +80,8 @@ $sourceTimestamp = [DateTimeOffset]::Parse(
     ($sourceTimestampOutput -join '').Trim(),
     [System.Globalization.CultureInfo]::InvariantCulture
 ).ToUniversalTime().ToString('o')
+
+$serialNumber = New-DeterministicUuidUrn -Value "https://github.com/masarray/arsvin|$Version|$sourceCommit"
 
 $packages = @{}
 
@@ -164,6 +200,7 @@ $components = foreach ($package in $sortedPackages) {
 $sbom = [ordered]@{
     bomFormat = 'CycloneDX'
     specVersion = '1.5'
+    serialNumber = $serialNumber
     version = 1
     metadata = [ordered]@{
         timestamp = $sourceTimestamp
@@ -173,7 +210,7 @@ $sbom = [ordered]@{
                     type = 'application'
                     author = 'ARSVIN project'
                     name = 'generate-sbom.ps1'
-                    version = '1.1.0'
+                    version = '1.2.0'
                 }
             )
         }
@@ -214,5 +251,6 @@ $json = $sbom | ConvertTo-Json -Depth 20
 $written = Get-Item $OutputPath
 Write-Host "==> CycloneDX SBOM written: $($written.FullName)"
 Write-Host "    Source commit: $sourceCommit"
+Write-Host "    Serial number: $serialNumber"
 Write-Host "    Components: $($components.Count)"
 Write-Host "    Size: $($written.Length) bytes"
