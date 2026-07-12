@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $root = $PSScriptRoot
+$solution = Join-Path $root 'ARSVIN.sln'
 $appProject = Join-Path $root 'src\ARSVIN\ARSVIN.csproj'
 $subscriberProject = Join-Path $root 'src\ARSVIN.Subscriber\ARSVIN.Subscriber.csproj'
 $testProject = Join-Path $root 'tests\ARSVIN.Tests\ARSVIN.Tests.csproj'
@@ -18,10 +19,8 @@ function Invoke-DotNet {
     }
 }
 
-Write-Host '==> Restoring solution projects'
-Invoke-DotNet -Arguments @('restore', $appProject)
-Invoke-DotNet -Arguments @('restore', $subscriberProject)
-Invoke-DotNet -Arguments @('restore', $testProject)
+Write-Host '==> Restoring locked solution dependency graph'
+Invoke-DotNet -Arguments @('restore', $solution, '--locked-mode')
 
 Write-Host '==> Building ARSVIN Publisher'
 Invoke-DotNet -Arguments @('build', $appProject, '-c', 'Release', '--no-restore', '-warnaserror')
