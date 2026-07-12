@@ -153,8 +153,10 @@ Compatibility wrapper:
 Run tests with the repository coverage gate and retain TRX/Cobertura evidence:
 
 ```powershell
-.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 20
+.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50
 ```
+
+The current linked engine surface measures 57.85% line coverage across 1,535 instrumented production lines. CI enforces a 50% regression floor while the shared engine project and broader protocol tests are developed.
 
 Generate a CycloneDX SBOM after restoring the solution:
 
