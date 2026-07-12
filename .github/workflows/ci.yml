@@ -28,6 +28,9 @@ jobs:
             src/**/packages.lock.json
             tests/**/packages.lock.json
 
+      - name: Validate public terminology neutrality
+        run: python scripts/validate-public-neutrality.py
+
       - name: Build public site and HTML documentation
         run: python scripts/build-public-site.py --output artifacts/public-site
 
