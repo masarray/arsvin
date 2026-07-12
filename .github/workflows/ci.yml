@@ -44,7 +44,7 @@ jobs:
 
       - name: Test with coverage gate
         shell: pwsh
-        run: .\scripts\test-with-coverage.ps1 -MinimumLineCoverage 20 -NoRestore
+        run: .\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50 -NoRestore
 
       - name: Upload test and coverage evidence
         if: always()
