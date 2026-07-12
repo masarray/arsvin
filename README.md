@@ -154,13 +154,13 @@ Compatibility wrapper:
 .\publish-win-x64.ps1 -Version 0.3.1
 ```
 
-Run tests with the repository coverage gate and retain TRX/Cobertura evidence:
+Run tests with both repository coverage gates and retain TRX/Cobertura evidence:
 
 ```powershell
-.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50
+.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 10.5 -MinimumLineCoverage 60
 ```
 
-The complete shared `ARSVIN.Engine` baseline currently measures 5.64% line coverage across 15,726 instrumented production lines. The established protocol-core regression surface measures 57.89% across 1,534 lines, with 888 covered lines; CI enforces a 50% floor on that tested protocol-core surface while broader engine tests are added.
+The current suite contains 54 deterministic tests. The complete shared `ARSVIN.Engine` baseline measures 10.74% line coverage across 15,742 instrumented production lines, with 1,691 covered lines. The protocol-core regression surface measures 64.97% across 1,550 lines, with 1,007 covered lines. CI enforces floors of 10.5% for the whole engine and 60% for protocol core.
 
 Generate a CycloneDX SBOM after restoring the solution:
 
@@ -171,19 +171,21 @@ Generate a CycloneDX SBOM after restoring the solution:
 ## Repository structure
 
 ```text
-src/ARSVIN.Engine/             Shared IEC 61850 protocol, SCL, capture, transport, and SV engine project
-src/ARSVIN/                    Publisher application
-src/ARSVIN.Subscriber/         ArSubsv subscriber and visualization companion
-tests/ARSVIN.Tests/            Protocol and publisher helper tests
-installer/                     Inno Setup definition for the Windows suite
-scripts/                       Repeatable release packaging and validation scripts
-docs/                          Engineering, safety, and contributor documentation
-samples/                       SCL, COMTRADE, scenario, and evidence samples
-site/                          Static, SEO-ready GitHub Pages product site
-.github/workflows/             CI, CodeQL, Pages, and release automation
+src/ARSVIN.Engine/                     Shared production engine project and source ownership
+src/ARSVIN.Engine/AR.Iec61850/         IEC 61850, SCL, SV, MMS, capture, diagnostics, and protocol code
+src/ARSVIN.Engine/AR.Iec61850.Transports.Npcap/  Npcap transport implementation
+src/ARSVIN/                            Publisher application
+src/ARSVIN.Subscriber/                 ArSubsv subscriber and visualization companion
+tests/ARSVIN.Tests/                    Deterministic engine and publisher regression tests
+installer/                             Inno Setup definition for the Windows suite
+scripts/                               Repeatable release packaging and validation scripts
+docs/                                  Engineering, safety, and contributor documentation
+samples/                               SCL, COMTRADE, scenario, and evidence samples
+site/                                  Static, SEO-ready GitHub Pages product site
+.github/workflows/                     CI, CodeQL, Pages, and release automation
 ```
 
-The shared engine is compiled once as `ARSVIN.Engine`; its source files are still physically located under `src/ARSVIN/Engine` during the staged directory migration.
+The shared engine is compiled once as `ARSVIN.Engine`, and its source is physically owned by the same `src/ARSVIN.Engine` project used by Publisher, Subscriber, and Tests.
 
 ## Documentation
 
