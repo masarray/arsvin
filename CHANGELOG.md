@@ -4,7 +4,16 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ## Unreleased
 
-_No unreleased changes._
+### Added
+
+- Added a formal Sampled Values standards and evidence research gate covering authoritative source hierarchy, claim levels, OMICRON benchmark findings, licensed-standard gaps, and implementation acceptance rules.
+- Added a conformance and interoperability matrix separating verified, implemented-generic, provisional, unknown, and out-of-scope behavior for Layer-2 SV, 9-2LE-style workflows, IEC 61869-9, timing, scaling, redundancy, and product claims.
+- Added a safe Sampled Values evidence-intake guide for anonymized SCL/PCAP cases, real-device metadata, independent verification, minimum negative tests, and evidence quality levels.
+
+### Changed
+
+- Documentation now prevents unverified profile constants from being promoted directly into production support claims.
+- The SV roadmap now treats StationScout as a system-engineering workflow benchmark and DANEO 400 as the stronger benchmark for SCL-versus-wire verification, merging-unit analysis, timing statistics, orphan detection, triggered recording, and evidence reporting.
 
 ## 0.4.0 — 2026-07-12
 ### Added
