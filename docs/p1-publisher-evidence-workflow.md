@@ -7,7 +7,7 @@ ARSVIN remains an IEC 61850 Sampled Values publisher. P1 adds evidence features 
 - **Publisher evidence report**: exports a Markdown report containing the enabled publisher streams, SCL-derived identity, operator overrides, sample rate, publication rate, `nofASDU`, payload length, estimated bandwidth, quality mode, synchronization marking, and preflight findings.
 - **SCL validation evidence**: the report includes publisher-side SCL checks for APPID, destination MAC, svID, dataset, `confRev`, `smpRate`, `nofASDU`, and payload support.
 - **TX-side boundary statement**: the report explicitly states that it is publisher evidence only, not a capture analyzer and not conformance certification.
-- **Recommended external verification**: the report tells the operator to export generated PCAP and inspect it in Wireshark or an external process-bus tool.
+- **Recommended external verification**: the report tells the operator to export generated PCAP and inspect it with an independent packet dissector or process-bus analyzer.
 
 ## Intended usage
 
@@ -21,7 +21,7 @@ ARSVIN remains an IEC 61850 Sampled Values publisher. P1 adds evidence features 
 
 ## Scope boundary
 
-P1 does not add a subscriber, network scanner, GOOSE/SV analyzer, or StationScout-like live mismatch engine. The report is generated from ARSVIN's configured TX plan and validation results.
+P1 does not add a subscriber, network scanner, GOOSE/SV analyzer, or live configuration-versus-wire mismatch engine. The report is generated from ARSVIN's configured TX plan and validation results.
 
 ## Current limitations
 
