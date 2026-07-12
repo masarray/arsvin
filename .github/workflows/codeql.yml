@@ -34,8 +34,8 @@ jobs:
       - name: Restore solution
         run: dotnet restore ARSVIN.sln
 
-      - name: Build solution
-        run: dotnet build ARSVIN.sln -c Release --no-restore
+      - name: Build solution with warnings as errors
+        run: dotnet build ARSVIN.sln -c Release --no-restore -warnaserror
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4

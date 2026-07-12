@@ -4,17 +4,27 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ## Unreleased
 
+### Added
+
+- Added pinned Coverlet MSBuild instrumentation, TRX/Cobertura/log evidence upload, and a verified 50% line-coverage regression floor for the linked production engine surface.
+- Established a measured baseline of 57.85% line coverage across 1,535 instrumented production lines, with 888 lines covered and all 26 tests passing.
+- Added a repository-owned CycloneDX 1.5 SBOM generator for direct and transitive Publisher/Subscriber NuGet dependencies while excluding test-only packages.
+- Added `ARSVIN-SBOM.cdx.json` to validated workflow artifacts, release downloads, and SHA-256 checksums.
+- Added signed GitHub build-provenance and SBOM attestations for tagged release artifacts.
+
 ### Security
 
 - Pinned all GitHub Actions used by CI, CodeQL, Pages, and release workflows to immutable commit SHAs while retaining version comments for maintainability and Dependabot updates.
+- Pinned automated installer compilation to the exact Inno Setup 6.7.1 Chocolatey package and retain resolved compiler metadata in workflow evidence.
+- Treat compiler warnings as errors in validated Publisher, Subscriber, test, release, and CodeQL build paths.
+- Stabilized SBOM component ordering, source commit, and metadata timestamp for repeatable review from the same commit.
 
 ### Planned
 
-- Exact-version and integrity pinning for installer tooling.
 - Shared `ARSVIN.Engine` class library extraction.
-- Code coverage and analyzer quality gates.
+- Higher coverage thresholds and expanded protocol regression tests.
 - Search-indexable HTML engineering documentation.
-- SBOM and release provenance/attestation.
+- Windows Authenticode signing when a trusted certificate becomes available.
 
 ## 0.3.0 — 2026-07-11
 

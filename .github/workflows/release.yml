@@ -10,6 +10,7 @@ on:
       - '.github/workflows/release.yml'
       - 'installer/**'
       - 'scripts/publish-release.ps1'
+      - 'scripts/generate-sbom.ps1'
       - 'publish-win-x64.ps1'
       - 'build.ps1'
       - 'src/**'
@@ -35,6 +36,7 @@ concurrency:
 env:
   DOTNET_CLI_TELEMETRY_OPTOUT: '1'
   DOTNET_NOLOGO: '1'
+  INNO_SETUP_VERSION: '6.7.1'
 
 jobs:
   package:
@@ -106,7 +108,7 @@ jobs:
             throw "Tag ${{ github.ref_name }} does not point to a commit contained in main. Merge the release commit before tagging."
           }
 
-      - name: Build and test
+      - name: Build and test with warnings as errors
         shell: pwsh
         run: .\build.ps1
 
@@ -114,9 +116,22 @@ jobs:
         shell: pwsh
         run: .\scripts\publish-release.ps1 -Version '${{ steps.version.outputs.value }}' -SkipTests
 
-      - name: Install Inno Setup
+      - name: Install pinned Inno Setup
         shell: pwsh
-        run: choco install innosetup --no-progress -y
+        run: |
+          choco install innosetup --version=$env:INNO_SETUP_VERSION --allow-downgrade --no-progress -y
+          if ($LASTEXITCODE -ne 0) {
+            throw "Chocolatey could not install Inno Setup $env:INNO_SETUP_VERSION."
+          }
+
+          $installed = choco list --local-only --exact innosetup --limit-output
+          if ($LASTEXITCODE -ne 0) {
+            throw 'Could not query the installed Inno Setup package.'
+          }
+
+          if ($installed -notcontains "innosetup|$env:INNO_SETUP_VERSION") {
+            throw "Expected Inno Setup $env:INNO_SETUP_VERSION, found: $($installed -join ', ')"
+          }
 
       - name: Build Windows installer
         shell: pwsh
@@ -129,6 +144,12 @@ jobs:
           if (-not $iscc) {
             throw 'Inno Setup compiler (ISCC.exe) was not found.'
           }
+
+          $versionInfo = (Get-Item $iscc).VersionInfo
+          Write-Host "Validated Chocolatey package: innosetup|$env:INNO_SETUP_VERSION"
+          Write-Host "ISCC path: $iscc"
+          Write-Host "ISCC product version metadata: $($versionInfo.ProductVersion)"
+          Write-Host "ISCC file version metadata: $($versionInfo.FileVersion)"
 
           $sourceDir = (Resolve-Path '.\artifacts\installer-input').Path
           $outputDir = (Resolve-Path '.\artifacts\release').Path
@@ -144,6 +165,10 @@ jobs:
             throw "Inno Setup failed with exit code $LASTEXITCODE."
           }
 
+      - name: Generate CycloneDX SBOM
+        shell: pwsh
+        run: .\scripts\generate-sbom.ps1 -Version '${{ steps.version.outputs.value }}'
+
       - name: Validate release artifacts
         shell: pwsh
         run: |
@@ -152,7 +177,8 @@ jobs:
             'ARSVIN-Publisher-win-x64.exe',
             'ArSubsv-Subscriber-win-x64.exe',
             'ARSVIN-Suite-Setup-win-x64.exe',
-            'ARSVIN-win-x64-portable.zip'
+            'ARSVIN-win-x64-portable.zip',
+            'ARSVIN-SBOM.cdx.json'
           )
 
           foreach ($name in $expected) {
@@ -164,6 +190,14 @@ jobs:
             if ((Get-Item $path).Length -le 0) {
               throw "Release artifact is empty: $path"
             }
+          }
+
+          $sbom = Get-Content (Join-Path $releaseRoot 'ARSVIN-SBOM.cdx.json') -Raw | ConvertFrom-Json
+          if ($sbom.bomFormat -ne 'CycloneDX' -or $sbom.specVersion -ne '1.5') {
+            throw 'Generated SBOM is not CycloneDX 1.5.'
+          }
+          if (@($sbom.components).Count -lt 1) {
+            throw 'Generated SBOM contains no dependency components.'
           }
 
           Get-ChildItem $releaseRoot -File |
@@ -259,8 +293,8 @@ jobs:
             [System.Text.UTF8Encoding]::new($false)
           )
 
-          if ($lines.Count -ne 4) {
-            throw "Expected four checksummed release artifacts, found $($lines.Count)."
+          if ($lines.Count -ne 5) {
+            throw "Expected five checksummed release artifacts, found $($lines.Count)."
           }
 
           Get-Content (Join-Path $releaseRoot 'SHA256SUMS.txt')
@@ -272,6 +306,7 @@ jobs:
           path: |
             artifacts/release/*.exe
             artifacts/release/*.zip
+            artifacts/release/*.json
             artifacts/release/SHA256SUMS.txt
           if-no-files-found: error
           retention-days: 30
@@ -283,6 +318,9 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
 
     steps:
       - name: Download validated release artifact
@@ -290,6 +328,23 @@ jobs:
         with:
           name: ${{ needs.package.outputs.artifact_name }}
           path: artifacts/release
+
+      - name: Attest release build provenance
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
+        with:
+          subject-path: |
+            artifacts/release/*.exe
+            artifacts/release/*.zip
+            artifacts/release/*.json
+            artifacts/release/SHA256SUMS.txt
+
+      - name: Attest release SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4
+        with:
+          subject-path: |
+            artifacts/release/*.exe
+            artifacts/release/*.zip
+          sbom-path: artifacts/release/ARSVIN-SBOM.cdx.json
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
@@ -306,4 +361,5 @@ jobs:
             artifacts/release/ArSubsv-Subscriber-win-x64.exe
             artifacts/release/ARSVIN-Suite-Setup-win-x64.exe
             artifacts/release/ARSVIN-win-x64-portable.zip
+            artifacts/release/ARSVIN-SBOM.cdx.json
             artifacts/release/SHA256SUMS.txt

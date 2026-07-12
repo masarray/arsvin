@@ -73,7 +73,14 @@ Every tagged release builds validated Windows x64 artifacts with stable filename
 | `ArSubsv-Subscriber-win-x64.exe` | Self-contained, single-file portable Subscriber. |
 | `ARSVIN-Suite-Setup-win-x64.exe` | Installer containing both applications, Start Menu shortcuts, documentation, and uninstaller. |
 | `ARSVIN-win-x64-portable.zip` | Portable suite folder containing both applications and essential documentation. |
+| `ARSVIN-SBOM.cdx.json` | CycloneDX 1.5 software bill of materials for resolved NuGet dependencies. |
 | `SHA256SUMS.txt` | SHA-256 checksums for release verification. |
+
+Stable and prerelease tag builds publish signed GitHub artifact attestations for provenance. Verify a downloaded file with GitHub CLI:
+
+```powershell
+gh attestation verify .\ARSVIN-Suite-Setup-win-x64.exe --repo masarray/arsvin
+```
 
 The binaries are currently **unsigned**. Windows SmartScreen may show an unknown-publisher warning. Releases do not silently install Npcap; download Npcap from its official website when live capture or transmission is required.
 
@@ -121,7 +128,7 @@ For developers:
 - .NET 8 SDK.
 - PowerShell 7+ recommended.
 - Visual Studio 2022, JetBrains Rider, or VS Code with C# tooling.
-- Inno Setup 6 only when building the installer locally.
+- Inno Setup 6.7.1 when reproducing the automated installer build locally.
 
 ## Build from source
 
@@ -134,19 +141,27 @@ cd arsvin
 Build all release artifacts except the installer:
 
 ```powershell
-.\scripts\publish-release.ps1 -Version 0.1.0
+.\scripts\publish-release.ps1 -Version 0.3.0
 ```
 
 Compatibility wrapper:
 
 ```powershell
-.\publish-win-x64.ps1 -Version 0.1.0
+.\publish-win-x64.ps1 -Version 0.3.0
 ```
 
-Run tests directly:
+Run tests with the repository coverage gate and retain TRX/Cobertura evidence:
 
 ```powershell
-dotnet test .\tests\ARSVIN.Tests\ARSVIN.Tests.csproj -c Release
+.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50
+```
+
+The current linked engine surface measures 57.85% line coverage across 1,535 instrumented production lines. CI enforces a 50% regression floor while the shared engine project and broader protocol tests are developed.
+
+Generate a CycloneDX SBOM after restoring the solution:
+
+```powershell
+.\scripts\generate-sbom.ps1 -Version 0.3.0
 ```
 
 ## Repository structure
@@ -156,7 +171,7 @@ src/ARSVIN/                    Publisher application and SV generation engine
 src/ARSVIN.Subscriber/         ArSubsv subscriber and visualization companion
 tests/ARSVIN.Tests/            Protocol and publisher helper tests
 installer/                     Inno Setup definition for the Windows suite
-scripts/                       Repeatable release packaging scripts
+scripts/                       Repeatable release packaging and validation scripts
 docs/                          Engineering, safety, and contributor documentation
 samples/                       SCL, COMTRADE, scenario, and evidence samples
 site/                          Static, SEO-ready GitHub Pages product site
