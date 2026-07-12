@@ -23,9 +23,12 @@ jobs:
         with:
           dotnet-version: 8.0.4xx
 
+      - name: Build public site and HTML documentation
+        run: python scripts/build-public-site.py --output artifacts/public-site
+
       - name: Validate public site
         shell: pwsh
-        run: .\scripts\validate-public-site.ps1
+        run: .\scripts\validate-public-site.ps1 -SiteRoot artifacts/public-site
 
       - name: Restore Publisher
         run: dotnet restore src/ARSVIN/ARSVIN.csproj
