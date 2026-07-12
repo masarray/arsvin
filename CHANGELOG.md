@@ -6,11 +6,18 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ### Added
 
-- Added pinned Coverlet MSBuild instrumentation, TRX/Cobertura/log evidence upload, and a verified 50% line-coverage regression floor for the linked production engine surface.
+- Added pinned Coverlet MSBuild instrumentation, TRX/Cobertura/log evidence upload, and a verified 50% line-coverage regression floor for the production IEC 61850 engine.
 - Established a measured baseline of 57.85% line coverage across 1,535 instrumented production lines, with 888 lines covered and all 26 tests passing.
 - Added a repository-owned CycloneDX 1.5 SBOM generator for direct and transitive Publisher/Subscriber NuGet dependencies while excluding test-only packages.
 - Added `ARSVIN-SBOM.cdx.json` to validated workflow artifacts, release downloads, and SHA-256 checksums.
 - Added signed GitHub build-provenance and SBOM attestations for tagged release artifacts.
+- Added the shared `ARSVIN.Engine` class library as the single compiled IEC 61850 protocol implementation used by Publisher, Subscriber, and Tests.
+
+### Changed
+
+- Publisher and Subscriber now reference one engine assembly instead of compiling duplicate copies of the protocol source.
+- Protocol tests now exercise the same `ARSVIN.Engine` assembly shipped with both applications.
+- Coverage instrumentation now targets `ARSVIN.Engine` directly.
 
 ### Security
 
@@ -21,7 +28,7 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ### Planned
 
-- Shared `ARSVIN.Engine` class library extraction.
+- Move the engine source directory physically under `src/ARSVIN.Engine` after the shared-assembly transition has proven stable.
 - Higher coverage thresholds and expanded protocol regression tests.
 - Search-indexable HTML engineering documentation.
 - Windows Authenticode signing when a trusted certificate becomes available.
