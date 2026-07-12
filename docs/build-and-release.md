@@ -1,6 +1,6 @@
 # Build and Release
 
-ARSVIN uses a tag-driven GitHub Actions workflow to build two self-contained portable applications, one suite installer, one portable ZIP, and SHA-256 checksums.
+ARSVIN uses a tag-driven GitHub Actions workflow to build two self-contained portable applications, one suite installer, one portable ZIP, a CycloneDX software bill of materials, SHA-256 checksums, and signed GitHub artifact attestations.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ For local source builds:
 For local installer builds:
 
 - All requirements above
-- Inno Setup 6
+- Inno Setup 6.7.1
 
 Npcap is required only for live capture/transmission testing. It is not silently bundled or installed by the ARSVIN release process.
 
@@ -29,7 +29,23 @@ The script restores, builds, and tests:
 - `src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj`
 - `tests/ARSVIN.Tests/ARSVIN.Tests.csproj`
 
-External command exit codes are checked, so CI and local builds stop immediately when a `dotnet` command fails.
+External command exit codes are checked, and compiler warnings are treated as errors for the validated build path.
+
+### Coverage evidence
+
+```powershell
+.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 20
+```
+
+The script:
+
+1. runs the xUnit suite with the pinned Coverlet collector,
+2. writes TRX evidence under `artifacts/test-results`,
+3. normalizes the Cobertura report to `artifacts/test-results/coverage.cobertura.xml`,
+4. reads the root line-rate value,
+5. fails when line coverage is below the configured threshold.
+
+The initial gate is 20%. It is a regression floor, not a claim that the complete WPF application surface is covered. Raise the threshold as engine tests are expanded.
 
 ## Validate the public site
 
@@ -70,6 +86,22 @@ artifacts/installer-input/
 
 The two direct `.exe` files are self-contained .NET 8 single-file applications. The ZIP includes both applications, essential documentation, license notices, and sample files.
 
+## Generate the CycloneDX SBOM
+
+After restoring the solution, run:
+
+```powershell
+.\scripts\generate-sbom.ps1 -Version 0.3.0
+```
+
+Output:
+
+```text
+artifacts/release/ARSVIN-SBOM.cdx.json
+```
+
+The generator reads the complete resolved NuGet graph for `ARSVIN.sln`, deduplicates direct and transitive packages, and writes CycloneDX 1.5 JSON. The SBOM covers managed application dependencies. It does not claim to inventory Windows, Npcap, GitHub-hosted runner contents, or every tool used by the build service.
+
 ## Build the installer locally
 
 After running the publish script:
@@ -93,6 +125,8 @@ Output:
 artifacts/release/ARSVIN-Suite-Setup-win-x64.exe
 ```
 
+The automated workflow installs and verifies the exact Chocolatey package version declared in `INNO_SETUP_VERSION`. It also checks the `ISCC.exe` product version before compiling.
+
 The installer:
 
 - installs per-user under `%LOCALAPPDATA%\Programs\ARSVIN`,
@@ -112,17 +146,19 @@ Workflow: `.github/workflows/release.yml`
 
 When release tooling, installer definitions, project files, or build configuration change, the workflow runs on the pull request and:
 
-1. restores, builds, and tests the solution,
+1. restores, builds, and tests the solution with warnings treated as errors,
 2. publishes both portable single-file applications,
 3. creates the portable suite ZIP,
-4. compiles the Inno Setup installer,
-5. checks all expected artifact names and non-empty files,
-6. silently installs the suite into a temporary directory,
-7. verifies Publisher, Subscriber, documentation, version file, and uninstaller,
-8. silently uninstalls the temporary installation,
-9. generates checksums and uploads a private workflow artifact.
+4. installs the pinned Inno Setup version,
+5. compiles the installer,
+6. generates and structurally validates the CycloneDX SBOM,
+7. checks all expected artifact names and non-empty files,
+8. silently installs the suite into a temporary directory,
+9. verifies Publisher, Subscriber, documentation, version file, and uninstaller,
+10. silently uninstalls the temporary installation,
+11. generates checksums and uploads a private workflow artifact.
 
-A pull-request run never creates a public GitHub Release.
+A pull-request run never creates a public GitHub Release or public attestation.
 
 ### Stable tagged release
 
@@ -135,7 +171,7 @@ git tag -a v0.4.0 -m "ARSVIN v0.4.0"
 git push origin v0.4.0
 ```
 
-The workflow repeats the validated packaging path, downloads the validated workflow artifact in a separate least-privilege release job, and publishes all public files to GitHub Releases. Stable tags are eligible to become the repository's latest release.
+The workflow repeats the validated packaging path, downloads the validated workflow artifact in a separate least-privilege release job, creates signed provenance and SBOM attestations, and publishes all public files to GitHub Releases. Stable tags are eligible to become the repository's latest release.
 
 ### Prerelease tag
 
@@ -164,15 +200,26 @@ Manual runs upload private workflow artifacts only. They never create or replace
 | `ArSubsv-Subscriber-win-x64.exe` | Portable Subscriber/analysis companion. |
 | `ARSVIN-Suite-Setup-win-x64.exe` | Installer for both applications. |
 | `ARSVIN-win-x64-portable.zip` | Portable suite package. |
+| `ARSVIN-SBOM.cdx.json` | CycloneDX 1.5 managed-dependency SBOM. |
 | `SHA256SUMS.txt` | Integrity hashes for all release assets. |
 
 ## Verify a download
+
+Verify the local hash:
 
 ```powershell
 Get-FileHash .\ARSVIN-Suite-Setup-win-x64.exe -Algorithm SHA256
 ```
 
 Compare the result with `SHA256SUMS.txt` from the same GitHub Release.
+
+Verify signed GitHub build provenance:
+
+```powershell
+gh attestation verify .\ARSVIN-Suite-Setup-win-x64.exe --repo masarray/arsvin
+```
+
+GitHub artifact attestations use a short-lived signing identity issued during the tagged workflow. This validates repository/workflow provenance; it is separate from Windows Authenticode signing.
 
 ## Code signing status
 
@@ -187,6 +234,7 @@ Before tagging a public release:
 - Confirm the intended release commit is already on `main`.
 - Confirm `main` CI, release validation, and CodeQL are green.
 - Update `VersionPrefix` and `CHANGELOG.md`.
+- Review the generated SBOM and checksums.
 - Test Publisher dry run.
 - Test live publishing only on an isolated lab link.
 - Test Subscriber live capture and PCAP import.
