@@ -1,6 +1,6 @@
 # Sampled Values Standards and Evidence Research Gate
 
-This document defines the evidence required before ARSVIN labels an IEC 61850 Sampled Values profile as supported. It intentionally separates verified standards requirements, vendor documentation, observed traffic, engineering inference, and product ideas.
+This document defines the evidence required before ARSVIN labels an IEC 61850 Sampled Values profile as supported. It intentionally separates verified standards requirements, manufacturer documentation, observed traffic, engineering inference, and product ideas.
 
 ARSVIN is an open engineering tool. It is not an accredited conformance test system, calibrated merging unit, deterministic real-time platform, or substitute for licensed standards.
 
@@ -13,11 +13,11 @@ Sampled Values interoperability cannot be established from a sample rate or payl
 - the SCL model and dataset,
 - profile-specific instrument-transformer requirements,
 - synchronization and timing behavior,
-- the actual wire traffic,
+- actual wire traffic,
 - publisher and subscriber behavior,
-- and evidence from real devices.
+- evidence from real devices.
 
-No profile-specific constant should be added to the production catalog merely because it is common in articles, vendor screenshots, or engineering memory.
+No profile-specific constant should be added to the production catalog merely because it is common in articles, screenshots, or engineering memory.
 
 ## Source hierarchy
 
@@ -29,7 +29,7 @@ Use sources in this order:
 4. Official manufacturer documentation.
 5. Anonymized SCL and PCAP evidence from real merging units and subscribers.
 6. Byte-exact interoperability tests with real devices.
-7. Independent reference implementations and Wireshark as supporting evidence only.
+7. Independent reference implementations and packet-analysis tools as supporting evidence only.
 8. Engineering inference, clearly marked provisional.
 
 A lower-level source must not override a higher-level source.
@@ -51,40 +51,34 @@ IEC 61869-9 must be reviewed from a licensed current copy before ARSVIN freezes 
 
 Public catalogue metadata is sufficient to establish which documents must be reviewed. It is not sufficient to implement clause-level behavior.
 
-## OMICRON benchmark findings
+## Engineering workflow benchmark outcomes
 
-### StationScout benchmark
+ARSVIN uses generic engineering outcomes as product targets without naming, copying, or implying compatibility with proprietary tools.
 
-StationScout is a benchmark for system-level engineering workflow rather than the primary reference for SV byte-level implementation. The official material emphasizes:
+### System engineering outcomes
 
 - automatic visualization of SCL-based system structure,
-- a clear status overview,
+- clear configured and observed status,
 - signal tracing,
-- comparison of configured and live system behavior,
-- simulation of unavailable IEDs,
+- configuration-versus-wire comparison,
+- simulation-friendly test preparation,
 - reusable test cases,
 - automated assessments,
-- and documented results.
+- documented results.
 
-ARSVIN should adopt the workflow principles, not copy the product UI or make unsupported feature claims.
+### Sampled Values analysis outcomes
 
-### DANEO 400 benchmark
-
-DANEO 400 is the stronger functional benchmark for ARSVIN Subscriber and merging-unit analysis. Official material describes:
-
-- SCL-based verification that expected GOOSE and Sampled Values are present,
-- side-by-side visibility of configuration versus observed traffic,
-- orphan stream detection,
-- PRP and HSR redundancy comparison,
-- merging-unit stream-parameter verification,
-- comparison of conventional input waveforms against SV output,
-- packet interval and packet delay statistics,
-- detection of dropped samples, synchronization issues, quality problems, and traffic abnormalities,
+- SCL-based verification that expected Sampled Values streams are present,
+- side-by-side configuration and observed traffic,
+- orphan and missing-stream detection,
+- stream-parameter verification,
+- packet interval and delay statistics with explicit limitations,
+- dropped-sample, synchronization, quality, and traffic anomaly detection,
 - trigger-based recording,
 - time-aligned analysis,
-- and report generation.
+- repeatable evidence reports.
 
-These capabilities define useful product outcomes, but they do not define protocol constants.
+These outcomes guide product design. They do not define protocol constants and do not justify a standards-compliance claim.
 
 ## Product claim levels
 
@@ -114,7 +108,7 @@ Research goals:
 - verify nominal-frequency-dependent behavior,
 - verify quality and synchronization fields,
 - collect representative SCL and PCAP fixtures,
-- and document vendor variations.
+- document implementation variations.
 
 Until the guideline and real evidence are reviewed, ARSVIN must retain the wording `9-2LE-style` rather than claim universal 9-2LE conformance.
 
@@ -126,27 +120,42 @@ Research goals:
 - record every preferred variant relevant to protection and measurement,
 - verify configurable dataset expectations,
 - verify sampling basis and rate semantics,
-- verify nofASDU expectations,
+- verify `nofASDU` expectations,
 - verify scaling and unit rules,
 - verify counter behavior,
 - verify synchronization requirements,
-- and validate against current merging-unit captures.
+- validate against current merging-unit captures.
 
-No rate, nofASDU value, scaling constant, or dataset shape is considered normative until entered in the evidence matrix with a clause reference.
+No rate, `nofASDU` value, scaling constant, or dataset shape is considered normative until entered in the evidence matrix with a clause reference.
 
 ### Track C — Generic SCL-driven Layer-2 SV
 
-The engine already supports a broader set of SCL-derived payload types than the current fixed 4I+4V workflow. Research must determine:
+The engine supports a broader set of SCL-derived payload types than the current fixed 4I+4V workflow. Research must determine:
 
 - which bTypes are valid and useful in SV datasets,
 - how nested data attributes are flattened and ordered,
 - whether each width and representation is correct,
-- how unknown or vendor-specific fields are preserved,
-- and when compatible decoding is safe without claiming a known profile.
+- how unknown or implementation-specific fields are preserved,
+- when compatible decoding is safe without claiming a known profile.
 
 ### Track D — Routable SV
 
 Routable SV is a separate architectural program. It requires separate review of transport, session, security, routing, synchronization, and test requirements. It must not be mixed into the current Layer-2 profile expansion.
+
+## Profile infrastructure now implemented
+
+The shared engine now includes a standards-neutral foundation:
+
+- `SvFrameObservation` for transport-independent frame facts,
+- `SvObservationAccumulator` for stable-field checks, frame/sample-rate estimation, and observed counter-wrap detection,
+- `SvProfileDefinition` with evidence status and source metadata,
+- `SvProfileDetector` with weighted, explainable match/conflict/unknown outcomes,
+- `SvConfigurationComparer` with strict and compatible configuration-versus-wire findings,
+- a built-in generic Layer-2 fallback without unverified profile constants.
+
+The infrastructure is intentionally independent of WPF and Npcap. Unknown or conflicting traffic remains observable; comparison results do not stop capture or decoding.
+
+No specific 9-2LE or IEC 61869-9 numeric definition is built into the production catalog yet.
 
 ## Required evidence package per profile
 
@@ -174,7 +183,7 @@ Real-device evidence may remain private when licensing or confidentiality requir
 A requirement may enter production only when:
 
 1. Its source and edition are identified.
-2. The relevant clause or official vendor section is recorded without copying protected standard text.
+2. The relevant clause or official manufacturer section is recorded without copying protected standard text.
 3. Its normative strength is classified as required, recommended, optional, or engineering convention.
 4. A deterministic automated test protects the behavior where technically possible.
 5. Conflicting evidence is documented instead of silently resolved.
@@ -182,24 +191,17 @@ A requirement may enter production only when:
 7. Unknown traffic remains observable and does not block capture.
 8. Live transmission is blocked when a verified critical requirement fails.
 
-## Immediate implementation order after the gate
+## Immediate implementation order
 
-1. Add source and evidence models; do not add unverified constants.
-2. Add observed-stream facts and confidence-based detection infrastructure.
-3. Formalize the current 9-2LE-style workflow using reviewed evidence.
-4. Add configuration-versus-wire mismatch reporting.
-5. Add scaling provenance and raw-value visibility.
+1. Integrate parsed live and PCAP frames with the observation accumulator.
+2. Convert SCL bindings into expected stream configuration.
+3. Expose compact profile confidence and mismatch findings in Subscriber.
+4. Add scaling provenance and raw-value visibility.
+5. Formalize the current 9-2LE-style workflow using reviewed evidence.
 6. Add IEC 61869-9 variants only after licensed clause review.
 7. Add high-rate performance work after functional fixtures pass.
 8. Add real-device interoperability evidence before public support claims.
 
-## Official public references
+## Public reference boundary
 
-- IEC 61850 series catalogue: https://webstore.iec.ch/en/publication/6028
-- OMICRON StationScout: https://www.omicronenergy.com/en/products/stationscout/
-- OMICRON StationScout brochure: https://www.omicronenergy.com/download/document/A73FDBE4-EFBB-4673-A765-E58195B69D2B/
-- OMICRON DANEO 400: https://www.omicronenergy.com/en/products/daneo-400/
-- OMICRON DANEO 400 brochure: https://www.omicronenergy.com/download/document/8C945CAA-C82D-4EFE-A1D8-BE6A52691FE6/
-- OMICRON IEC 61850 thematic introduction: https://www.omicronenergy.com/download/document/918A983B-DD8B-43AE-938A-168E40ECB8C1/
-
-These links support public product and catalogue research. They do not replace licensed standards.
+Public repository documentation may cite standards publications, implementation guidelines, and generic evidence categories. Proprietary product names and comparative product marketing are intentionally excluded from ARSVIN documentation. Internal research notes may retain source attribution outside the public repository when needed for traceability.
