@@ -21,7 +21,14 @@ New-Item -ItemType Directory -Path $resultsRoot -Force | Out-Null
 $arguments = @(
     'test',
     $testProject,
-    '-c', 'Release',
+    '-c', 'Release'
+)
+
+if ($NoRestore) {
+    $arguments += '--no-restore'
+}
+
+$arguments += @(
     '--logger', 'trx;LogFileName=ARSVIN.Tests.trx',
     '--results-directory', $resultsRoot,
     '--collect', 'XPlat Code Coverage',
@@ -29,10 +36,6 @@ $arguments = @(
     'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura',
     'DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.ExcludeByFile=**/*.g.cs,**/*.g.i.cs,**/obj/**'
 )
-
-if ($NoRestore) {
-    $arguments = @('test', $testProject, '-c', 'Release', '--no-restore') + $arguments[5..($arguments.Count - 1)]
-}
 
 & dotnet @arguments
 if ($LASTEXITCODE -ne 0) {
