@@ -108,16 +108,45 @@ public sealed record SvProfileDefinition
             throw new InvalidOperationException("SV profile definition requires a stable ID.");
         if (string.IsNullOrWhiteSpace(DisplayName))
             throw new InvalidOperationException($"SV profile '{Id}' requires a display name.");
+        if (Sources.Count == 0)
+            throw new InvalidOperationException($"SV profile '{Id}' requires at least one evidence source.");
+        if (Sources.Any(source => string.IsNullOrWhiteSpace(source.SourceId) || string.IsNullOrWhiteSpace(source.Description)))
+            throw new InvalidOperationException($"SV profile '{Id}' contains incomplete evidence-source metadata.");
         if (RateTolerancePercent < 0 || RateTolerancePercent > 100)
             throw new InvalidOperationException($"SV profile '{Id}' has an invalid rate tolerance.");
         if (AllowedAsduPerFrame.Any(value => value <= 0))
             throw new InvalidOperationException($"SV profile '{Id}' contains an invalid ASDU-per-frame value.");
+        if (AllowedAsduPerFrame.Count != AllowedAsduPerFrame.Distinct().Count())
+            throw new InvalidOperationException($"SV profile '{Id}' contains duplicate ASDU-per-frame values.");
         if (ExpectedPayloadBytesPerAsdu is <= 0)
             throw new InvalidOperationException($"SV profile '{Id}' contains an invalid payload length.");
         if (ExpectedDataSetElementCount is < 0)
             throw new InvalidOperationException($"SV profile '{Id}' contains an invalid dataset element count.");
+        if (ExpectedDataSetElementCount.HasValue &&
+            ExpectedDataSetSignature.Count > 0 &&
+            ExpectedDataSetElementCount.Value != ExpectedDataSetSignature.Count)
+        {
+            throw new InvalidOperationException($"SV profile '{Id}' dataset count does not match its ordered signature.");
+        }
         if (ExpectedCounterWrap is <= 1)
             throw new InvalidOperationException($"SV profile '{Id}' contains an invalid sample-counter wrap.");
+        if (AllowedNominalFrequenciesHz.Any(value => value <= 0 || double.IsNaN(value) || double.IsInfinity(value)))
+            throw new InvalidOperationException($"SV profile '{Id}' contains an invalid nominal frequency.");
+        if (ExpectedSamplesPerCycle is <= 0 || ExpectedSamplesPerSecond is <= 0)
+            throw new InvalidOperationException($"SV profile '{Id}' contains an invalid sampling expectation.");
+        if (ExpectedSamplesPerCycle.HasValue && ExpectedSamplesPerSecond.HasValue)
+            throw new InvalidOperationException($"SV profile '{Id}' cannot define both samples-per-cycle and samples-per-second expectations.");
+
+        switch (SamplingBasis)
+        {
+            case SvSamplingBasis.SamplesPerCycle when !ExpectedSamplesPerCycle.HasValue:
+                throw new InvalidOperationException($"SV profile '{Id}' requires a samples-per-cycle expectation.");
+            case SvSamplingBasis.SamplesPerSecond when !ExpectedSamplesPerSecond.HasValue:
+                throw new InvalidOperationException($"SV profile '{Id}' requires a samples-per-second expectation.");
+            case SvSamplingBasis.SamplesPerCycle when ExpectedSamplesPerSecond.HasValue:
+            case SvSamplingBasis.SamplesPerSecond when ExpectedSamplesPerCycle.HasValue:
+                throw new InvalidOperationException($"SV profile '{Id}' sampling expectation conflicts with its sampling basis.");
+        }
     }
 }
 
