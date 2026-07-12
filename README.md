@@ -62,6 +62,23 @@ The tools are intentionally separated. Publisher evidence proves what the PC gen
 - `smpCnt` continuity and stream-health diagnostics.
 - Decoded instantaneous values, oscilloscope waveform, phasor, and RMS views.
 - Receiver-side Markdown evidence reports.
+- Shared-engine foundation for evidence-aware profile classification and configuration-versus-wire comparison; live UI integration remains a following milestone.
+
+## Profile intelligence foundation
+
+The shared engine now separates:
+
+```text
+Observed wire facts
+Configured SCL expectations
+Evidence-backed profile definitions
+Explainable profile confidence
+Strict or compatible mismatch findings
+```
+
+Sparse evidence cannot produce a false `Confirmed` result. Unknown or conflicting receive traffic remains observable, and the built-in catalog contains only a generic SCL-driven Layer-2 fallback until named-profile requirements are verified.
+
+See [SV Profile Infrastructure](docs/sv-profile-infrastructure.md) and [SV Standards and Evidence Research Gate](docs/sv-research-gate.md).
 
 ## Release downloads
 
@@ -108,9 +125,11 @@ See [Quick Start](docs/quick-start.md) and [Build and Release](docs/build-and-re
 
 | Area | Current status | Boundary |
 |---|---|---|
-| IEC 61850 Sampled Values APDU | Publisher and subscriber implementation for engineering/lab use | Not certified conformance testing. |
-| IEC 61850-9-2LE-style 4I+4V | Supported lab profile | Validate formal requirements independently. |
-| `nofASDU` | `1`, `2`, `4`, `8` | Publisher and receiver behavior is software/PC timing dependent. |
+| IEC 61850 Sampled Values APDU | Publisher and Subscriber implementation for engineering/lab use | Not certified conformance testing. |
+| IEC 61850-9-2LE-style 4I+4V | Implemented laboratory workflow | Formal profile verification and broader device evidence remain pending. |
+| Generic SCL-driven Layer-2 SV | Dataset-aware engine foundation | Unknown layouts remain visible; unsupported payload elements are diagnosed. |
+| Evidence-aware profile detection | Engine infrastructure implemented | Named-profile definitions await verified source and device evidence. |
+| `nofASDU` | UI workflows emphasize `1`, `2`, `4`, `8` | Publisher and receiver behavior is software/PC timing dependent. |
 | COMTRADE | ASCII, BINARY, BINARY32, FLOAT32 analog replay | Verify scaling and channel mapping before live TX. |
 | PTP / `smpSynch` | Compatibility and lab behavior | Not an IEC 61850-9-3 certified clock. |
 | Windows timing | Best-effort scheduling with visible health metrics | Not deterministic real-time execution. |
@@ -123,7 +142,7 @@ For users:
 - Windows 10 or Windows 11, x64.
 - Npcap for live capture or transmission.
 - Administrator permission when required by the local Npcap/network configuration.
-- Wireshark or another independent packet tool is recommended for verification.
+- An independent packet dissector or process-bus analyzer is recommended for verification.
 
 For developers:
 
@@ -145,27 +164,27 @@ NuGet versions are centrally managed and committed `packages.lock.json` files lo
 Build all release artifacts except the installer:
 
 ```powershell
-.\scripts\publish-release.ps1 -Version 0.3.1
+.\scripts\publish-release.ps1 -Version 0.4.0
 ```
 
 Compatibility wrapper:
 
 ```powershell
-.\publish-win-x64.ps1 -Version 0.3.1
+.\publish-win-x64.ps1 -Version 0.4.0
 ```
 
 Run tests with both repository coverage gates and retain TRX/Cobertura evidence:
 
 ```powershell
-.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 10.5 -MinimumLineCoverage 60
+.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 13 -MinimumLineCoverage 70
 ```
 
-The current suite contains 54 deterministic tests. The complete shared `ARSVIN.Engine` baseline measures 10.74% line coverage across 15,742 instrumented production lines, with 1,691 covered lines. The protocol-core regression surface measures 64.97% across 1,550 lines, with 1,007 covered lines. CI enforces floors of 10.5% for the whole engine and 60% for protocol core.
+The current suite contains 74 deterministic tests. The complete shared `ARSVIN.Engine` baseline measures 13.35% line coverage across 16,312 instrumented production lines, with 2,178 covered lines. The protocol-core regression surface measures 70.47% across 2,120 lines, with 1,494 covered lines. CI enforces floors of 13% for the whole engine and 70% for protocol core.
 
 Generate a CycloneDX SBOM after restoring the solution:
 
 ```powershell
-.\scripts\generate-sbom.ps1 -Version 0.3.1
+.\scripts\generate-sbom.ps1 -Version 0.4.0
 ```
 
 ## Repository structure
@@ -173,6 +192,7 @@ Generate a CycloneDX SBOM after restoring the solution:
 ```text
 src/ARSVIN.Engine/                     Shared production engine project and source ownership
 src/ARSVIN.Engine/AR.Iec61850/         IEC 61850, SCL, SV, MMS, capture, diagnostics, and protocol code
+src/ARSVIN.Engine/AR.Iec61850/SampledValues/Profiles/  Profile observation, detection, and comparison engine
 src/ARSVIN.Engine/AR.Iec61850.Transports.Npcap/  Npcap transport implementation
 src/ARSVIN/                            Publisher application
 src/ARSVIN.Subscriber/                 ArSubsv subscriber and visualization companion
@@ -191,6 +211,10 @@ The shared engine is compiled once as `ARSVIN.Engine`, and its source is physica
 
 - [Documentation index](docs/index.md)
 - [Quick start](docs/quick-start.md)
+- [SV standards and evidence research gate](docs/sv-research-gate.md)
+- [SV conformance and interoperability matrix](docs/sv-evidence-matrix.md)
+- [SV profile infrastructure](docs/sv-profile-infrastructure.md)
+- [Profile detection output contract](docs/profile-detection-output.md)
 - [Subscriber verification app](docs/subscriber-verification-app.md)
 - [ArSubsv SV scout companion](docs/arsubsv-sv-scout-companion.md)
 - [SV profile support](docs/sv-profile-support.md)
