@@ -111,6 +111,7 @@
       <a href="#products">Products</a>
       <a href="#screenshots">Screenshots</a>
       <a href="#capabilities">Capabilities</a>
+      <a href="docs/">Docs</a>
       <a href="#downloads">Downloads</a>
       <a href="#safety">Safety</a>
     </nav>
@@ -128,7 +129,7 @@
         <div class="actions">
           <a class="button primary" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Suite-Setup-win-x64.exe">Download installer</a>
           <a class="button" href="https://github.com/masarray/arsvin/releases/latest">All release files</a>
-          <a class="text-link" href="https://github.com/masarray/arsvin/blob/main/docs/quick-start.md">Read quick start →</a>
+          <a class="text-link" href="docs/quick-start/">Read quick start →</a>
         </div>
 
         <div class="trust-row" aria-label="Project facts">
@@ -224,42 +225,61 @@
       </div>
     </section>
 
-    <section id="downloads" class="section section-soft">
+    <section id="documentation" class="section section-soft">
       <div class="shell">
         <div class="section-heading">
-          <p class="eyebrow">Windows release options</p>
-          <h2>Installer or direct portable applications.</h2>
-          <p>All public release files use stable names so the latest download links remain predictable.</p>
+          <p class="eyebrow">Search-indexable engineering documentation</p>
+          <h2>Understand the workflow before sending a frame.</h2>
+          <p>Every repository guide is published as a dedicated HTML page with canonical metadata, structured data, internal navigation, and sitemap discovery.</p>
         </div>
 
-        <div class="download-list">
-          <a class="download-item featured" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Suite-Setup-win-x64.exe">
-            <span class="file-type">EXE</span>
-            <span><strong>ARSVIN Suite Installer</strong><small>Publisher + Subscriber + shortcuts + uninstaller</small></span>
-            <span class="download-action">Download</span>
-          </a>
-
-          <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Publisher-win-x64.exe">
-            <span class="file-type">EXE</span>
-            <span><strong>Publisher Portable</strong><small>Self-contained single-file application</small></span>
-            <span class="download-action">Download</span>
-          </a>
-
-          <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ArSubsv-Subscriber-win-x64.exe">
-            <span class="file-type">EXE</span>
-            <span><strong>Subscriber Portable</strong><small>Self-contained single-file application</small></span>
-            <span class="download-action">Download</span>
-          </a>
-
-          <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-win-x64-portable.zip">
-            <span class="file-type">ZIP</span>
-            <span><strong>Portable Suite</strong><small>Both applications, docs, notices, and samples</small></span>
-            <span class="download-action">Download</span>
-          </a>
+        <div class="capability-grid">
+          <article><span>01</span><h3><a href="docs/quick-start/">Quick Start</a></h3><p>Install the suite, select Publisher or Subscriber, and begin with an authorized dry-run or isolated link.</p></article>
+          <article><span>02</span><h3><a href="docs/sv-profile-support/">SV Profile Support</a></h3><p>Review current Sampled Values profile support, packing behavior, and explicit technical boundaries.</p></article>
+          <article><span>03</span><h3><a href="docs/comtrade-replay/">COMTRADE Replay</a></h3><p>Map analog records into repeatable Sampled Values publishing scenarios with documented scaling assumptions.</p></article>
+          <article><span>04</span><h3><a href="docs/subscriber-verification-app/">Subscriber Verification</a></h3><p>Inspect live or recorded streams, continuity, decoded values, waveform, phasor, RMS, and receiver evidence.</p></article>
         </div>
 
-        <p class="download-note">Current binaries are unsigned and may trigger a Windows SmartScreen warning. Npcap is not bundled; install it separately from the official Npcap website for live network features. Verify downloads with <a href="https://github.com/masarray/arsvin/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>.</p>
+        <div class="actions">
+          <a class="button" href="docs/">Browse all engineering documentation</a>
+        </div>
       </div>
+    </section>
+
+    <section id="downloads" class="section shell">
+      <div class="section-heading">
+        <p class="eyebrow">Windows release options</p>
+        <h2>Installer or direct portable applications.</h2>
+        <p>All public release files use stable names so the latest download links remain predictable.</p>
+      </div>
+
+      <div class="download-list">
+        <a class="download-item featured" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Suite-Setup-win-x64.exe">
+          <span class="file-type">EXE</span>
+          <span><strong>ARSVIN Suite Installer</strong><small>Publisher + Subscriber + shortcuts + uninstaller</small></span>
+          <span class="download-action">Download</span>
+        </a>
+
+        <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Publisher-win-x64.exe">
+          <span class="file-type">EXE</span>
+          <span><strong>Publisher Portable</strong><small>Self-contained single-file application</small></span>
+          <span class="download-action">Download</span>
+        </a>
+
+        <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ArSubsv-Subscriber-win-x64.exe">
+          <span class="file-type">EXE</span>
+          <span><strong>Subscriber Portable</strong><small>Self-contained single-file application</small></span>
+          <span class="download-action">Download</span>
+        </a>
+
+        <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-win-x64-portable.zip">
+          <span class="file-type">ZIP</span>
+          <span><strong>Portable Suite</strong><small>Both applications, docs, notices, and samples</small></span>
+          <span class="download-action">Download</span>
+        </a>
+      </div>
+
+      <p class="download-note">Current binaries are unsigned and may trigger a Windows SmartScreen warning. Npcap is not bundled; install it separately from the official Npcap website for live network features. Verify downloads with <a href="https://github.com/masarray/arsvin/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a>.</p>
     </section>
 
     <section id="safety" class="section safety-section">
@@ -271,7 +291,7 @@
         <div class="safety-copy">
           <p>ARSVIN can transmit and capture raw Ethernet frames. Use isolated networks, point-to-point links, or networks where you have explicit authorization.</p>
           <p>It is not a certified protection test set, calibrated merging unit, deterministic real-time platform, production process-bus monitor, or IEC 61850 conformance tool.</p>
-          <a class="text-link light" href="https://github.com/masarray/arsvin/blob/main/docs/safety-boundaries.md">Read safety boundaries →</a>
+          <a class="text-link light" href="docs/safety-boundaries/">Read safety boundaries →</a>
         </div>
       </div>
     </section>
@@ -319,7 +339,7 @@
       <span>ARSVIN · Apache-2.0 · © 2026 Ari Sulistiono</span>
       <nav aria-label="Footer navigation">
         <a href="https://github.com/masarray/arsvin">Source</a>
-        <a href="https://github.com/masarray/arsvin/tree/main/docs">Docs</a>
+        <a href="docs/">Docs</a>
         <a href="https://github.com/masarray/arsvin/issues">Issues</a>
         <a href="https://github.com/masarray/arsvin/blob/main/LICENSE">License</a>
       </nav>
