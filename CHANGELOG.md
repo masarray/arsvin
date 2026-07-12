@@ -13,7 +13,8 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 - Added recursive validation for all HTML metadata, structured data, canonical uniqueness, local references, search-index targets, sitemap coverage, web-manifest icons, and robots metadata.
 - Added committed NuGet lock files for Publisher, Subscriber, the shared engine, and Tests.
 - Added CI evidence upload for the committed dependency lock graph.
-- Added a 5.5% whole-engine line-coverage regression floor alongside the existing 50% protocol-core floor.
+- Added whole-engine and protocol-core regression floors of 10.5% and 60% respectively.
+- Expanded the deterministic test suite from 26 to 54 tests across SCL, COMTRADE, PCAP, MMS, diagnostics, and Sampled Values publisher sessions.
 
 ### Changed
 
@@ -23,6 +24,12 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 - README, build guidance, contributor guidance, repository structure, release examples, and coverage baselines now match the current shared-engine implementation.
 - CI, CodeQL, and release validation now use the explicit `windows-2025` runner image; Pages and release publication use `ubuntu-24.04`.
 - GitHub Pages now retriggers when the Python public-site validator changes.
+- Moved all shared engine source physically from `src/ARSVIN/Engine` into the owning `src/ARSVIN.Engine` project without duplicating compilation.
+- Raised whole-engine line coverage from 5.64% to 10.74% and protocol-core coverage from 57.89% to 64.97%.
+
+### Fixed
+
+- Multi-ASDU Publisher sessions now apply the configured `smpCnt` wrap to every ASDU inside a frame, preventing counters such as `4000` and `4001` when a 4,000-sample wrap is configured.
 
 ### Security
 
@@ -32,8 +39,7 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ### Planned
 
-- Move the engine source directory physically under `src/ARSVIN.Engine` after the shared-assembly transition has proven stable.
-- Expand protocol regression tests and raise the whole-engine coverage baseline progressively.
+- Continue expanding deterministic regression tests for remaining live capture, MMS service, scheduling, and device-interoperability paths.
 - Add Windows Authenticode signing when a trusted certificate becomes available.
 
 ## 0.3.1 — 2026-07-12
