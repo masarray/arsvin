@@ -82,6 +82,8 @@ Stable and prerelease tag builds publish signed GitHub artifact attestations for
 gh attestation verify .\ARSVIN-Suite-Setup-win-x64.exe --repo masarray/arsvin
 ```
 
+Published GitHub Releases are immutable in the automated workflow. Corrections use a new semantic-version tag instead of replacing existing assets.
+
 The binaries are currently **unsigned**. Windows SmartScreen may show an unknown-publisher warning. Releases do not silently install Npcap; download Npcap from its official website when live capture or transmission is required.
 
 ## Quick start
@@ -125,7 +127,7 @@ For users:
 
 For developers:
 
-- .NET 8 SDK.
+- .NET 8 SDK, feature band 8.0.4xx.
 - PowerShell 7+ recommended.
 - Visual Studio 2022, JetBrains Rider, or VS Code with C# tooling.
 - Inno Setup 6.7.1 when reproducing the automated installer build locally.
@@ -138,16 +140,18 @@ cd arsvin
 .\build.ps1
 ```
 
+NuGet versions are centrally managed and committed `packages.lock.json` files lock the resolved dependency graph. Validated CI and release paths restore with `--locked-mode`.
+
 Build all release artifacts except the installer:
 
 ```powershell
-.\scripts\publish-release.ps1 -Version 0.3.0
+.\scripts\publish-release.ps1 -Version 0.3.1
 ```
 
 Compatibility wrapper:
 
 ```powershell
-.\publish-win-x64.ps1 -Version 0.3.0
+.\publish-win-x64.ps1 -Version 0.3.1
 ```
 
 Run tests with the repository coverage gate and retain TRX/Cobertura evidence:
@@ -156,18 +160,19 @@ Run tests with the repository coverage gate and retain TRX/Cobertura evidence:
 .\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50
 ```
 
-The current linked engine surface measures 57.85% line coverage across 1,535 instrumented production lines. CI enforces a 50% regression floor while the shared engine project and broader protocol tests are developed.
+The complete shared `ARSVIN.Engine` baseline currently measures 5.64% line coverage across 15,726 instrumented production lines. The established protocol-core regression surface measures 57.89% across 1,534 lines, with 888 covered lines; CI enforces a 50% floor on that tested protocol-core surface while broader engine tests are added.
 
 Generate a CycloneDX SBOM after restoring the solution:
 
 ```powershell
-.\scripts\generate-sbom.ps1 -Version 0.3.0
+.\scripts\generate-sbom.ps1 -Version 0.3.1
 ```
 
 ## Repository structure
 
 ```text
-src/ARSVIN/                    Publisher application and SV generation engine
+src/ARSVIN.Engine/             Shared IEC 61850 protocol, SCL, capture, transport, and SV engine project
+src/ARSVIN/                    Publisher application
 src/ARSVIN.Subscriber/         ArSubsv subscriber and visualization companion
 tests/ARSVIN.Tests/            Protocol and publisher helper tests
 installer/                     Inno Setup definition for the Windows suite
@@ -177,6 +182,8 @@ samples/                       SCL, COMTRADE, scenario, and evidence samples
 site/                          Static, SEO-ready GitHub Pages product site
 .github/workflows/             CI, CodeQL, Pages, and release automation
 ```
+
+The shared engine is compiled once as `ARSVIN.Engine`; its source files are still physically located under `src/ARSVIN/Engine` during the staged directory migration.
 
 ## Documentation
 
