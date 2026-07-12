@@ -196,10 +196,22 @@ jobs:
           if ($sbom.bomFormat -ne 'CycloneDX' -or $sbom.specVersion -ne '1.5') {
             throw 'Generated SBOM is not CycloneDX 1.5.'
           }
+
+          $serialNumber = [string] $sbom.serialNumber
+          if ($serialNumber -notmatch '^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$') {
+            throw "Generated CycloneDX SBOM has an invalid or missing serialNumber: $serialNumber"
+          }
+
+          $componentVersion = [string] $sbom.metadata.component.version
+          if ($componentVersion -ne '${{ steps.version.outputs.value }}') {
+            throw "Generated SBOM component version $componentVersion does not match release version ${{ steps.version.outputs.value }}."
+          }
+
           if (@($sbom.components).Count -lt 1) {
             throw 'Generated SBOM contains no dependency components.'
           }
 
+          Write-Host "Validated CycloneDX serial number: $serialNumber"
           Get-ChildItem $releaseRoot -File |
             Select-Object Name, Length |
             Sort-Object Name |
