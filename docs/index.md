@@ -8,6 +8,12 @@ ARSVIN is a focused IEC 61850 Sampled Values engineering suite for Windows. It i
 - [Safety Boundaries](safety-boundaries.md) — laboratory assumptions and responsible use.
 - [Known Limitations](known-limitations.md) — current protocol and runtime boundaries.
 
+## Sampled Values standards and interoperability
+
+- [SV Standards and Evidence Research Gate](sv-research-gate.md) — authoritative source hierarchy, OMICRON benchmark findings, claim levels, and research acceptance rules.
+- [SV Conformance and Interoperability Matrix](sv-evidence-matrix.md) — verified, provisional, unknown, and out-of-scope requirements for 9-2LE-style, IEC 61869-9, and generic Layer-2 SV.
+- `samples/sv-evidence` — safe evidence intake, anonymization rules, metadata, and minimum regression cases for real merging-unit captures.
+
 ## Publisher workflows
 
 - [SV Profile Support](sv-profile-support.md) — current IEC 61850 SV publishing support and limits.
@@ -45,3 +51,4 @@ ARSVIN is a focused IEC 61850 Sampled Values engineering suite for Windows. It i
 - `samples/comtrade` — COMTRADE replay files.
 - `samples/evidence` — sample Markdown evidence reports.
 - `samples/scenarios` — publisher scenario notes and matrices.
+- `samples/sv-evidence` — anonymized or synthetic profile-validation evidence packages.
