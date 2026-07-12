@@ -30,14 +30,18 @@ jobs:
         shell: pwsh
         run: .\scripts\validate-public-site.ps1 -SiteRoot artifacts/public-site
 
-      - name: Restore Publisher
-        run: dotnet restore src/ARSVIN/ARSVIN.csproj
+      - name: Restore solution and generate NuGet lock files
+        run: dotnet restore ARSVIN.sln --use-lock-file
 
-      - name: Restore Subscriber
-        run: dotnet restore src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj
-
-      - name: Restore tests
-        run: dotnet restore tests/ARSVIN.Tests/ARSVIN.Tests.csproj
+      - name: Upload generated NuGet lock files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: arsvin-nuget-lockfiles
+          path: |
+            src/**/packages.lock.json
+            tests/**/packages.lock.json
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Build Publisher with warnings as errors
         run: dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore -warnaserror
