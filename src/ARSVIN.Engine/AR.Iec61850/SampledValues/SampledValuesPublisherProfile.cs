@@ -53,12 +53,19 @@ public sealed class SampledValuesPublisherProfile
         ushort sampleCount,
         ReadOnlySpan<byte> samplePayload,
         Iec61850UtcTime? referenceTime = null,
-        byte sampleSynchronization = 2)
+        byte sampleSynchronization = 2,
+        ushort? sampleCounterWrap = null)
     {
         if (AsduPerFrame != 1)
             throw new InvalidOperationException($"SV {Stream.ControlBlockReference} declares nofASDU={AsduPerFrame}. Use the multi-ASDU CreateFrame overload.");
 
-        return CreateFrame(source, sampleCount, new[] { samplePayload.ToArray() }, referenceTime, sampleSynchronization);
+        return CreateFrame(
+            source,
+            sampleCount,
+            new[] { samplePayload.ToArray() },
+            referenceTime,
+            sampleSynchronization,
+            sampleCounterWrap);
     }
 
     public SampledValuesFrame CreateFrame(
@@ -66,10 +73,14 @@ public sealed class SampledValuesPublisherProfile
         ushort sampleCount,
         IReadOnlyList<byte[]> samplePayloads,
         Iec61850UtcTime? referenceTime = null,
-        byte sampleSynchronization = 2)
+        byte sampleSynchronization = 2,
+        ushort? sampleCounterWrap = null)
     {
         ArgumentNullException.ThrowIfNull(samplePayloads);
         ValidateAsduPayloadBatch(samplePayloads);
+
+        if (sampleCounterWrap is 1)
+            throw new ArgumentOutOfRangeException(nameof(sampleCounterWrap), "SV sample counter wrap must be greater than 1 when supplied.");
 
         var asdus = new List<SampledValueAsdu>(samplePayloads.Count);
         for (var i = 0; i < samplePayloads.Count; i++)
@@ -78,7 +89,7 @@ public sealed class SampledValuesPublisherProfile
             {
                 SvId = Stream.SvId,
                 DataSetReference = Stream.DataSetReference,
-                SampleCount = SampleCounterPolicy.Increment(sampleCount, null, i),
+                SampleCount = SampleCounterPolicy.Increment(sampleCount, sampleCounterWrap, i),
                 ConfigurationRevision = Stream.ConfigurationRevision,
                 ReferenceTime = referenceTime,
                 SampleSynchronization = sampleSynchronization,
@@ -103,9 +114,11 @@ public sealed class SampledValuesPublisherProfile
         ushort sampleCount,
         ReadOnlySpan<byte> samplePayload,
         Iec61850UtcTime? referenceTime = null,
-        byte sampleSynchronization = 2)
+        byte sampleSynchronization = 2,
+        ushort? sampleCounterWrap = null)
     {
-        return SampledValuesFrameBuilder.BuildEthernetFrame(CreateFrame(source, sampleCount, samplePayload, referenceTime, sampleSynchronization));
+        return SampledValuesFrameBuilder.BuildEthernetFrame(
+            CreateFrame(source, sampleCount, samplePayload, referenceTime, sampleSynchronization, sampleCounterWrap));
     }
 
     public byte[] BuildEthernetFrame(
@@ -113,9 +126,11 @@ public sealed class SampledValuesPublisherProfile
         ushort sampleCount,
         IReadOnlyList<byte[]> samplePayloads,
         Iec61850UtcTime? referenceTime = null,
-        byte sampleSynchronization = 2)
+        byte sampleSynchronization = 2,
+        ushort? sampleCounterWrap = null)
     {
-        return SampledValuesFrameBuilder.BuildEthernetFrame(CreateFrame(source, sampleCount, samplePayloads, referenceTime, sampleSynchronization));
+        return SampledValuesFrameBuilder.BuildEthernetFrame(
+            CreateFrame(source, sampleCount, samplePayloads, referenceTime, sampleSynchronization, sampleCounterWrap));
     }
 
     public byte[] BuildPayload(IReadOnlyList<MmsDataValue> values)
@@ -182,7 +197,6 @@ public sealed class SampledValuesPublisherProfile
     {
         if (sampleRateHz <= 0)
             throw new ArgumentOutOfRangeException(nameof(sampleRateHz), "Sample rate must be greater than 0.");
-
         if (noAsdu == 0)
             throw new ArgumentOutOfRangeException(nameof(noAsdu), "nofASDU must be greater than 0.");
 
