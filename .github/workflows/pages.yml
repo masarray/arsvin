@@ -6,6 +6,7 @@ on:
     paths:
       - 'site/**'
       - 'docs/**'
+      - 'scripts/build-public-site.py'
       - 'scripts/validate-public-site.ps1'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
@@ -29,15 +30,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
+      - name: Build public site and HTML documentation
+        run: python3 scripts/build-public-site.py --output artifacts/public-site
+
       - name: Validate public site
         shell: pwsh
-        run: ./scripts/validate-public-site.ps1
-
-      - name: Prepare site
-        run: |
-          mkdir -p site/docs
-          cp -R docs/* site/docs/
-          touch site/.nojekyll
+        run: ./scripts/validate-public-site.ps1 -SiteRoot artifacts/public-site
 
       - name: Configure Pages
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
@@ -45,7 +43,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
-          path: site
+          path: artifacts/public-site
 
       - name: Deploy
         id: deployment
