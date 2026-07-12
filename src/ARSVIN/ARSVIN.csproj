@@ -17,7 +17,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Remove="Engine\**\*.cs" />
     <ProjectReference Include="..\ARSVIN.Engine\ARSVIN.Engine.csproj" />
   </ItemGroup>
 
