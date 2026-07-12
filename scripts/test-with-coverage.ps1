@@ -3,6 +3,9 @@ param(
     [ValidateRange(0, 100)]
     [double] $MinimumLineCoverage = 50,
 
+    [ValidateRange(0, 100)]
+    [double] $MinimumWholeEngineLineCoverage = 5.5,
+
     [switch] $NoRestore
 )
 
@@ -30,9 +33,8 @@ if ($NoRestore) {
     $arguments += '--no-restore'
 }
 
-# Instrument the complete production engine. The report remains a truthful
-# whole-engine baseline, while the regression gate below is calculated over
-# the protocol-core surface that has an established test baseline.
+# Instrument the complete production engine. CI now protects both the truthful
+# whole-engine baseline and the higher protocol-core regression baseline.
 $arguments += @(
     '/p:RestoreLockedMode=true',
     '/p:TreatWarningsAsErrors=true',
@@ -130,6 +132,7 @@ $coreLineCoverage = [Math]::Round(($coreLinesCovered / $coreLinesValid) * 100, 2
 
 Write-Host "Whole engine lines: $overallLinesValid"
 Write-Host "Whole engine line coverage: $overallLineCoverage%"
+Write-Host "Whole engine minimum required: $MinimumWholeEngineLineCoverage%"
 Write-Host "Protocol core files: $($coreFiles.Count)"
 Write-Host "Protocol core lines: $coreLinesValid"
 Write-Host "Protocol core covered lines: $coreLinesCovered"
@@ -145,6 +148,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
 |---|---:|
 | Whole `ARSVIN.Engine` instrumented lines | **$overallLinesValid** |
 | Whole engine line coverage | **$overallLineCoverage%** |
+| Whole-engine regression floor | **$MinimumWholeEngineLineCoverage%** |
 | Tested protocol-core files | **$($coreFiles.Count)** |
 | Protocol-core instrumented lines | **$coreLinesValid** |
 | Protocol-core covered lines | **$coreLinesCovered** |
@@ -154,6 +158,14 @@ if ($env:GITHUB_STEP_SUMMARY) {
 "@ | Add-Content $env:GITHUB_STEP_SUMMARY
 }
 
+$coverageFailures = [System.Collections.Generic.List[string]]::new()
+if ($overallLineCoverage -lt $MinimumWholeEngineLineCoverage) {
+    $coverageFailures.Add("Whole-engine line coverage $overallLineCoverage% is below the required $MinimumWholeEngineLineCoverage%.")
+}
 if ($coreLineCoverage -lt $MinimumLineCoverage) {
-    throw "Protocol-core line coverage $coreLineCoverage% is below the required $MinimumLineCoverage%."
+    $coverageFailures.Add("Protocol-core line coverage $coreLineCoverage% is below the required $MinimumLineCoverage%.")
+}
+
+if ($coverageFailures.Count -gt 0) {
+    throw ($coverageFailures -join ' ')
 }
