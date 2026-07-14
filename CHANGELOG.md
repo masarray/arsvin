@@ -6,9 +6,14 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ### Added
 
+- Added the current GPL-3.0-or-later community licensing model and a separate negotiated commercial path.
+- Added `COMMERCIAL-LICENSE.md`, `COPYRIGHT.md`, `TRADEMARK.md`, a Contributor License Agreement, and Developer Certificate of Origin.
+- Added the historical Apache-2.0 boundary at commit `9440f08b6909ef2dc93dd483cfdcb4e1e86077d0` with preservation branch `archive/apache-2.0-final`.
+- Added current-license, packaging, provenance, and public-wording verification to CI, Pages, build, and release paths.
+- Added evidence-based external IP/provenance and public-claim reviews.
 - Added a formal Sampled Values standards and evidence research gate covering authoritative source hierarchy, claim levels, licensed-standard gaps, and implementation acceptance rules.
-- Added a conformance and interoperability matrix separating verified, implemented-generic, provisional, unknown, and out-of-scope behavior for Layer-2 SV, 9-2LE-style workflows, IEC 61869-9, timing, scaling, redundancy, and product claims.
-- Added a safe Sampled Values evidence-intake guide for anonymized SCL/PCAP cases, real-device metadata, independent verification, minimum negative tests, and evidence quality levels.
+- Added a conformance and interoperability matrix separating implemented, provisional, unknown, and out-of-scope behavior for Layer-2 SV, 9-2LE-style workflows, IEC 61869-9, timing, scaling, redundancy, and product claims.
+- Added a guarded Sampled Values evidence-intake guide for anonymized or authorized SCL/PCAP cases, device metadata, independent verification, negative tests, and evidence quality levels.
 - Added transport-independent SV frame observations and an accumulator for stable-field checks, rate estimation, and sample-counter wrap detection.
 - Added evidence-aware profile definitions with standards-neutral sampling, dataset, packing, payload, and source metadata.
 - Added an explainable weighted profile detector that reports matches, conflicts, missing evidence, confidence, and score.
@@ -18,6 +23,8 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 
 ### Changed
 
+- Current README, website, generated documentation, project metadata, installer, and portable packages now identify GPL-3.0-or-later as the only license for later community revisions.
+- Release packages include GPL, commercial-licensing notice, copyright, trademark, third-party, and historical-boundary documentation without presenting Apache as a current license choice.
 - Documentation now prevents unverified profile constants from being promoted directly into production support claims.
 - Public engineering workflow targets are described generically without proprietary product comparisons or branding.
 - The built-in profile catalog contains only the generic SCL-driven Layer-2 SV fallback until profile-specific requirements are verified.
@@ -27,129 +34,100 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 - Raised protocol-core coverage from 64.97% to 70.47% and the enforced floor from 60% to 70%.
 
 ## 0.4.0 — 2026-07-12
+
 ### Added
 
 - Added a repository-owned, dependency-free public-site builder that converts every `docs/*.md` guide into a dedicated HTML page.
 - Added compact documentation navigation, topic filtering, breadcrumbs, source links, responsive styling, and a generated search index.
 - Added unique canonical URLs, descriptions, Open Graph metadata, Twitter Card metadata, and `TechArticle` JSON-LD for engineering documentation pages.
 - Added a generated multi-page sitemap containing the product homepage and every published documentation page.
-- Added recursive validation for all HTML metadata, structured data, canonical uniqueness, local references, search-index targets, sitemap coverage, web-manifest icons, and robots metadata.
-- Added committed NuGet lock files for Publisher, Subscriber, the shared engine, and Tests.
+- Added recursive validation for HTML metadata, structured data, canonical uniqueness, local references, search-index targets, sitemap coverage, web-manifest icons, and robots metadata.
+- Added committed NuGet lock files for Publisher, Subscriber, shared engine, and Tests.
 - Added CI evidence upload for the committed dependency lock graph.
-- Added whole-engine and protocol-core regression floors of 10.5% and 60% respectively.
-- Expanded the deterministic test suite from 26 to 54 tests across SCL, COMTRADE, PCAP, MMS, diagnostics, and Sampled Values publisher sessions.
+- Expanded deterministic tests across SCL, COMTRADE, PCAP, MMS, diagnostics, and Sampled Values publisher sessions.
 
 ### Changed
 
-- GitHub Pages and Windows CI now build and validate the same staged public-site artifact instead of copying raw Markdown into the deployment directory.
-- The product landing page now links directly to Quick Start, SV Profile Support, COMTRADE Replay, Subscriber Verification, Safety Boundaries, and the complete documentation index.
-- Validated CI, CodeQL, build, test, publish, and release paths now restore NuGet dependencies in locked mode.
-- README, build guidance, contributor guidance, repository structure, release examples, and coverage baselines now match the current shared-engine implementation.
-- CI, CodeQL, and release validation now use the explicit `windows-2025` runner image; Pages and release publication use `ubuntu-24.04`.
-- GitHub Pages now retriggers when the Python public-site validator changes.
-- Moved all shared engine source physically from `src/ARSVIN/Engine` into the owning `src/ARSVIN.Engine` project without duplicating compilation.
-- Raised whole-engine line coverage from 5.64% to 10.74% and protocol-core coverage from 57.89% to 64.97%.
+- GitHub Pages and Windows CI build and validate the same staged public-site artifact.
+- The product landing page links directly to Quick Start, SV Profile Support, COMTRADE Replay, Subscriber Verification, Safety Boundaries, and the documentation index.
+- Validated CI, CodeQL, build, test, publish, and release paths restore NuGet dependencies in locked mode.
+- README, build guidance, contributor guidance, repository structure, release examples, and coverage baselines match the shared-engine implementation.
+- CI, CodeQL, and release validation use explicit runner images.
+- Shared engine source is physically owned by `src/ARSVIN.Engine` without duplicate compilation.
 
 ### Fixed
 
-- Multi-ASDU Publisher sessions now apply the configured `smpCnt` wrap to every ASDU inside a frame, preventing counters such as `4000` and `4001` when a 4,000-sample wrap is configured.
+- Multi-ASDU Publisher sessions apply the configured `smpCnt` wrap to every ASDU inside a frame.
 
 ### Security
 
-- Published GitHub Releases are now immutable in automation; a release job fails before attestation or upload when the semantic-version tag already has a GitHub Release.
-- Artifact corrections require a new semantic-version patch instead of replacing previously published binaries, checksums, or SBOMs.
-- Workflow execution no longer depends on moving `windows-latest` or `ubuntu-latest` labels.
-
-### Planned
-
-- Continue expanding deterministic regression tests for remaining live capture, MMS service, scheduling, and device-interoperability paths.
-- Add Windows Authenticode signing when a trusted certificate becomes available.
+- Published GitHub Releases are immutable in automation; corrections require a new semantic-version tag.
+- Workflow execution no longer depends on moving default runner labels.
 
 ## 0.3.1 — 2026-07-12
 
 ### Added
 
-- Added pinned Coverlet MSBuild instrumentation with TRX, Cobertura, and complete test-log evidence upload.
-- Added a verified 50% line-coverage regression floor for the established IEC 61850 protocol-core test surface.
-- Added transparent whole-engine coverage reporting: 15,726 production lines at the current 5.64% full-engine baseline.
-- Established a protocol-core baseline of 57.89% line coverage across 1,534 instrumented lines, with 888 lines covered and all 26 tests passing.
-- Added a repository-owned CycloneDX 1.5 SBOM generator for direct and transitive Publisher/Subscriber NuGet dependencies while excluding test-only packages.
-- Added `ARSVIN-SBOM.cdx.json` to validated workflow artifacts, release downloads, and SHA-256 checksums.
-- Added signed GitHub build-provenance and SBOM attestations for tagged release artifacts.
-- Added the shared `ARSVIN.Engine` class library as the single compiled IEC 61850 protocol implementation used by Publisher, Subscriber, and Tests.
+- Added Coverlet MSBuild instrumentation with TRX, Cobertura, and complete test-log evidence upload.
+- Added whole-engine and protocol-core coverage reporting and enforcement.
+- Added a repository-owned CycloneDX 1.5 SBOM generator for direct and transitive runtime dependencies.
+- Added `ARSVIN-SBOM.cdx.json` to workflow artifacts, releases, and SHA-256 checksums.
+- Added GitHub build-provenance and SBOM attestations for tagged release artifacts.
+- Added `ARSVIN.Engine` as the single compiled IEC 61850 implementation used by Publisher, Subscriber, and Tests.
 
 ### Changed
 
-- Public releases now require semantic-version tags whose commits are already contained in `main`.
-- Alpha, beta, and release-candidate tags are published as prereleases without replacing the latest stable release.
-- Centralized Publisher and Subscriber source version metadata.
-- GitHub Pages now validates the public site immediately before deployment.
-- Publisher and Subscriber now reference one engine assembly instead of compiling duplicate copies of the protocol source.
-- Protocol tests now exercise the same `ARSVIN.Engine` assembly shipped with both applications.
-- Coverage instrumentation now measures the complete shared engine while preserving the tested protocol-core regression gate.
+- Public releases require semantic-version tags whose commits are contained in `main`.
+- Prerelease tags do not replace the latest stable release.
+- Publisher and Subscriber reference one engine assembly.
+- Protocol tests exercise the same engine assembly shipped with both applications.
 
 ### Security
 
-- Pinned all GitHub Actions used by CI, CodeQL, Pages, and release workflows to immutable commit SHAs while retaining version comments for maintainability and Dependabot updates.
-- Pinned automated installer compilation to the exact Inno Setup 6.7.1 Chocolatey package and retained resolved compiler metadata in workflow evidence.
-- Treat compiler warnings as errors in validated Publisher, Subscriber, test, release, and CodeQL build paths.
-- Stabilized SBOM component ordering, source commit, and metadata timestamp for repeatable review from the same commit.
+- Pinned GitHub Actions to immutable commit SHAs.
+- Pinned automated installer compilation to a reviewed Inno Setup package version.
+- Treat compiler warnings as errors in validated build paths.
+- Stabilized SBOM ordering, source commit, and metadata timestamp for repeatable review.
 
 ## 0.3.0 — 2026-07-11
 
 ### Added
 
-- Public Apache-2.0 ARSVIN suite positioning with separate Publisher and ArSubsv Subscriber applications.
-- Self-contained Windows x64 portable executables for Publisher and Subscriber.
-- Inno Setup suite installer with Start Menu shortcuts, documentation, samples, and uninstaller.
-- Portable suite ZIP and SHA-256 checksum release assets.
-- SCL/SCD-assisted SV stream configuration and validation.
-- Multi-ASDU Sampled Values publishing with `nofASDU=1/2/4/8`.
-- Manual values, ramps, state sequences, per-phase scenarios, waveform shaping, and COMTRADE replay.
-- Publisher timing-health metrics, generated PCAP export, and Markdown evidence reports.
-- ArSubsv live Npcap capture, classic-PCAP import, stream discovery, payload decoding, waveform, phasor, RMS, and receiver reports.
-- Real application screenshots in the public README and GitHub Pages product site.
-- SEO metadata, Open Graph, Twitter Card, `SoftwareApplication` JSON-LD, FAQ structured data, sitemap, robots, and web manifest.
-- GitHub Actions CI, full-solution CodeQL, Pages deployment, release packaging, installer smoke test, and dependency vulnerability reports.
+- Public Apache-2.0 ARSVIN suite release with separate Publisher and ArSubsv Subscriber applications.
+- Self-contained Windows x64 portable executables, suite installer, portable ZIP, and SHA-256 checksums.
+- SCL/SCD-assisted SV configuration, multi-ASDU publishing, scenarios, waveform shaping, and COMTRADE replay.
+- Publisher timing-health metrics, PCAP export, and Markdown evidence reports.
+- ArSubsv live capture, PCAP import, stream discovery, payload decoding, waveform, phasor, RMS, and receiver reports.
+- Actual application screenshots, SEO metadata, structured data, sitemap, robots, web manifest, CI, CodeQL, Pages, and release automation.
 
 ### Changed
 
-- Reworked ArSubsv into a compact engineering workspace with a persistent stream explorer, dominant waveform view, phasor rail, values, frame details, diagnostics, and cursor comparison.
-- Normalized Subscriber phasor angles to `Va = 0°` for clearer Publisher/Subscriber comparison.
-- Centralized public documentation around transparent laboratory evidence and explicit IEC 61850 safety boundaries.
-- Made silent installer and uninstaller operation suitable for automated release validation.
+- Reworked ArSubsv into a compact engineering workspace.
+- Normalized Subscriber phasor angles to `Va = 0°` for Publisher/Subscriber comparison.
+- Centralized public documentation around laboratory evidence and explicit operational boundaries.
 
 ### Fixed
 
-- Publisher shutdown dispatch no longer raises late UI exceptions while the application is closing.
-- Subscriber payload decoding, linked engine compilation, WPF control resolution, and frame parser build issues.
-- Publisher slot selection now updates the currently selected live slot instead of a stale startup selection.
-- Release packaging now fails immediately when external `dotnet` or installer commands fail.
+- Publisher shutdown dispatch, Subscriber payload decoding, linked engine compilation, WPF control resolution, frame parser, slot selection, and release-command handling issues.
 
-### Safety
+### Operational boundary
 
-- Clarified that ARSVIN is not a calibrated protection test set, certified merging unit, deterministic real-time platform, production process-bus monitor, or IEC 61850 conformance tool.
-- Clarified that Publisher evidence proves generated traffic and Subscriber evidence proves PC/NIC reception, not IED consumption.
-- Kept Npcap external to the installer and limited live use to authorized, isolated laboratory networks.
+- Clarified that ARSVIN is not calibrated, deterministic real-time, production-monitoring, or formal conformance equipment.
+- Clarified that Publisher and Subscriber evidence does not prove IED consumption.
+- Kept Npcap external to the installer and limited live use to authorized isolated test networks.
 
 ## 0.2.0 — 2026-07-02
 
 ### Added
 
-- Initial ArSubsv IEC 61850 Sampled Values Subscriber companion.
-- Npcap capture, SV APDU decode, SCL binding, stream-health analysis, sample-counter continuity checks, decoded values, waveform, phasor, RMS, PCAP replay, and Markdown verification reports.
+- Initial ArSubsv Subscriber companion with Npcap capture, SV decode, SCL binding, stream health, values, waveform, phasor, RMS, PCAP replay, and reports.
 
 ### Changed
 
-- Kept Publisher and Subscriber as separate applications so each workflow remains focused and its evidence boundary remains clear.
+- Kept Publisher and Subscriber separate so each evidence boundary remains explicit.
 
 ## 0.1.0 — 2026-06-01
 
 ### Added
 
-- Initial Windows WPF IEC 61850 Sampled Values Publisher.
-- SCL-based stream setup.
-- Manual, ramp, and state-sequenced publishing workflows.
-- COMTRADE replay.
-- Laboratory PTP and `smpSynch` compatibility controls.
-- Initial CI, CodeQL, Pages, and release packaging.
+- Initial Windows WPF Sampled Values Publisher with SCL setup, manual and sequenced publishing, COMTRADE replay, laboratory timing controls, CI, Pages, and release packaging.
