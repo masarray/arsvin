@@ -1,7 +1,8 @@
 # Legal and Provenance Index
 
+Canonical repository records:
+
 - [Current licensing model](LICENSING.md)
-- [Current license summary](CURRENT_LICENSE_SUMMARY.md)
 - [License transition record](LICENSE_TRANSITION_RECORD_2026-07-14.md)
 - [Commercial licensing FAQ](COMMERCIAL_LICENSING_FAQ.md)
 - [Current package legal content](PACKAGE_LEGAL_CONTENT.md)
