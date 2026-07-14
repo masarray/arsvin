@@ -8,15 +8,23 @@ $subscriberProject = Join-Path $root 'src\ARSVIN.Subscriber\ARSVIN.Subscriber.cs
 $testProject = Join-Path $root 'tests\ARSVIN.Tests\ARSVIN.Tests.csproj'
 
 function Invoke-DotNet {
-    param(
-        [Parameter(Mandatory)]
-        [string[]] $Arguments
-    )
-
+    param([Parameter(Mandatory)][string[]] $Arguments)
     & dotnet @Arguments
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
     }
+}
+
+Write-Host '==> Verifying current license, provenance, and public wording'
+& python (Join-Path $root 'scripts\verify-current-license.py')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Current-license and public-wording verification failed.'
+}
+
+Write-Host '==> Validating neutral public terminology'
+& python (Join-Path $root 'scripts\validate-public-neutrality.py')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Public terminology neutrality validation failed.'
 }
 
 Write-Host '==> Restoring locked solution dependency graph'
