@@ -1,12 +1,18 @@
 ARSVIN - IEC 61850 Sampled Values Engineering Suite
-Copyright 2026 Ari Sulistiono
+Copyright (C) 2026 Ari Sulistiono
 
-Licensed under the Apache License, Version 2.0.
+Current community source and current public release packages are licensed under the GNU General Public License v3.0 or later (GPL-3.0-or-later).
+
+A separate negotiated commercial license may be available. COMMERCIAL-LICENSE.md is an invitation to discuss terms and does not itself grant additional rights.
+
+Revisions up to and including commit 9440f08b6909ef2dc93dd483cfdcb4e1e86077d0 were released under Apache-2.0 and remain available on archive/apache-2.0-final. Those historical grants apply only to those earlier revisions.
 
 Author: Ari Sulistiono
 GitHub: https://github.com/masarray
 Project: https://github.com/masarray/arsvin
 
-ARSVIN includes a Sampled Values Publisher and the ArSubsv Subscriber companion. The software can capture and transmit raw Ethernet frames and is intended only for isolated laboratory networks, authorized point-to-point engineering tests, development, troubleshooting support, and education.
+ARSVIN includes a Sampled Values Publisher and the ArSubsv Subscriber companion. The software can capture and transmit raw Ethernet frames and is intended for authorized laboratory networks, point-to-point engineering tests, development, troubleshooting support, commissioning preparation, and education.
 
-ARSVIN is not a certified IEC 61850 conformance tool, calibrated merging unit, protection test set, deterministic real-time platform, or production process-bus monitoring system.
+ARSVIN is not a certified IEC 61850 conformance tool, calibrated merging unit, protection test set, deterministic real-time platform, functional-safety system, cybersecurity-certified product, or production process-bus monitoring system.
+
+Third-party components remain subject to the licenses and notices identified in THIRD_PARTY_NOTICES.md. Project branding is governed separately by TRADEMARK.md.
