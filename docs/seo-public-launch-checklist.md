@@ -1,124 +1,120 @@
 # SEO and Public Launch Checklist
 
-This checklist keeps ARSVIN discoverable and trustworthy as a public Apache-2.0 engineering repository.
+This checklist keeps ARSVIN discoverable and trustworthy as a GPL-3.0-or-later IEC 61850 Sampled Values engineering repository with a separate commercial licensing path.
 
 ## Target positioning
 
-Primary phrase:
+Primary phrases:
 
 ```text
-IEC 61850 Sampled Values Publisher for Windows
+IEC 61850 Sampled Values Publisher and Subscriber for Windows
+IEC 61850 Sampled Values engineering workbench
 ```
 
 Secondary phrases:
 
 ```text
 IEC 61850 SV Publisher
-Sampled Values Publisher
-SV Injector
-Merging Unit Simulator
-IEC 61850 Process Bus Tool
+Sampled Values Subscriber
+SV stream analyzer
 COMTRADE to Sampled Values
 SCL-driven SV Publisher
+PCAP Sampled Values analysis
+process bus engineering software
+Sampled Values waveform phasor RMS
 ```
 
-Use these phrases naturally in the README, landing page, release notes, and documentation. Avoid claiming certified conformance unless formal testing has been completed.
+Use phrases naturally. Do not use “injector,” “merging unit simulator,” “certified,” “conformant,” “real-time accurate,” or similar wording as an unqualified product claim when it could imply calibrated equipment, formal conformance, or deterministic execution.
 
 ## GitHub repository settings
 
-- Set repository description to:
+Recommended repository description:
 
 ```text
-Apache-2.0 IEC 61850 Sampled Values Publisher for Windows — SCL-driven SV publishing, COMTRADE replay, nofASDU support, TX timing health, scenario presets, and PCAP evidence export.
+GPL IEC 61850 Sampled Values Publisher and Subscriber for Windows — SCL setup, COMTRADE replay, live/PCAP analysis, waveform, phasor, RMS, timing health, and engineering evidence.
 ```
 
-- Set website URL to:
+Website URL:
 
 ```text
 https://masarray.github.io/arsvin/
 ```
 
-- Add topics:
+Recommended topics:
 
 ```text
 iec61850
 iec-61850
 sampled-values
 sampled-values-publisher
+sampled-values-subscriber
 sv-publisher
-sv-injector
-merging-unit
-merging-unit-simulator
 process-bus
 digital-substation
 substation-automation
 comtrade
-ptp
+pcap
+phasor
+waveform
 wpf
 dotnet
 windows
+gplv3
 ```
 
 - Upload `site/assets/arsvin-social-preview.png` as the GitHub social preview image.
-- Enable GitHub Pages using the existing Pages workflow.
-- Use Releases for portable downloads.
-- Pin or link the latest stable release in the README and landing page.
+- Enable GitHub Pages using the reviewed Actions workflow.
+- Use immutable Releases for downloadable artifacts.
+- Link the latest stable release from README and landing page.
 
 ## README requirements
 
-- Product title contains the primary phrase.
-- First paragraph explains what ARSVIN is, who it is for, and the main workflow.
-- A preview image appears near the top.
-- Download, landing page, quick start, and docs links are visible above the fold.
-- Safety boundaries are visible before the quick start.
-- Feature matrix includes `nofASDU`, SCL, COMTRADE, TX Timing Health, PCAP, report, and scenarios.
-- “What ARSVIN is not” is explicit and honest.
+- Product title and opening paragraph state Publisher, Subscriber, Windows, and IEC 61850 Sampled Values.
+- Download, website, quick start, documentation, and licensing links are visible near the top.
+- Actual application images have descriptive alternative text.
+- Operational boundaries are visible before live-network instructions.
+- Capabilities include SCL, COMTRADE, `nofASDU`, timing health, PCAP, reports, waveform, phasor, RMS, and scenarios.
+- Transmitter evidence, receiver evidence, and IED behavior are clearly separated.
+- GPL-3.0-or-later is the only current community license shown.
+- The commercial notice is described as a separate negotiated path, not an automatically granted alternative license.
 
 ## Landing page requirements
 
-- Title: `ARSVIN — IEC 61850 Sampled Values Publisher for Windows`.
-- H1 uses the primary phrase.
-- Meta description stays specific and non-generic.
-- Open Graph image points to `arsvin-social-preview.png`.
-- FAQ section answers common search questions.
-- SoftwareApplication and FAQ structured data are present.
-- Safety boundaries are visible without needing to open the README.
+- Unique title and meta description include IEC 61850 Sampled Values and the actual Publisher/Subscriber scope.
+- Exactly one H1 describes the engineering workflow without exaggerated claims.
+- Open Graph and Twitter images use the project-owned social preview.
+- `SoftwareApplication` JSON-LD declares `GPL-3.0-or-later`.
+- FAQ structured data covers Npcap, evidence limits, formal conformance, and commercial licensing.
+- Canonical URL, sitemap, robots metadata, manifest, and descriptive image alt text are present.
+- Operational and licensing boundaries are visible without opening another page.
 
-## Image SEO
+## Documentation SEO
 
-Use descriptive file names and alt text:
-
-```text
-arsvin-iec-61850-sampled-values-publisher-preview.png
-arsvin-social-preview.png
-```
-
-Alt text should describe the product and the visible workflow, for example:
-
-```text
-ARSVIN IEC 61850 Sampled Values Publisher preview with SCL setup, TX Timing Health, nofASDU, COMTRADE replay, PCAP evidence, and scenario presets
-```
+- Every published guide has a unique title, description, canonical URL, and `TechArticle` structured data.
+- Sitemap includes the product homepage and every generated documentation page.
+- Documentation links use stable paths and no broken local references.
+- Current docs do not present Apache-2.0 as an active license; historical references are clearly labelled and link to the archive boundary.
+- External product names are not used as feature-target or affiliation keywords.
 
 ## Release SEO
 
 Each public release should include:
 
-- short summary of user-facing changes,
-- portable ZIP asset name,
-- upgrade notes,
-- known limitations,
-- safety reminder,
-- screenshot or link to the landing page.
+- a concise user-facing summary;
+- stable artifact names;
+- upgrade and compatibility notes;
+- known limitations and evidence boundaries;
+- current GPL and separate commercial-path wording;
+- operational reminder for authorized live Ethernet use; and
+- a screenshot or product-site link.
 
 ## Trust evidence
 
 Keep these visible:
 
-- Apache-2.0 license,
-- CI badge,
-- CodeQL badge,
-- SECURITY.md,
-- CONTRIBUTING.md,
-- sample SCL and COMTRADE files,
-- sample evidence report,
-- generated PCAP workflow.
+- GPL-3.0-or-later license badge and full license text;
+- commercial licensing notice;
+- CI, CodeQL, Pages, release, SBOM, checksum, and attestation evidence;
+- SECURITY, SUPPORT, CONTRIBUTING, CLA, DCO, copyright, trademark, and third-party notices;
+- synthetic or authorized sample SCL, COMTRADE, PCAP, and report evidence; and
+- explicit limitations concerning calibration, timing, formal conformance, cybersecurity, functional safety, and IED consumption.
