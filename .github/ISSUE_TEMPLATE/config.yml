@@ -1,8 +1,14 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Security report
+  - name: Security vulnerability
     url: https://github.com/masarray/arsvin/security/advisories/new
-    about: Please report security issues privately.
-  - name: Support guide
+    about: Report vulnerabilities privately. Do not publish exploit or confidential evidence.
+  - name: Support and sanitization guide
     url: https://github.com/masarray/arsvin/blob/main/SUPPORT.md
-    about: Read what information to include in support requests.
+    about: Review environment details, evidence limits, and data-sanitization requirements before filing an issue.
+  - name: Commercial licensing
+    url: https://github.com/masarray/arsvin/blob/main/COMMERCIAL-LICENSE.md
+    about: Review the commercial licensing notice. Do not post confidential commercial or station information publicly.
+  - name: Product website
+    url: https://masarray.github.io/arsvin/
+    about: Product overview, downloads, engineering documentation, and licensing model.
