@@ -12,11 +12,14 @@ permissions:
 
 jobs:
   public-content:
-    name: Validate public terminology
+    name: Validate licensing, provenance, and public wording
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Verify current GPL and commercial-license boundaries
+        run: python3 scripts/verify-current-license.py
 
       - name: Validate public terminology neutrality
         id: neutrality
@@ -53,6 +56,9 @@ jobs:
             Directory.Packages.props
             src/**/packages.lock.json
             tests/**/packages.lock.json
+
+      - name: Verify current licensing and public wording
+        run: python scripts/verify-current-license.py
 
       - name: Build public site and HTML documentation
         run: python scripts/build-public-site.py --output artifacts/public-site
