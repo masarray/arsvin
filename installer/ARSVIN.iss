@@ -58,6 +58,9 @@ Source: "{#SourceDir}\ArSubsv.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\README.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\NOTICE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\COMMERCIAL-LICENSE.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\COPYRIGHT.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "{#SourceDir}\TRADEMARK.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\THIRD_PARTY_NOTICES.md"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\VERSION.txt"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#SourceDir}\docs\*"; DestDir: "{app}\docs"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -67,7 +70,9 @@ Source: "{#SourceDir}\samples\*"; DestDir: "{app}\samples"; Flags: ignoreversion
 Name: "{group}\ARSVIN Publisher"; Filename: "{app}\ARSVIN.exe"; WorkingDir: "{app}"
 Name: "{group}\ArSubsv Subscriber"; Filename: "{app}\ArSubsv.exe"; WorkingDir: "{app}"
 Name: "{group}\Documentation"; Filename: "{app}\README.md"
-Name: "{group}\Project website"; Filename: "{#MyAppUrl}"
+Name: "{group}\GPL License"; Filename: "{app}\LICENSE.txt"
+Name: "{group}\Commercial Licensing Notice"; Filename: "{app}\COMMERCIAL-LICENSE.md"
+Name: "{group}\Project website"; Filename: "https://masarray.github.io/arsvin/"
 Name: "{group}\Uninstall ARSVIN Suite"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\ARSVIN Publisher"; Filename: "{app}\ARSVIN.exe"; WorkingDir: "{app}"; Tasks: desktopicon
 
@@ -89,7 +94,7 @@ begin
     SuppressibleMsgBox(
       'ARSVIN was installed successfully.' + #13#10 + #13#10 +
       'Live IEC 61850 Sampled Values capture and transmission require Npcap. ' +
-      'Install Npcap separately from its official website before using live network features.',
+      'Install Npcap separately from its official website before using authorized live network features.',
       mbInformation,
       MB_OK,
       IDOK

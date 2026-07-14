@@ -1,39 +1,48 @@
 # Build and Release
 
-ARSVIN uses a tag-driven GitHub Actions workflow to build two self-contained portable applications, one suite installer, one portable ZIP, a CycloneDX software bill of materials, SHA-256 checksums, and signed GitHub artifact attestations.
+ARSVIN uses tag-driven GitHub Actions to build two self-contained applications, a suite installer, a portable ZIP, a CycloneDX SBOM, SHA-256 checksums, and GitHub artifact attestations.
 
 ## Prerequisites
 
-For local source builds:
+Local source builds require Windows 10 or Windows 11 x64, .NET 8 SDK feature band 8.0.4xx, and PowerShell 7+ recommended. Reproducing the installer also requires Inno Setup 6.7.1.
 
-- Windows 10/11 x64
-- .NET 8 SDK, feature band 8.0.4xx
-- PowerShell 7+ recommended
+Npcap is required only for authorized live capture or transmission tests. It is not bundled or silently installed.
 
-For local installer builds:
+## Licensing and public-content gate
 
-- All requirements above
-- Inno Setup 6.7.1
+Before restore, build, site publication, or release packaging, run:
 
-Npcap is required only for live capture/transmission testing. It is not silently bundled or installed by the ARSVIN release process.
+```powershell
+python scripts/verify-current-license.py
+python scripts/validate-public-neutrality.py
+```
+
+The first command verifies:
+
+- GNU GPL version 3 as the current root license;
+- `GPL-3.0-or-later` project metadata;
+- historical Apache boundary documentation without an active dual-license presentation;
+- commercial-notice wording that grants no rights by itself;
+- required copyright, trademark, CLA, DCO, provenance, and third-party files; and
+- current README, site, installer, and packaging markers.
+
+The second command rejects prohibited external-product comparison terms from public content.
 
 ## Dependency locking
 
-Package versions are centrally managed in `Directory.Packages.props`. Each project commits a `packages.lock.json` file so the resolved direct and transitive NuGet graph is reviewable and repeatable.
-
-Validated automation restores with locked mode:
+Package versions are centrally managed in `Directory.Packages.props`. Every project commits `packages.lock.json` so the resolved graph is reviewable and reproducible.
 
 ```powershell
 dotnet restore ARSVIN.sln --locked-mode
 ```
 
-A dependency update must intentionally regenerate the affected lock files and include them in the same pull request:
+A deliberate dependency update uses:
 
 ```powershell
 dotnet restore ARSVIN.sln --force-evaluate
 ```
 
-Do not hand-edit lock files. Review dependency and integrity changes in the generated diff.
+Review direct and transitive changes, licenses, vulnerability output, and lock-file integrity. Do not hand-edit lock files.
 
 ## Build and test
 
@@ -41,91 +50,49 @@ Do not hand-edit lock files. Review dependency and integrity changes in the gene
 .\build.ps1
 ```
 
-The script restores the solution in locked mode, then builds and tests:
+The build script:
 
-- `src/ARSVIN.Engine/ARSVIN.Engine.csproj`
-- `src/ARSVIN/ARSVIN.csproj`
-- `src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj`
-- `tests/ARSVIN.Tests/ARSVIN.Tests.csproj`
+1. verifies current licensing, provenance, and public wording;
+2. validates public terminology neutrality;
+3. restores the locked dependency graph;
+4. builds Publisher and Subscriber with warnings as errors; and
+5. runs deterministic tests.
 
-The shared production source is physically owned by `src/ARSVIN.Engine`, including IEC 61850 protocol code, Sampled Values profile infrastructure, and the Npcap transport implementation. Publisher, Subscriber, and Tests reference the same compiled assembly.
+Publisher, Subscriber, and Tests reference the same `ARSVIN.Engine` assembly. Protocol parsing, Sampled Values behavior, SCL handling, profile observations, comparison logic, capture, and transport code remain owned by the shared engine project.
 
-External command exit codes are checked, and compiler warnings are treated as errors for the validated build path.
-
-### Coverage evidence
+## Coverage evidence
 
 ```powershell
 .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 13 -MinimumLineCoverage 70
 ```
 
-The script:
+The coverage workflow retains TRX, full test logs, and Cobertura output under `artifacts/test-results`, then enforces whole-engine and protocol-core regression floors.
 
-1. runs the xUnit suite using pinned Coverlet MSBuild instrumentation,
-2. instruments the complete shared production `ARSVIN.Engine` assembly,
-3. writes TRX, the complete `dotnet test` log, and Cobertura evidence under `artifacts/test-results`,
-4. calculates and enforces the whole-engine regression floor,
-5. calculates and enforces the protocol-core regression floor,
-6. fails when no production lines are instrumented or either configured floor is missed.
+The documented baseline contains 74 deterministic tests, 13.35% whole-engine line coverage, and 70.47% protocol-core line coverage. These values are regression evidence, not formal conformance, complete live-network validation, deterministic timing evidence, or universal device-interoperability evidence.
 
-Current verified baselines from 74 deterministic tests:
-
-| Metric | Result |
-|---|---:|
-| Whole `ARSVIN.Engine` instrumented lines | 16,312 |
-| Whole-engine covered lines | 2,178 |
-| Whole-engine line coverage | 13.35% |
-| Enforced whole-engine floor | 13% |
-| Protocol-core instrumented lines | 2,120 |
-| Protocol-core covered lines | 1,494 |
-| Protocol-core line coverage | 70.47% |
-| Enforced protocol-core floor | 70% |
-
-The suite covers deterministic behavior across Sampled Values framing, publisher sessions, profile observations, evidence-aware detection, configuration comparison, SCL parsing, COMTRADE parsing and scaling, PCAP read/write handling, MMS data and object references, diagnostics, Ethernet framing, and transport helpers. It does not claim complete WPF, live-network, timing, or device-interoperability coverage.
-
-## Validate public content
-
-Public documentation uses neutral engineering terminology and avoids proprietary comparison language.
-
-```powershell
-python scripts/validate-public-neutrality.py
-```
-
-CI and Pages deployment run this check before publishing public content. The validator writes evidence to:
-
-```text
-artifacts/public-neutrality-report.txt
-```
-
-## Validate the public site
-
-Build the staged landing page and HTML documentation:
+## Build and validate the public site
 
 ```powershell
 python scripts/build-public-site.py --output artifacts/public-site
-```
-
-Validate the staged output:
-
-```powershell
 .\scripts\validate-public-site.ps1 -SiteRoot artifacts/public-site
 ```
 
-The validator recursively checks:
+The site validator checks:
 
-- one `<h1>` per public page,
-- descriptions and canonical URLs,
-- canonical uniqueness,
-- valid JSON-LD,
-- local links and assets,
-- documentation search-index targets,
-- sitemap coverage,
-- web-manifest icons,
-- release filenames,
+- one H1 per page;
+- meta descriptions and canonical URLs;
+- canonical uniqueness;
+- valid JSON-LD;
+- local links and assets;
+- documentation search-index targets;
+- sitemap coverage;
+- web-manifest icons;
+- required release filenames; and
 - sitemap metadata in `robots.txt`.
 
-The same builder and validator run inside GitHub Pages deployment. A broken page cannot deploy merely because another CI job has not finished.
+Generated documentation pages identify GPL-3.0-or-later as the current community license and link to the separate commercial path without presenting it as an automatically granted alternative.
 
-## Build portable release artifacts
+## Build release artifacts
 
 ```powershell
 .\scripts\publish-release.ps1 -Version 0.4.0
@@ -137,7 +104,7 @@ Compatibility wrapper:
 .\publish-win-x64.ps1 -Version 0.4.0
 ```
 
-Generated files:
+Generated portable files:
 
 ```text
 artifacts/release/
@@ -146,17 +113,26 @@ artifacts/release/
 └── ARSVIN-win-x64-portable.zip
 ```
 
-Staging files for the installer are generated under:
+Installer staging is created under `artifacts/installer-input/`.
+
+The portable ZIP and installer staging include:
 
 ```text
-artifacts/installer-input/
+README.md
+LICENSE.txt
+NOTICE.txt
+COMMERCIAL-LICENSE.md
+COPYRIGHT.md
+TRADEMARK.md
+THIRD_PARTY_NOTICES.md
+docs/LICENSING.md
 ```
 
-The two direct `.exe` files are self-contained .NET 8 single-file applications. The ZIP includes both applications, essential documentation, license notices, and sample files.
+`LICENSE.txt` must contain GNU GPL version 3. A historical Apache license file must not be included in a current GPL package.
 
-## Generate the CycloneDX SBOM
+## SBOM
 
-After restoring the solution, run:
+After restoring the solution:
 
 ```powershell
 .\scripts\generate-sbom.ps1 -Version 0.4.0
@@ -168,13 +144,11 @@ Output:
 artifacts/release/ARSVIN-SBOM.cdx.json
 ```
 
-The generator reads the locked, resolved NuGet graphs for Publisher and Subscriber, deduplicates direct and transitive application packages, records which application uses each package, and writes CycloneDX 1.5 JSON. Test-only packages are excluded.
+The CycloneDX 1.5 SBOM records locked managed runtime dependencies used by Publisher and Subscriber. It does not claim to inventory Windows, separately installed Npcap, hosted-runner contents, or every build-service component.
 
-The SBOM includes a deterministic UUID URN `serialNumber`, source commit metadata, component version, and stable component ordering. It covers managed application dependencies; it does not claim to inventory Windows, Npcap, hosted-runner contents, or every build-service tool.
+## Installer
 
-## Build the installer locally
-
-After running the publish script:
+After publishing the applications:
 
 ```powershell
 $version = '0.4.0'
@@ -189,24 +163,7 @@ $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
   '.\installer\ARSVIN.iss'
 ```
 
-Output:
-
-```text
-artifacts/release/ARSVIN-Suite-Setup-win-x64.exe
-```
-
-The automated workflow installs and verifies the exact package version declared in `INNO_SETUP_VERSION`. It records the compiler path and file metadata for evidence.
-
-The installer:
-
-- installs per-user under `%LOCALAPPDATA%\Programs\ARSVIN`,
-- includes Publisher and Subscriber,
-- creates Start Menu shortcuts,
-- offers an optional Publisher desktop shortcut,
-- includes an uninstaller,
-- preserves Apache-2.0 and third-party notices,
-- warns interactively when Npcap is not detected,
-- supports unattended installation and removal without an Npcap message box.
+The installer is per-user, contains Publisher and Subscriber, includes current legal and documentation files, creates Start Menu shortcuts, supports silent install and uninstall validation, and informs the user when Npcap is not detected.
 
 ## GitHub Actions release flow
 
@@ -214,26 +171,24 @@ Workflow: `.github/workflows/release.yml`
 
 ### Pull-request validation
 
-When release tooling, installer definitions, project files, dependency locks, or build configuration change, the workflow:
+When release tooling or application inputs change, the workflow:
 
-1. restores the locked dependency graph,
-2. builds and tests with warnings treated as errors,
-3. publishes both portable applications,
-4. creates the portable suite ZIP,
-5. installs and verifies pinned installer tooling,
-6. compiles the installer,
-7. generates and validates the CycloneDX SBOM,
-8. checks expected artifact names and non-empty files,
-9. silently installs the suite into a temporary directory,
-10. verifies Publisher, Subscriber, documentation, version file, and uninstaller,
-11. silently uninstalls the temporary installation,
-12. generates checksums and uploads a private workflow artifact.
+1. runs the licensing and wording gate through `build.ps1`;
+2. restores, builds, and tests;
+3. publishes both portable applications;
+4. creates the portable suite ZIP;
+5. installs pinned installer tooling;
+6. compiles and smoke-tests the installer;
+7. generates and validates the SBOM;
+8. validates artifact names and non-empty files;
+9. generates checksums; and
+10. uploads a private workflow artifact.
 
-A pull-request run never creates a public GitHub Release or public attestation.
+A pull-request run does not create a public GitHub Release or public attestation.
 
-### Stable tagged release
+### Stable release
 
-A public release is created only by pushing a semantic-version tag. The tagged commit must already be contained in `main`.
+A release is created only by pushing a semantic-version tag whose commit is already contained in `main`:
 
 ```powershell
 git switch main
@@ -242,71 +197,41 @@ git tag -a v0.4.0 -m "ARSVIN v0.4.0"
 git push origin v0.4.0
 ```
 
-The workflow repeats the validated packaging path, downloads the validated artifact in a separate least-privilege release job, verifies that no GitHub Release already exists for the tag, creates signed provenance and SBOM attestations, and publishes the public files.
+Published releases are immutable in automation. Corrections require a new semantic-version patch.
 
-Published GitHub Releases are immutable in automation. Any artifact correction requires a new patch version.
-
-### Prerelease tag
-
-Semantic versions containing a suffix are published as prereleases and do not replace the latest stable release:
-
-```powershell
-git switch main
-git pull --ff-only origin main
-git tag -a v0.5.0-rc.1 -m "ARSVIN v0.5.0-rc.1"
-git push origin v0.5.0-rc.1
-```
-
-### Manual artifact build
-
-Run **Build Windows Release** from the Actions tab and provide a version such as `0.5.0-dev.1`.
-
-Manual runs upload private workflow artifacts only. They never create or replace a public GitHub Release.
+Prerelease suffixes such as `v0.5.0-rc.1` produce prereleases without replacing the latest stable release. Manual workflow dispatch produces private workflow artifacts only.
 
 ## Release assets
 
 | File | Description |
 |---|---|
 | `ARSVIN-Publisher-win-x64.exe` | Portable Publisher. |
-| `ArSubsv-Subscriber-win-x64.exe` | Portable Subscriber/analysis companion. |
+| `ArSubsv-Subscriber-win-x64.exe` | Portable Subscriber. |
 | `ARSVIN-Suite-Setup-win-x64.exe` | Installer for both applications. |
 | `ARSVIN-win-x64-portable.zip` | Portable suite package. |
-| `ARSVIN-SBOM.cdx.json` | CycloneDX 1.5 managed application-dependency SBOM. |
-| `SHA256SUMS.txt` | Integrity hashes for all release assets. |
+| `ARSVIN-SBOM.cdx.json` | CycloneDX managed runtime-dependency SBOM. |
+| `SHA256SUMS.txt` | Integrity hashes for release assets. |
 
 ## Verify a download
 
-Verify the local hash:
-
 ```powershell
 Get-FileHash .\ARSVIN-Suite-Setup-win-x64.exe -Algorithm SHA256
-```
-
-Compare the result with `SHA256SUMS.txt` from the same release.
-
-Verify signed build provenance:
-
-```powershell
 gh attestation verify .\ARSVIN-Suite-Setup-win-x64.exe --repo masarray/arsvin
 ```
 
-Artifact attestations validate repository/workflow provenance; they are separate from Windows Authenticode signing.
+Checksums verify file integrity against the same release. Artifact attestations verify repository and workflow provenance. Neither is Windows Authenticode signing.
 
-## Code signing status
+## Code-signing status
 
-Release binaries are currently unsigned. Windows SmartScreen may display an unknown-publisher warning. The workflow intentionally does not contain placeholder signing steps or require paid signing secrets.
+Release binaries are currently unsigned. Windows SmartScreen may show an unknown-publisher warning. When a trusted certificate and operating process are available, sign the portable executables before installer compilation and sign the completed installer before checksum generation.
 
-When a trusted certificate becomes available, sign the portable executables before compiling the installer, then sign the completed installer before checksum generation.
+## Before tagging
 
-## Release checklist
-
-Before tagging a public release:
-
-- Confirm the intended release commit is already on `main`.
-- Confirm `main` CI, release validation, and CodeQL are green.
-- Update `VersionPrefix` and `CHANGELOG.md`.
-- Confirm committed NuGet lock files match the reviewed dependency update.
-- Review the generated application SBOM and checksums.
-- Confirm no GitHub Release already exists for the intended tag.
+- Confirm the intended commit is on `main`.
+- Confirm CI, CodeQL, Pages validation, and release validation are green.
+- Update `VersionPrefix`, `CHANGELOG.md`, and release notes.
+- Review dependency locks, SBOM, checksums, legal notices, and package contents.
+- Confirm no release already exists for the tag.
 - Test Publisher dry run and Subscriber PCAP import.
-- Use a new patch version for any correction to an already published release.
+- Use authorized isolated links for any live test.
+- Use a new patch version for any correction to an existing release.

@@ -6,10 +6,17 @@ on:
     paths:
       - 'site/**'
       - 'docs/**'
+      - 'README.md'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'COMMERCIAL-LICENSE.md'
+      - 'TRADEMARK.md'
       - 'scripts/build-public-site.py'
+      - 'scripts/public_site_builder.py'
       - 'scripts/validate-public-site.ps1'
       - 'scripts/validate-public-site.py'
       - 'scripts/validate-public-neutrality.py'
+      - 'scripts/verify-current-license.py'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -31,6 +38,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Verify current GPL and commercial-license boundaries
+        run: python3 scripts/verify-current-license.py
 
       - name: Validate public terminology neutrality
         run: python3 scripts/validate-public-neutrality.py

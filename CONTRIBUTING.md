@@ -1,100 +1,121 @@
-# Contributing
+# Contributing to ARSVIN
 
 Thank you for considering a contribution to ARSVIN.
 
-ARSVIN is an engineering suite for IEC 61850 Sampled Values laboratory workflows. The project values clear code, cautious live-network behavior, reproducible test notes, and documentation that an engineer can use in the field.
+ARSVIN is an IEC 61850 Sampled Values engineering suite for authorized laboratory, development, troubleshooting, commissioning-preparation, and education workflows. Contributions should improve observable engineering behavior without overstating safety, conformance, or interoperability.
 
-## Project principles
+## Licensing and acceptance
+
+The current community edition is `GPL-3.0-or-later` and the project maintains a separate commercial-licensing path.
+
+Before merge, contributors must:
+
+1. read and affirmatively accept [CONTRIBUTOR-LICENSE-AGREEMENT.md](CONTRIBUTOR-LICENSE-AGREEMENT.md);
+2. add a Developer Certificate of Origin sign-off to every commit;
+3. have the legal right and any required employer or organizational authorization to submit the contribution; and
+4. identify any third-party material together with its provenance and license.
+
+Sign commits with:
+
+```text
+Signed-off-by: Full Name <email@example.com>
+```
+
+The CLA grants rights needed for GPL-compatible publication and a separate commercial path. It does not transfer ownership of the contributor’s work.
+
+## Engineering principles
 
 - Keep Publisher and Subscriber responsibilities explicit and independently testable.
+- Keep protocol and transport behavior in the shared engine rather than duplicating it in application UI code.
 - Add analysis features only when they improve Sampled Values visibility, interoperability, troubleshooting, or evidence quality.
-- Keep live packet capture and injection guarded, visible, and clearly labelled.
-- Preserve Apache-2.0 compatibility.
-- Prefer explicit engineering wording over marketing claims.
-- Update documentation when behavior, UI, safety assumptions, or release packaging changes.
-- Preserve committed NuGet lock files and immutable public releases.
+- Keep live packet capture and transmission guarded, visible, and clearly labelled.
+- Prefer scoped evidence language over universal marketing claims.
+- Update documentation when behavior, UI, operational assumptions, licensing, or packaging changes.
+- Preserve committed dependency lock files and immutable public releases.
+
+## Independent-development and provenance boundary
+
+External software may be used only as a lawfully licensed black-box interoperability endpoint within the applicable authorization and license boundary.
+
+Do not use external source, generated bindings, API composition, examples, tests, internal structures, documentation wording, screenshots, UI layouts, icons, reports, or extracted resources as implementation design material unless the project has documented rights to incorporate and relicense that material.
+
+Public fixtures should be synthetic or contributor-owned. Real SCL, COMTRADE, PCAP, screenshots, and diagnostics require documented sharing rights and sanitization.
+
+Do not submit:
+
+- confidential customer, employer, station, credential, or restricted network information;
+- production captures or configuration files without explicit redistribution authority;
+- proprietary manuals, screenshots, support responses, binaries, or copied UI assets; or
+- unverified profile constants presented as normative requirements.
 
 ## Development setup
 
 Recommended environment:
 
-- Windows 10/11 x64
-- .NET 8 SDK, feature band 8.0.4xx
-- PowerShell 7+
-- Npcap for live packet capture/publishing tests
-- Wireshark for packet inspection
+- Windows 10 or Windows 11, x64;
+- .NET 8 SDK, feature band 8.0.4xx;
+- PowerShell 7+;
+- Npcap for authorized live packet capture or publishing tests; and
+- an independent packet dissector or process-bus analyzer for verification.
 
-Build using the committed dependency graph:
+Build with the committed dependency graph:
 
 ```powershell
 .\build.ps1
 ```
 
-Run tests and produce coverage evidence:
+Run tests and coverage gates:
 
 ```powershell
-.\scripts\test-with-coverage.ps1 -MinimumLineCoverage 50
+.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 13 -MinimumLineCoverage 70
 ```
 
-Create portable release artifacts for the current source version:
+Create portable release artifacts:
 
 ```powershell
-.\scripts\publish-release.ps1 -Version 0.3.1
+.\scripts\publish-release.ps1 -Version 0.4.0
 ```
 
 ## Dependency updates
 
 NuGet versions are centrally managed in `Directory.Packages.props`, and each project commits `packages.lock.json`.
 
-Normal builds and automation restore with locked mode. When deliberately changing a dependency:
+When deliberately changing a dependency:
 
-1. update the version in `Directory.Packages.props`,
-2. regenerate lock files from the repository root,
-3. review direct and transitive changes,
-4. commit package-version and lock-file changes together.
+1. update the central version;
+2. regenerate lock files from the repository root;
+3. review direct and transitive changes, license compatibility, and vulnerability output; and
+4. commit the package version and lock-file changes together.
 
 ```powershell
 dotnet restore ARSVIN.sln --force-evaluate
 ```
 
-Do not hand-edit `packages.lock.json`. Unrelated lock-file churn should not be included in a pull request.
+Do not hand-edit lock files or include unrelated lock-file churn.
 
-## Pull request checklist
+## Pull request expectations
 
-Before opening a PR, please check:
+A pull request should state:
 
-- The change has a narrow engineering purpose.
-- Both affected applications build in Release mode.
-- Relevant unit tests were added or updated where practical.
-- The protocol-core coverage floor still passes, and broader coverage changes are explained.
-- Safety behavior is not weakened.
-- Docs are updated for user-visible changes.
-- Screenshots or Wireshark notes are included for UI / packet behavior changes.
-- New dependencies are necessary, maintained, license-compatible, and represented in lock files.
-- Release-workflow changes preserve tag-only publication and immutable existing releases.
+- the engineering problem and application/engine boundary;
+- the source of protocol requirements and test expectations;
+- the evidence environment: automated test, simulator, loopback, isolated laboratory equipment, or approved commissioning environment;
+- operational and data-handling impact;
+- public wording or documentation changes; and
+- any limitations not covered by the validation.
 
-## Commit and branch style
+Before opening a PR, verify:
 
-Short, clear commit messages are preferred:
-
-```text
-Fix VLAN TCI validation
-Add COMTRADE replay guardrail
-Document smpSynch compatibility mode
-```
+- relevant Release builds and deterministic tests pass;
+- whole-engine and protocol-core coverage gates remain satisfied;
+- public-site, terminology, licensing, and provenance checks pass;
+- active network behavior remains explicitly guarded;
+- no claim implies formal conformance, deterministic timing, functional safety, cybersecurity approval, switching authority, or IED consumption proof;
+- screenshots and captures are sanitized and legally shareable; and
+- release changes preserve immutable existing releases and required legal notices.
 
 ## Reporting issues
 
-Use GitHub Issues and include:
+Use the structured GitHub issue forms. Include the ARSVIN version, application, Windows and Npcap versions, reproduction steps, and the smallest sanitized evidence needed to explain the problem.
 
-- ARSVIN version or commit
-- Application: Publisher or ArSubsv Subscriber
-- Windows version
-- Npcap version
-- SCL/COMTRADE/PCAP sample if shareable
-- Steps to reproduce
-- Expected behavior
-- Actual behavior
-- Screenshots or Wireshark capture notes when relevant
-
-Do not upload confidential station SCL files, relay IP plans, credentials, or production network captures.
+Never post confidential SCL, COMTRADE, PCAP, station addressing, credentials, customer identity, or proprietary third-party material in a public issue.

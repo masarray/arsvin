@@ -1,29 +1,38 @@
 # Security Policy
 
-ARSVIN can transmit raw Ethernet frames. Security and safety reports are taken seriously because misuse on a live process-bus or substation network can create operational risk.
+ARSVIN can capture and transmit raw Ethernet frames. Cybersecurity vulnerabilities and operational-risk defects are reviewed separately but both require careful handling because live use may affect a test network or connected equipment.
 
 ## Supported versions
 
-Only the current `main` branch and the latest public release are supported for security review.
+Only the current `main` branch and latest public release are supported for security review. Historical archive branches preserve earlier licensing and source history but are not maintained security release lines.
 
-## Reporting a vulnerability
+## Report a cybersecurity vulnerability
 
-Please report security issues privately by opening a GitHub Security Advisory on the repository. If that is not possible, contact the maintainer through GitHub.
+Use GitHub private vulnerability reporting or a private Security Advisory. When that is unavailable, contact the maintainer through the `masarray` GitHub profile without posting exploit details publicly.
 
-Please include:
+Include:
 
-- A clear description of the issue
-- A minimal reproduction case, if safe to share
-- Affected version or commit
-- Whether live Ethernet transmission is involved
-- Any relevant packet details, with confidential information removed
+- a clear description and affected version or commit;
+- the security boundary or trust assumption that fails;
+- the smallest reproducible case that can be shared lawfully;
+- whether packet capture, transmission, file parsing, installer, update, or privilege behavior is involved; and
+- sanitized evidence with credentials, customer information, station identifiers, restricted addressing, and proprietary material removed.
 
-## Responsible disclosure expectations
+## Report an operational-risk defect
 
-- Do not test against networks or devices without authorization.
-- Do not publish exploit details before the maintainer has had a reasonable opportunity to respond.
-- Do not include real substation SCL files, relay credentials, internal IP plans, or production packet captures in public issues.
+Issues such as unintended transmission, incorrect adapter selection, missing live-mode confirmation, misleading evidence, unexpected stream persistence, timing-health misreporting, or failure to stop output may be reported as operational defects. Use a public issue only when all details are sanitized; otherwise contact the maintainer privately.
 
-## Safety boundary
+Software checks do not establish network authorization, equipment isolation, switching authority, functional safety, or process safety.
 
-ARSVIN is intended for isolated lab networks, point-to-point test links, and engineering education. It is not designed for production substations, closed-loop protection validation, or calibrated protection testing.
+## Responsible disclosure
+
+- Do not test networks, devices, drivers, or installers without authorization.
+- Do not publish exploit or hazardous reproduction details before reasonable coordinated review.
+- Do not upload real station SCL, credentials, production captures, internal network plans, customer identity, or proprietary third-party material to public issues.
+- Use synthetic or contributor-owned fixtures whenever practical.
+
+## Product boundary
+
+ARSVIN is intended for authorized laboratory, development, troubleshooting, commissioning-support, and education workflows. It is not calibrated deterministic real-time equipment, a formal conformance platform, a functional-safety system, a cybersecurity-certified product, or proof that an IED consumed or acted on a multicast stream.
+
+The software is provided under GPL-3.0-or-later without warranty, except where a separate written agreement expressly states otherwise.
