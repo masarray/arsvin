@@ -66,6 +66,16 @@ def metadata(path: Path) -> tuple[str, str]:
     return title, description
 
 
+def repository_reference(path: str, fragment: str = "") -> str:
+    normalized = path.replace("\\", "/").lstrip("/")
+    while normalized.startswith("../"):
+        normalized = normalized[3:]
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    mode = "blob" if Path(normalized).suffix else "tree"
+    return f"{REPO_URL}/{mode}/main/{normalized}{fragment}"
+
+
 def rewrite_link(target: str, current_slug: str, docs: dict[str, DocPage]) -> str:
     target = html.unescape(target.strip())
     if not target or target.startswith("#"):
@@ -76,13 +86,19 @@ def rewrite_link(target: str, current_slug: str, docs: dict[str, DocPage]) -> st
     parsed = urlsplit(target)
     path = parsed.path.replace("\\", "/")
     fragment = f"#{parsed.fragment}" if parsed.fragment else ""
+    normalized = path
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
 
-    if path.endswith(".md"):
-        normalized = path
-        while normalized.startswith("./"):
-            normalized = normalized[2:]
-        if normalized.startswith("../"):
-            return f"{REPO_URL}/blob/main/{normalized[3:]}{fragment}"
+    if normalized.startswith("../site/"):
+        relative_asset = normalized[len("../site/") :]
+        prefix = "../" if current_slug == "index" else "../../"
+        return f"{prefix}{relative_asset}{fragment}"
+
+    if normalized.startswith("../"):
+        return repository_reference(normalized, fragment)
+
+    if normalized.endswith(".md"):
         name = Path(normalized).name
         page = docs.get(name)
         if page:
@@ -93,8 +109,9 @@ def rewrite_link(target: str, current_slug: str, docs: dict[str, DocPage]) -> st
             return base + fragment
         return f"{REPO_URL}/blob/main/docs/{normalized}{fragment}"
 
-    if path.startswith("samples/") or path.startswith("src/"):
-        return f"{REPO_URL}/tree/main/{path}{fragment}"
+    if normalized.startswith(("samples/", "src/", "tests/", "scripts/", "installer/", ".github/")):
+        return repository_reference(normalized, fragment)
+
     return target
 
 
