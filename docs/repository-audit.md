@@ -1,38 +1,42 @@
 # Repository Audit
 
-Audit date: 2026-06-30
+Audit refreshed: 2026-07-14
 
 ## Summary
 
-ARSVIN already has a strong public-repository foundation: focused README, engineering docs, Apache-2.0 intent, GitHub Actions CI, CodeQL, Dependabot, release packaging, and a GitHub Pages landing page.
+ARSVIN now has a professional public-repository foundation for an IEC 61850 Sampled Values engineering suite:
 
-The main gaps before calling it a polished global open-source repository were:
-
-- License text needed the full Apache-2.0 appendix / application notice.
-- No issue templates or pull request template.
-- No unit test project.
-- Architecture documentation was not explicit enough for external contributors.
-- Third-party dependency notices were not listed separately.
-- Release readiness checklist was missing.
+- GPL-3.0-or-later current community edition;
+- separate negotiated commercial licensing path;
+- preserved historical Apache-2.0 boundary;
+- Publisher, Subscriber, and shared-engine architecture;
+- deterministic tests and coverage gates;
+- locked dependencies, vulnerability reporting, SBOM, checksums, and artifact attestations;
+- CI, CodeQL, Pages, installer, and immutable release automation;
+- structured issue and pull-request workflows;
+- SEO-ready product site and searchable documentation; and
+- operational, provenance, wording, and external-material controls.
 
 ## Current strengths
 
-- Clear niche: IEC 61850 Sampled Values lab publishing.
-- Honest safety positioning: not a certified protection test set.
-- Existing docs for quick start, live safety, PTP/smpSynch, COMTRADE, and limitations.
-- CI, CodeQL, release workflow, Pages workflow, and Dependabot already present.
-- No obvious committed secrets found during static text scan.
+- Clear scope: Sampled Values generation, reception, decoding, visualization, diagnostics, and evidence.
+- Explicit distinction between transmitter evidence, receiver evidence, and IED behavior.
+- Current-license and public-wording verification before build, Pages deployment, and release packaging.
+- Separate Publisher and Subscriber applications using one shared engine.
+- Release artifacts include current license, commercial notice, copyright, trademark, and third-party notices.
+- Public fixtures are expected to be synthetic or documented as authorized and sanitized.
+- Current claims avoid formal conformance, calibrated measurement, deterministic timing, functional-safety, cybersecurity, and IED-consumption guarantees.
 
-## High-priority recommendations
+## Remaining priorities
 
-1. Split pure IEC 61850 protocol code into a class library once the API stabilizes.
-2. Add more tests around SCL parsing, SV frame encoding, COMTRADE reading, VLAN behavior, and PTP compatibility.
-3. Add golden packet fixtures for SV and PTP behavior.
-4. Keep safety language prominent in README, docs, and release notes.
-5. Avoid marketing claims such as “certified,” “calibrated,” or “real-time accurate” unless independently validated.
+1. Expand deterministic coverage for live transport, scheduling, MMS/SCL edge cases, malformed traffic, and device-interoperability paths.
+2. Add additional independently sourced packet fixtures with documented provenance.
+3. Add Authenticode signing when a suitable certificate and operational process are available.
+4. Maintain evidence labels that distinguish automated tests, loopback, laboratory devices, and approved commissioning environments.
+5. Perform a contributor, employment, invention-assignment, confidentiality, trademark, and private-artifact review before a high-value commercial agreement.
 
-## Public readiness score
+## Scope limitations
 
-- Before cleanup: 7.8 / 10
-- After repository-polish cleanup: 8.8 / 10
-- To reach 9.5+ global standard: separate engine library, test coverage, signed releases, SBOM/provenance, and packet-level golden fixtures.
+Repository inspection cannot prove ownership of every off-repository artifact or resolve employment and contractual obligations. Git account attribution is evidence of activity, not by itself conclusive legal ownership.
+
+See [External IP and Provenance Review](EXTERNAL_IP_AND_PROVENANCE_REVIEW_2026-07-14.md), [Public Wording and Claim Review](WORDING_AND_CLAIM_REVIEW_2026-07-14.md), and [Licensing](LICENSING.md).
