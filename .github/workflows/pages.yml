@@ -18,22 +18,35 @@ on:
       - 'scripts/validate-public-neutrality.py'
       - 'scripts/verify-current-license.py'
       - '.github/workflows/pages.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'site/**'
+      - 'docs/**'
+      - 'README.md'
+      - 'LICENSE'
+      - 'NOTICE'
+      - 'COMMERCIAL-LICENSE.md'
+      - 'TRADEMARK.md'
+      - 'scripts/build-public-site.py'
+      - 'scripts/public_site_builder.py'
+      - 'scripts/validate-public-site.ps1'
+      - 'scripts/validate-public-site.py'
+      - 'scripts/validate-public-neutrality.py'
+      - 'scripts/verify-current-license.py'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: false
+  group: pages-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  validate:
+    name: Validate product website and documentation
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -53,13 +66,27 @@ jobs:
         run: ./scripts/validate-public-site.ps1 -SiteRoot artifacts/public-site
 
       - name: Configure Pages
+        if: github.event_name != 'pull_request'
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6
 
       - name: Upload Pages artifact
+        if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5
         with:
           path: artifacts/public-site
 
+  deploy:
+    name: Deploy product website
+    if: github.event_name != 'pull_request'
+    needs: validate
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5
