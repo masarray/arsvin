@@ -3,26 +3,26 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>ARSVIN — Open-Source IEC 61850 Sampled Values Publisher &amp; Subscriber</title>
-  <meta name="description" content="ARSVIN is an Apache-2.0 IEC 61850 Sampled Values workbench for Windows with SCL-driven publishing, COMTRADE replay, live and PCAP subscriber analysis, waveform, phasor, RMS, stream health, and evidence export." />
+  <title>ARSVIN — IEC 61850 Sampled Values Publisher &amp; Subscriber</title>
+  <meta name="description" content="ARSVIN is a GPL-3.0-or-later Windows workbench for IEC 61850 Sampled Values publishing, COMTRADE replay, live and PCAP analysis, waveform, phasor, RMS, diagnostics, and engineering evidence." />
   <meta name="author" content="Ari Sulistiono" />
-  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1" />
   <meta name="theme-color" content="#f5f8fc" />
   <link rel="canonical" href="https://masarray.github.io/arsvin/" />
 
   <meta property="og:site_name" content="ARSVIN" />
-  <meta property="og:title" content="ARSVIN — IEC 61850 Sampled Values Workbench for Windows" />
-  <meta property="og:description" content="Open-source SV Publisher and Subscriber suite with SCL setup, COMTRADE replay, live and PCAP analysis, timing health, and engineering evidence export." />
+  <meta property="og:title" content="ARSVIN — IEC 61850 Sampled Values Engineering Workbench" />
+  <meta property="og:description" content="Generate SCL-driven SV streams, replay COMTRADE, inspect live or recorded traffic, and preserve transmitter and receiver evidence." />
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://masarray.github.io/arsvin/" />
   <meta property="og:image" content="https://masarray.github.io/arsvin/assets/arsvin-social-preview.png" />
   <meta property="og:image:width" content="1280" />
   <meta property="og:image:height" content="640" />
-  <meta property="og:image:alt" content="ARSVIN IEC 61850 Sampled Values engineering suite for Windows" />
+  <meta property="og:image:alt" content="ARSVIN IEC 61850 Sampled Values Publisher and Subscriber workbench" />
 
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="ARSVIN — IEC 61850 Sampled Values Workbench" />
-  <meta name="twitter:description" content="Apache-2.0 SV Publisher and Subscriber for controlled Windows laboratory workflows." />
+  <meta name="twitter:title" content="ARSVIN — Sampled Values Publisher &amp; Subscriber" />
+  <meta name="twitter:description" content="GPL IEC 61850 Sampled Values engineering software for SCL setup, COMTRADE replay, live and PCAP analysis, and evidence export." />
   <meta name="twitter:image" content="https://masarray.github.io/arsvin/assets/arsvin-social-preview.png" />
 
   <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32x32.png" />
@@ -39,7 +39,8 @@
     "applicationCategory": "EngineeringApplication",
     "applicationSubCategory": "Substation automation and process bus engineering",
     "operatingSystem": "Windows 10, Windows 11",
-    "license": "https://www.apache.org/licenses/LICENSE-2.0",
+    "softwareVersion": "0.4.0",
+    "license": "https://spdx.org/licenses/GPL-3.0-or-later.html",
     "isAccessibleForFree": true,
     "codeRepository": "https://github.com/masarray/arsvin",
     "url": "https://masarray.github.io/arsvin/",
@@ -55,7 +56,15 @@
       "name": "Ari Sulistiono",
       "url": "https://github.com/masarray"
     },
-    "description": "Apache-2.0 IEC 61850 Sampled Values Publisher and Subscriber suite for Windows with SCL-driven stream setup, COMTRADE replay, live and PCAP analysis, waveform, phasor, RMS, timing health, and evidence export."
+    "offers": [
+      {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD",
+        "category": "GPL community edition"
+      }
+    ],
+    "description": "Windows IEC 61850 Sampled Values Publisher and Subscriber suite for SCL-driven stream setup, COMTRADE replay, live and PCAP analysis, waveform, phasor, RMS, timing health, and engineering evidence."
   }
   </script>
 
@@ -69,7 +78,7 @@
         "name": "What is ARSVIN?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "ARSVIN is an Apache-2.0 IEC 61850 Sampled Values engineering suite for Windows. It includes an SCL-driven Publisher and a live and PCAP Subscriber analysis companion."
+          "text": "ARSVIN is a GPL-3.0-or-later IEC 61850 Sampled Values engineering suite for Windows. It includes an SCL-driven Publisher and a live and PCAP Subscriber companion."
         }
       },
       {
@@ -77,7 +86,7 @@
         "name": "Does ARSVIN require Npcap?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "Npcap is required for live raw Ethernet capture and transmission. Offline configuration, dry-run, and PCAP workflows can be used without live network access."
+          "text": "Npcap is required for live raw Ethernet capture and transmission. Offline configuration, dry-run, COMTRADE, and PCAP workflows can be used without live network access."
         }
       },
       {
@@ -85,15 +94,23 @@
         "name": "Is ARSVIN a certified IEC 61850 test set?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "No. ARSVIN is laboratory-oriented engineering software. It is not calibrated, deterministic real-time equipment, a certified merging unit, or an IEC 61850 conformance test platform."
+          "text": "No. ARSVIN is engineering software for authorized laboratory and commissioning-support workflows. It is not calibrated deterministic real-time equipment, a certified merging unit, or a formal conformance platform."
         }
       },
       {
         "@type": "Question",
-        "name": "Can ARSVIN prove that a protection IED subscribed to an SV stream?",
+        "name": "Can ARSVIN prove that an IED consumed an SV stream?",
         "acceptedAnswer": {
           "@type": "Answer",
-          "text": "No. IEC 61850 Sampled Values is multicast and has no application-layer acknowledgement. ARSVIN can show what the Publisher generated and what the selected PC or NIC received, but not prove IED consumption."
+          "text": "No. Sampled Values multicast has no application-layer acknowledgement. ARSVIN records what the Publisher generated and what the selected computer or adapter received, but it does not prove IED consumption or process action."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is commercial licensing available?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "A separate negotiated commercial path is available for proprietary integration, OEM or white-label distribution, closed-source redistribution, private branches, and contractual support. The repository notice is an invitation to discuss terms, not an executed commercial license."
         }
       }
     ]
@@ -112,7 +129,7 @@
       <a href="#capabilities">Capabilities</a>
       <a href="docs/">Docs</a>
       <a href="#downloads">Downloads</a>
-      <a href="#safety">Safety</a>
+      <a href="#licensing">Licensing</a>
     </nav>
     <a class="header-link" href="https://github.com/masarray/arsvin">GitHub</a>
   </header>
@@ -120,43 +137,43 @@
   <main id="top">
     <section class="hero shell">
       <div class="hero-copy">
-        <p class="eyebrow">Apache-2.0 · Windows x64 · IEC 61850 laboratory engineering</p>
-        <h1>Sampled Values publishing and analysis, without a black box.</h1>
-        <p class="lead">ARSVIN combines an SCL-driven SV Publisher with a focused Subscriber companion for live capture, PCAP replay, decoded values, waveform, phasor, RMS, stream health, profile evidence, and engineering reports.</p>
+        <p class="eyebrow">GPL-3.0-or-later · Windows x64 · Authorized engineering workflows</p>
+        <h1>Generate Sampled Values. Inspect what arrives. Preserve the evidence.</h1>
+        <p class="lead">ARSVIN combines an SCL-driven SV Publisher with ArSubsv Subscriber for COMTRADE replay, live and PCAP capture, decoded values, waveform, phasor, RMS, continuity diagnostics, profile evidence, and engineering reports.</p>
         <div class="actions">
           <a class="button primary" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Suite-Setup-win-x64.exe">Download installer</a>
           <a class="button" href="https://github.com/masarray/arsvin/releases/latest">All release files</a>
           <a class="text-link" href="docs/quick-start/">Read quick start →</a>
         </div>
         <div class="trust-row" aria-label="Project facts">
-          <span>Open source</span>
-          <span>Portable EXEs</span>
-          <span>Installer</span>
+          <span>GPL community edition</span>
+          <span>Commercial path</span>
           <span>SBOM + SHA-256</span>
+          <span>Artifact attestations</span>
         </div>
       </div>
       <figure class="product-shot">
         <img src="assets/arsvin-subscriber-live-analysis.webp" alt="ArSubsv live analysis interface showing channel values, phasor, voltage waveform, and current waveform" width="478" height="256" />
-        <figcaption>Real Subscriber workspace — channel data, phasor, voltage, and current analysis.</figcaption>
+        <figcaption>Actual Subscriber workspace — channels, phasor, voltage, and current analysis.</figcaption>
       </figure>
     </section>
 
     <section id="products" class="section shell">
       <div class="section-heading">
-        <p class="eyebrow">One repository, two focused tools</p>
-        <h2>Generate the stream. Inspect what arrives.</h2>
-        <p>Publisher and Subscriber remain separate applications so each workflow stays understandable, testable, and honest about what it proves.</p>
+        <p class="eyebrow">One repository, two focused applications</p>
+        <h2>Transmitter evidence and receiver evidence stay separate.</h2>
+        <p>Publisher and Subscriber have distinct responsibilities so each workflow remains understandable, testable, and explicit about what it proves.</p>
       </div>
       <div class="product-grid">
         <article class="product-card">
           <div class="product-label">TX</div>
           <div>
             <h3>ARSVIN Publisher</h3>
-            <p>Build repeatable SV streams from SCL, manual values, per-phase scenarios, waveform shaping, or COMTRADE records.</p>
+            <p>Build repeatable streams from SCL, manual values, scenarios, waveform shaping, or COMTRADE records.</p>
             <ul>
-              <li>SCL/SCD stream setup</li>
+              <li>SCL and SCD stream setup</li>
               <li>Dataset-aware payload generation</li>
-              <li>Multi-ASDU frame packing</li>
+              <li>Multi-ASDU packing and timing health</li>
               <li>Generated PCAP and evidence report</li>
             </ul>
           </div>
@@ -165,7 +182,7 @@
           <div class="product-label secondary">RX</div>
           <div>
             <h3>ArSubsv Subscriber</h3>
-            <p>Discover and decode live or recorded SV traffic, bind streams to SCL, and inspect receiver-side behavior.</p>
+            <p>Discover and decode live or recorded traffic, bind streams to SCL, and inspect receiver-side behavior.</p>
             <ul>
               <li>Live Npcap capture and PCAP import</li>
               <li>Stream and <code>smpCnt</code> health</li>
@@ -181,22 +198,22 @@
       <div class="shell">
         <div class="section-heading">
           <p class="eyebrow">Actual Windows interfaces</p>
-          <h2>See the engineering workflow before downloading.</h2>
-          <p>These are captures from the Publisher and Subscriber applications, not generic product mockups.</p>
+          <h2>Review the workflow before sending a frame.</h2>
+          <p>These images are captures from the project applications, not generic product mockups or external-product references.</p>
         </div>
         <div class="product-grid">
           <figure class="product-shot">
-            <img src="assets/arsvin-publisher-sv-setup.webp" alt="ARSVIN Publisher SV Setup with SCL stream selection, source modes, network fields, and manual output controls" width="478" height="313" loading="lazy" />
-            <figcaption>Publisher SV Setup — stream, adapter, network, mode, and output configuration.</figcaption>
+            <img src="assets/arsvin-publisher-sv-setup.webp" alt="ARSVIN Publisher SV setup with SCL stream selection, source modes, network fields, and manual output controls" width="478" height="313" loading="lazy" />
+            <figcaption>Publisher setup — stream, adapter, network, source, and output configuration.</figcaption>
           </figure>
           <figure class="product-shot">
             <img src="assets/arsvin-subscriber-live-analysis.webp" alt="ArSubsv live analysis with channel table, phasor plot, voltage waveform, and current waveform" width="478" height="256" loading="lazy" />
-            <figcaption>Subscriber analysis — decoded channels, phasor, voltage, and current views.</figcaption>
+            <figcaption>Subscriber analysis — decoded channels, phasor, voltage, and current.</figcaption>
           </figure>
         </div>
         <figure class="product-shot" style="max-width:760px;margin:15px auto 0">
-          <img src="assets/arsvin-subscriber-waveform-phasor.webp" alt="ArSubsv stream monitor with discovered SV streams, voltage and current waveforms, phasor view, and RMS values" width="478" height="281" loading="lazy" />
-          <figcaption>Stream monitor — discovered Sampled Values streams, waveform, phasor, and RMS inspection.</figcaption>
+          <img src="assets/arsvin-subscriber-waveform-phasor.webp" alt="ArSubsv stream monitor with discovered Sampled Values streams, voltage and current waveforms, phasor view, and RMS values" width="478" height="281" loading="lazy" />
+          <figcaption>Stream monitor — discovered traffic, waveform, phasor, RMS, and continuity inspection.</figcaption>
         </figure>
       </div>
     </section>
@@ -204,13 +221,13 @@
     <section id="capabilities" class="section shell">
       <div class="section-heading compact">
         <p class="eyebrow">Engineering workflow</p>
-        <h2>Useful visibility from configuration to evidence.</h2>
+        <h2>Trace configuration, observed traffic, and evidence without overclaiming.</h2>
       </div>
       <div class="capability-grid">
         <article><span>01</span><h3>Configure from SCL</h3><p>Reuse APPID, destination MAC, VLAN, <code>svID</code>, dataset, <code>confRev</code>, sample rate, and packing.</p></article>
         <article><span>02</span><h3>Generate scenarios</h3><p>Use manual values, ramps, faults, waveform shaping, sequence components, or COMTRADE replay.</p></article>
         <article><span>03</span><h3>Inspect stream health</h3><p>Expose timing, continuity, counters, payload layout, decoded values, and configuration differences.</p></article>
-        <article><span>04</span><h3>Preserve evidence</h3><p>Export PCAP and Markdown reports for independent review, troubleshooting, and repeatable laboratory records.</p></article>
+        <article><span>04</span><h3>Preserve evidence</h3><p>Export PCAP and Markdown reports for independent review and repeatable laboratory records.</p></article>
       </div>
     </section>
 
@@ -218,111 +235,68 @@
       <div class="shell">
         <div class="section-heading">
           <p class="eyebrow">Search-indexable engineering documentation</p>
-          <h2>Understand the workflow before sending a frame.</h2>
-          <p>Repository guides are published as dedicated HTML pages with canonical metadata, structured data, navigation, and sitemap discovery.</p>
+          <h2>Understand the boundary before enabling live Ethernet.</h2>
+          <p>Documentation is published as dedicated HTML pages with canonical metadata, structured data, navigation, and sitemap discovery.</p>
         </div>
         <div class="capability-grid">
-          <article><span>01</span><h3><a href="docs/quick-start/">Quick Start</a></h3><p>Install the suite and begin with an authorized dry run, PCAP, or isolated link.</p></article>
-          <article><span>02</span><h3><a href="docs/sv-profile-support/">SV Profile Support</a></h3><p>Review current profile support, generic payload behavior, and explicit technical boundaries.</p></article>
-          <article><span>03</span><h3><a href="docs/subscriber-verification-app/">Subscriber Verification</a></h3><p>Inspect live or recorded streams, continuity, decoded values, waveform, phasor, RMS, and evidence.</p></article>
-          <article><span>04</span><h3><a href="docs/safety-boundaries/">Safety Boundaries</a></h3><p>Understand laboratory assumptions, evidence limits, and responsible live-network use.</p></article>
+          <article><span>01</span><h3><a href="docs/quick-start/">Quick Start</a></h3><p>Begin with a dry run, synthetic sample, PCAP file, or authorized isolated link.</p></article>
+          <article><span>02</span><h3><a href="docs/sv-profile-support/">SV Profile Support</a></h3><p>Review implemented behavior, generic payload support, and explicit limitations.</p></article>
+          <article><span>03</span><h3><a href="docs/subscriber-verification-app/">Subscriber Verification</a></h3><p>Inspect continuity, decoded values, waveform, phasor, RMS, and receiver evidence.</p></article>
+          <article><span>04</span><h3><a href="docs/LICENSING/">Licensing</a></h3><p>Understand GPL community rights, historical revisions, and the separate commercial path.</p></article>
         </div>
         <div class="actions">
-          <a class="button" href="docs/">Browse all engineering documentation</a>
+          <a class="button" href="docs/">Browse all documentation</a>
+          <a class="text-link" href="https://github.com/masarray/arsvin/blob/main/docs/WORDING_AND_CLAIM_REVIEW_2026-07-14.md">Review public claim boundaries →</a>
         </div>
       </div>
     </section>
 
     <section id="downloads" class="section shell">
       <div class="section-heading">
-        <p class="eyebrow">Windows release options</p>
-        <h2>Installer or direct portable applications.</h2>
-        <p>Public release files use stable names so the latest download links remain predictable.</p>
+        <p class="eyebrow">Reproducible Windows releases</p>
+        <h2>Choose the suite, one portable application, or verification files.</h2>
       </div>
-      <div class="download-list">
-        <a class="download-item featured" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Suite-Setup-win-x64.exe">
-          <span class="file-type">EXE</span>
-          <span><strong>ARSVIN Suite Installer</strong><small>Publisher, Subscriber, shortcuts, documentation, and uninstaller</small></span>
-          <span class="download-action">Download</span>
-        </a>
-        <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-Publisher-win-x64.exe">
-          <span class="file-type">EXE</span>
-          <span><strong>Publisher Portable</strong><small>Self-contained single-file application</small></span>
-          <span class="download-action">Download</span>
-        </a>
-        <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ArSubsv-Subscriber-win-x64.exe">
-          <span class="file-type">EXE</span>
-          <span><strong>Subscriber Portable</strong><small>Self-contained single-file application</small></span>
-          <span class="download-action">Download</span>
-        </a>
-        <a class="download-item" href="https://github.com/masarray/arsvin/releases/latest/download/ARSVIN-win-x64-portable.zip">
-          <span class="file-type">ZIP</span>
-          <span><strong>Portable Suite</strong><small>Both applications, documentation, notices, and samples</small></span>
-          <span class="download-action">Download</span>
-        </a>
+      <div class="product-grid">
+        <article class="product-card"><div class="product-label">SETUP</div><div><h3>ARSVIN-Suite-Setup-win-x64.exe</h3><p>Publisher, Subscriber, documentation, legal notices, shortcuts, and uninstaller.</p></div></article>
+        <article class="product-card"><div class="product-label secondary">ZIP</div><div><h3>ARSVIN-win-x64-portable.zip</h3><p>Portable suite folder with both applications and required notices.</p></div></article>
+        <article class="product-card"><div class="product-label">TX</div><div><h3>ARSVIN-Publisher-win-x64.exe</h3><p>Self-contained single-file Publisher.</p></div></article>
+        <article class="product-card"><div class="product-label secondary">RX</div><div><h3>ArSubsv-Subscriber-win-x64.exe</h3><p>Self-contained single-file Subscriber.</p></div></article>
       </div>
-      <p class="download-note">Current binaries are unsigned and may trigger a Windows SmartScreen warning. Npcap is not bundled. Verify downloads with <a href="https://github.com/masarray/arsvin/releases/latest/download/SHA256SUMS.txt">SHA256SUMS.txt</a> and review the release SBOM.</p>
+      <p>Releases also provide <code>ARSVIN-SBOM.cdx.json</code> and <code>SHA256SUMS.txt</code>. Npcap is installed separately and is not silently bundled.</p>
     </section>
 
-    <section id="safety" class="section safety-section">
-      <div class="shell safety-layout">
-        <div>
-          <p class="eyebrow">Explicit boundaries</p>
-          <h2>Designed for controlled laboratory use.</h2>
-        </div>
-        <div class="safety-copy">
-          <p>ARSVIN can transmit and capture raw Ethernet frames. Use isolated networks, point-to-point links, or networks where you have explicit authorization.</p>
-          <p>It is not a certified protection test set, calibrated merging unit, deterministic real-time platform, production process-bus monitor, or IEC 61850 conformance tool.</p>
-          <a class="text-link light" href="docs/safety-boundaries/">Read safety boundaries →</a>
+    <section id="safety" class="section section-soft">
+      <div class="shell">
+        <div class="section-heading">
+          <p class="eyebrow">Operational boundary</p>
+          <h2>Software checks do not establish site authorization or process safety.</h2>
+          <p>Use live capture and transmission only under an approved test plan and network boundary. ARSVIN does not establish isolation, switching authority, functional safety, cybersecurity approval, calibrated measurement, deterministic timing, or IED consumption.</p>
         </div>
       </div>
     </section>
 
-    <section id="faq" class="section shell faq">
-      <div class="section-heading compact">
-        <p class="eyebrow">FAQ</p>
-        <h2>Clear answers before live traffic.</h2>
+    <section id="licensing" class="section shell">
+      <div class="section-heading">
+        <p class="eyebrow">Clear licensing model</p>
+        <h2>GPL community edition with a separate negotiated commercial path.</h2>
+        <p>Current public source and releases are licensed only under <strong>GPL-3.0-or-later</strong>. Commercial terms are available for proprietary integration, OEM or white-label distribution, closed-source redistribution, private branches, and contractual support.</p>
       </div>
-      <details open>
-        <summary>What does the Subscriber prove?</summary>
-        <p>It proves that the selected PC or NIC received and decoded the stream. It does not prove that a relay or other IED consumed the multicast traffic.</p>
-      </details>
-      <details>
-        <summary>Does ARSVIN require Npcap?</summary>
-        <p>Npcap is required for live raw Ethernet capture and transmission. PCAP import, documentation, configuration, and dry-run workflows do not require live network access.</p>
-      </details>
-      <details>
-        <summary>Is the installer code-signed?</summary>
-        <p>Not currently. Release assets include SHA-256 checksums, an SBOM, and repository workflow provenance, but Windows may still show an unknown-publisher warning.</p>
-      </details>
-      <details>
-        <summary>Can ARSVIN replace a calibrated test set or certified analyzer?</summary>
-        <p>No. ARSVIN is transparent engineering software for controlled laboratory workflows, education, development, and troubleshooting support.</p>
-      </details>
-    </section>
-
-    <section class="final-cta">
-      <div class="shell final-cta-inner">
-        <div>
-          <p class="eyebrow">Build, inspect, improve</p>
-          <h2>Open engineering for IEC 61850 Sampled Values.</h2>
-        </div>
-        <div class="actions">
-          <a class="button primary" href="https://github.com/masarray/arsvin/releases/latest">Get the latest release</a>
-          <a class="button dark" href="https://github.com/masarray/arsvin">View source on GitHub</a>
-        </div>
+      <div class="product-grid">
+        <article class="product-card"><div class="product-label">GPL</div><div><h3>Community edition</h3><p>Use, study, modify, and redistribute under GPL-3.0-or-later and its source-distribution obligations.</p><p><a href="https://github.com/masarray/arsvin/blob/main/LICENSE">Read the license</a></p></div></article>
+        <article class="product-card"><div class="product-label secondary">OEM</div><div><h3>Commercial discussion</h3><p>The repository notice invites negotiation but grants no additional rights by itself. Commercial rights cover only material controlled by the relevant copyright holder.</p><p><a href="https://github.com/masarray/arsvin/blob/main/COMMERCIAL-LICENSE.md">Commercial licensing notice</a></p></div></article>
       </div>
+      <p>Earlier revisions through commit <code>9440f08b6909ef2dc93dd483cfdcb4e1e86077d0</code> remain available under their historical Apache-2.0 grant on <code>archive/apache-2.0-final</code>. That historical grant is not a current Apache-or-GPL choice for later releases.</p>
     </section>
   </main>
 
   <footer>
     <div class="shell footer-inner">
-      <span>ARSVIN · Apache-2.0 · © 2026 Ari Sulistiono</span>
+      <span>ARSVIN · GPL-3.0-or-later · © 2026 Ari Sulistiono</span>
       <nav aria-label="Footer navigation">
-        <a href="https://github.com/masarray/arsvin">Source</a>
         <a href="docs/">Docs</a>
+        <a href="https://github.com/masarray/arsvin/releases/latest">Releases</a>
         <a href="https://github.com/masarray/arsvin/issues">Issues</a>
-        <a href="https://github.com/masarray/arsvin/blob/main/LICENSE">License</a>
+        <a href="https://github.com/masarray/arsvin/blob/main/TRADEMARK.md">Branding</a>
       </nav>
     </div>
   </footer>
