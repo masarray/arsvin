@@ -1,0 +1,68 @@
+name: Apply PR 39 Review Fixes
+
+on:
+  push:
+    branches:
+      - agent/p3c-scl-expected-configuration
+
+permissions:
+  contents: write
+
+jobs:
+  apply-fixes:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: agent/p3c-scl-expected-configuration
+          fetch-depth: 0
+
+      - name: Apply exact review fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          def replace_exact(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one match in {path}, found {count}")
+              file.write_text(text.replace(old, new), encoding="utf-8")
+
+          replace_exact(
+              "src/ARSVIN.Subscriber/ViewModels/SvSubscriberViewModel.cs",
+              "        return addressCandidates.Length == 1 ? addressCandidates[0] : null;\n",
+              "        return null;\n")
+
+          report_path = "src/ARSVIN.Subscriber/Reporting/SvSubscriberReportBuilder.cs"
+          replace_exact(
+              report_path,
+              "        var configurationComparison = observation?.ConfigurationComparison ?? stream.ConfigurationComparison;\n        var diagnostics = stream.Diagnostics.Concat(observationDiagnostics)",
+              "        var configurationComparison = observation?.ConfigurationComparison ?? stream.ConfigurationComparison;\n        var health = ResolveHealth(stream, observation, configurationComparison);\n        var healthDetail = ResolveHealthDetail(stream, observation, configurationComparison, health);\n        var diagnostics = stream.Diagnostics.Concat(observationDiagnostics)")
+          replace_exact(
+              report_path,
+              "            Health = stream.Health,\n            HealthDetail = stream.HealthDetail,",
+              "            Health = health,\n            HealthDetail = healthDetail,")
+          replace_exact(
+              report_path,
+              "                WindowSamples = stream.ObservationWindowSamples,",
+              "                WindowSamples = ResolveWindowSamples(facts, stream.ObservationWindowSamples),")
+
+          helpers = '''    private static int ResolveWindowSamples(SvObservedStreamFacts facts, int fallback)\n    {\n        if (facts.ObservationCount > 0)\n            return facts.ObservationCount * Math.Max(1, facts.AsduPerFrame ?? 1);\n        return Math.Max(0, fallback);\n    }\n\n    private static string ResolveHealth(\n        SvStreamSnapshot stream,\n        SvStreamObservationSnapshot? observation,\n        SvConfigurationComparisonResult? comparison)\n    {\n        var hasRuntimeError = stream.PayloadIssueCount > 0 || stream.OutOfOrderCount > 0;\n        var hasRuntimeWarning = stream.SequenceGapCount > 0 || stream.DuplicateCount > 0;\n        var isConfigured = observation?.IsBoundToScl ?? stream.IsBoundToScl;\n        if (hasRuntimeError || comparison?.HasBlockingErrors == true)\n            return "BAD";\n        if (hasRuntimeWarning || comparison?.WarningCount > 0 || !isConfigured)\n            return "WARN";\n        return "GOOD";\n    }\n\n    private static string ResolveHealthDetail(\n        SvStreamSnapshot stream,\n        SvStreamObservationSnapshot? observation,\n        SvConfigurationComparisonResult? comparison,\n        string health)\n    {\n        var blocking = comparison?.Findings\n            .FirstOrDefault(item => item.Severity == SvConfigurationFindingSeverity.Error);\n        if (blocking is not null)\n            return blocking.Message;\n        if (stream.PayloadIssueCount > 0 || stream.OutOfOrderCount > 0)\n            return stream.HealthDetail;\n\n        var warning = comparison?.Findings\n            .FirstOrDefault(item => item.Severity == SvConfigurationFindingSeverity.Warning);\n        if (warning is not null)\n            return warning.Message;\n        if (health == "GOOD")\n            return "SV stream is stable and matches the configured SCL expectation.";\n        if (observation?.IsBoundToScl != true)\n            return "SV stream is not bound to an SCL expectation.";\n        return stream.HealthDetail;\n    }\n\n'''
+          replace_exact(
+              report_path,
+              "    private static double ResolveWindowDuration(SvObservedStreamFacts facts, double fallback)\n",
+              helpers + "    private static double ResolveWindowDuration(SvObservedStreamFacts facts, double fallback)\n")
+
+      - name: Commit review fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/ARSVIN.Subscriber/ViewModels/SvSubscriberViewModel.cs src/ARSVIN.Subscriber/Reporting/SvSubscriberReportBuilder.cs
+          git diff --cached --check
+          git commit -m "Address PR 39 evidence binding and report review feedback"
+          git push origin HEAD:agent/p3c-scl-expected-configuration
