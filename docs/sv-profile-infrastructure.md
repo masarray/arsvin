@@ -15,7 +15,7 @@ Imported PCAP ────┘          ↓
                          └── SvConfigurationComparer
 ```
 
-The profile infrastructure is part of the shared `ARSVIN.Engine` assembly and has no dependency on WPF or Npcap. Subscriber live capture and PCAP replay now use the same manager and stable stream identity, so both paths produce the same facts and diagnostics contract.
+The profile infrastructure is part of the shared `ARSVIN.Engine` assembly and has no dependency on WPF or Npcap. Subscriber live capture and PCAP replay use the same manager and stable stream identity, so both paths produce the same facts and diagnostics contract.
 
 ## Observed facts
 
@@ -75,14 +75,24 @@ A high score is an engineering classification result, not a conformance certific
 
 ## Configuration-versus-wire comparison
 
-`SvConfigurationComparer` compares configured expectations with observed facts for addressing, identifiers, dataset, revision, packing, payload, and declared sampling fields.
+`SvExpectedStreamConfigurationFactory` converts the SCL-bound `SampledValuesPublisherProfile` into a transport-neutral `SvExpectedStreamConfiguration`. The expected configuration includes addressing, identifiers, revision, packing, payload length, declared sampling fields, and ordered dataset signature.
+
+`SvStreamObservationManager` compares that expected configuration with the rolling `SvObservedStreamFacts` for every bound live or PCAP stream. The resulting immutable snapshot carries:
+
+- the expected configuration,
+- field-level findings,
+- comparison mode,
+- exact/warning/error counts,
+- a compact summary such as `Exact`, `2 warnings`, or `1 error`.
 
 Two modes are available:
 
-- **Strict** — mismatches become errors suitable for validation and live-transmission preflight.
-- **Compatible** — mismatches become warnings suitable for troubleshooting and unfamiliar devices.
+- **Compatible** — the Subscriber default; mismatches become warnings suitable for troubleshooting and unfamiliar devices.
+- **Strict** — explicit opt-in for validation, preflight, and formal test cases; mismatches become errors.
 
 Neither mode stops receive-side capture or decoding. Unknown and conflicting streams remain visible.
+
+Before accepting an SCL candidate, the observation manager requires APPID, destination MAC, and VLAN to identify the same configured stream. A candidate that fails this address gate is rejected instead of contaminating observed facts with the wrong dataset layout.
 
 ## Current integration boundary
 
@@ -92,13 +102,15 @@ Neither mode stops receive-side capture or decoding. Unknown and conflicting str
 - groups frames by source, destination, VLAN, APPID, `svID`, and dataset reference;
 - deliberately keeps `confRev` outside the key so revision changes remain observable;
 - retains input provenance (`LiveCapture` or `PcapReplay`);
+- validates the SCL candidate against the observed address tuple;
+- converts a bound SCL stream into `SvExpectedStreamConfiguration`;
+- runs Compatible comparison by default, with Strict available per observation call;
 - adds SCL-derived dataset signatures when a stream is bound; and
-- exposes immutable rolling facts to the Subscriber runtime snapshot.
+- exposes immutable rolling facts plus persistent configuration comparison results to Subscriber runtime snapshots.
 
 ## Next integration
 
-1. Convert selected SCL stream bindings into `SvExpectedStreamConfiguration`.
-2. Run strict or compatible configuration comparison per observed stream.
-3. Present one compact profile/confidence and SCL-match state per selected stream.
-4. Show evidence and mismatch details on demand rather than adding permanent visual noise.
-5. Add profile-specific definitions only after source review and deterministic evidence.
+1. Present one compact profile/confidence and SCL-match state per selected stream.
+2. Show evidence and mismatch details on demand rather than adding permanent visual noise.
+3. Add profile-specific definitions only after source review and deterministic evidence.
+4. Serialize profile, configuration, provenance, and source evidence into Subscriber reports.
