@@ -57,6 +57,7 @@ public sealed record SvStreamObservationSnapshot
     public string ControlBlockReference { get; init; } = string.Empty;
     public SvExpectedStreamConfiguration? ExpectedConfiguration { get; init; }
     public SvConfigurationComparisonResult? ConfigurationComparison { get; init; }
+    public SvProfileDetectionResult? ProfileDetection { get; init; }
     public string ConfigurationMatchSummary => ConfigurationComparison?.Summary ?? "Not configured";
     public IReadOnlyList<string> Diagnostics { get; init; } = Array.Empty<string>();
 }
@@ -124,6 +125,9 @@ public sealed class SvStreamObservationManager
                         _expectedConfiguration,
                         facts,
                         _comparisonMode);
+                var profileDetection = new SvProfileDetector().DetectBest(
+                    facts,
+                    SvProfileCatalog.BuiltIn);
 
                 return new SvStreamObservationSnapshot
                 {
@@ -135,6 +139,7 @@ public sealed class SvStreamObservationManager
                     ControlBlockReference = ControlBlockReference,
                     ExpectedConfiguration = _expectedConfiguration,
                     ConfigurationComparison = comparison,
+                    ProfileDetection = profileDetection,
                     Diagnostics = facts.Diagnostics.Concat(_diagnostics).Distinct(StringComparer.Ordinal).ToArray()
                 };
             }
