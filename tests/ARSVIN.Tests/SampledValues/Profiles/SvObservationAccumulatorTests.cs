@@ -6,7 +6,7 @@ namespace ARSVIN.Tests.SampledValues.Profiles;
 public sealed class SvObservationAccumulatorTests
 {
     [Fact]
-    public void BuildFactsCalculatesRatesAndCounterWrapWithoutTransportDependencies()
+    public void BuildFactsCalculatesRatesAndConfirmedCounterWrapWithoutTransportDependencies()
     {
         var accumulator = new SvObservationAccumulator();
         accumulator.Add(CreateObservation(0, [3998, 3999]));
@@ -23,7 +23,68 @@ public sealed class SvObservationAccumulatorTests
         Assert.Equal(1000, facts.ObservedFramesPerSecond!.Value, precision: 6);
         Assert.Equal(2000, facts.ObservedSamplesPerSecond!.Value, precision: 6);
         Assert.Equal(4000, facts.ObservedCounterWrap);
+        Assert.Equal(1, facts.CounterTransitions.ConfirmedWrapCount);
+        Assert.Equal(SvFactSource.CaptureCalculated, facts.Provenance[nameof(SvObservedStreamFacts.ObservedCounterWrap)]);
         Assert.Empty(facts.Diagnostics);
+    }
+
+    [Fact]
+    public void OutOfOrderCounterIsNotMisclassifiedAsWrap()
+    {
+        var accumulator = new SvObservationAccumulator();
+        accumulator.Add(CreateObservation(0, [100, 101]));
+        accumulator.Add(CreateObservation(1, [99, 102]));
+
+        var facts = accumulator.BuildFacts();
+
+        Assert.Null(facts.ObservedCounterWrap);
+        Assert.Equal(1, facts.CounterTransitions.OutOfOrderOrResetCount);
+        Assert.Contains(facts.Diagnostics, item => item.Contains("not classified as wraps", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void DuplicateAndGapTransitionsAreReportedSeparately()
+    {
+        var accumulator = new SvObservationAccumulator();
+        accumulator.Add(CreateObservation(0, [10, 10]));
+        accumulator.Add(CreateObservation(1, [13, 14]));
+
+        var facts = accumulator.BuildFacts();
+
+        Assert.Equal(1, facts.CounterTransitions.DuplicateCount);
+        Assert.Equal(1, facts.CounterTransitions.GapCount);
+        Assert.Contains(facts.Diagnostics, item => item.Contains("duplicate", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(facts.Diagnostics, item => item.Contains("gap", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void AccumulatorKeepsOnlyConfiguredMaximumObservationCount()
+    {
+        var accumulator = new SvObservationAccumulator(maximumObservations: 3, maximumAge: TimeSpan.FromMinutes(1));
+
+        for (var index = 0; index < 6; index++)
+            accumulator.Add(CreateObservation(index, [(ushort)index]));
+
+        var facts = accumulator.BuildFacts();
+
+        Assert.Equal(3, accumulator.Count);
+        Assert.Equal(3, facts.ObservationCount);
+        Assert.Equal(DateTimeOffset.UnixEpoch.AddMilliseconds(3), facts.FirstTimestamp);
+    }
+
+    [Fact]
+    public void AccumulatorDropsObservationsOutsideMaximumAge()
+    {
+        var accumulator = new SvObservationAccumulator(maximumObservations: 100, maximumAge: TimeSpan.FromMilliseconds(2));
+        accumulator.Add(CreateObservation(0, [0]));
+        accumulator.Add(CreateObservation(1, [1]));
+        accumulator.Add(CreateObservation(4, [4]));
+
+        var facts = accumulator.BuildFacts();
+
+        Assert.Single(new[] { facts.ObservationCount });
+        Assert.Equal(1, facts.ObservationCount);
+        Assert.Equal(DateTimeOffset.UnixEpoch.AddMilliseconds(4), facts.FirstTimestamp);
     }
 
     [Fact]
