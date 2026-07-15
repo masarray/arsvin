@@ -3,6 +3,8 @@ name: Temporary P3B Finalization
 on:
   push:
     branches: [ agent/p3b-observation-pipeline ]
+  pull_request:
+    branches: [ main ]
 
 permissions:
   contents: write
