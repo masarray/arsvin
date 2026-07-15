@@ -5,6 +5,10 @@ namespace ARSVIN.Subscriber.ViewModels;
 
 public sealed class SvStreamViewModel : ObservableObject
 {
+    private readonly BulkObservableCollection<DecodedValueRow> _values = new();
+    private readonly BulkObservableCollection<WaveformPoint> _waveformPoints = new();
+    private readonly BulkObservableCollection<PhasorVector> _phasors = new();
+    private readonly BulkObservableCollection<string> _evidenceDetails = new();
     private string _key = string.Empty;
     private string _health = "IDLE";
     private string _healthDetail = string.Empty;
@@ -36,10 +40,10 @@ public sealed class SvStreamViewModel : ObservableObject
     private string _comparisonMode = "Compatible";
     private string _waveformState = "Waiting for complete two-cycle window";
 
-    public BulkObservableCollection<DecodedValueRow> Values { get; } = new();
-    public BulkObservableCollection<WaveformPoint> WaveformPoints { get; } = new();
-    public BulkObservableCollection<PhasorVector> Phasors { get; } = new();
-    public BulkObservableCollection<string> EvidenceDetails { get; } = new();
+    public IReadOnlyList<DecodedValueRow> Values => _values;
+    public IReadOnlyList<WaveformPoint> WaveformPoints => _waveformPoints;
+    public IReadOnlyList<PhasorVector> Phasors => _phasors;
+    public IReadOnlyList<string> EvidenceDetails => _evidenceDetails;
 
     public string Key { get => _key; set => SetProperty(ref _key, value); }
     public string Health { get => _health; set => SetProperty(ref _health, value); }
@@ -130,9 +134,9 @@ public sealed class SvStreamViewModel : ObservableObject
         var samples = ResolveObservationSamples(observation?.Facts);
         Window = $"{duration:0.0} s · {samples:N0} samples";
 
-        Values.ReplaceAll(snapshot.Values.Take(64));
+        _values.ReplaceAll(snapshot.Values.Take(64));
         UpdateStableVisuals(snapshot);
-        EvidenceDetails.ReplaceAll(BuildEvidenceDetails(observation));
+        _evidenceDetails.ReplaceAll(BuildEvidenceDetails(observation));
     }
 
     private void UpdateStableVisuals(SvStreamSnapshot snapshot)
@@ -141,14 +145,14 @@ public sealed class SvStreamViewModel : ObservableObject
         var fullWindow = snapshot.WaveformPoints.Count >= expectedPoints;
         if (fullWindow)
         {
-            WaveformPoints.ReplaceAll(snapshot.WaveformPoints.TakeLast(expectedPoints));
-            Phasors.ReplaceAll(snapshot.Phasors);
+            _waveformPoints.ReplaceAll(snapshot.WaveformPoints.TakeLast(expectedPoints));
+            _phasors.ReplaceAll(snapshot.Phasors);
             WaveformState = $"2 cycles locked · {expectedPoints:N0} points";
             return;
         }
 
-        if (WaveformPoints.Count == 0)
-            Phasors.ReplaceAll(Array.Empty<PhasorVector>());
+        if (_waveformPoints.Count == 0)
+            _phasors.ReplaceAll(Array.Empty<PhasorVector>());
         WaveformState = $"Filling full window · {snapshot.WaveformPoints.Count:N0}/{expectedPoints:N0} points";
     }
 
