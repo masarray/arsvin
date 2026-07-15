@@ -4,10 +4,12 @@ using System.Windows;
 using System.Windows.Threading;
 using AR.Iec61850.SampledValues;
 using AR.Iec61850.SampledValues.Profiles;
+using AR.Iec61850.SampledValues.Reporting;
 using AR.Iec61850.Scl;
 using AR.Iec61850.Transports;
 using AR.Iec61850.Transports.Npcap;
 using ARSVIN.Subscriber.Models;
+using ARSVIN.Subscriber.Reporting;
 using Microsoft.Win32;
 
 namespace ARSVIN.Subscriber.ViewModels;
@@ -481,88 +483,57 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
     {
         var dialog = new SaveFileDialog
         {
-            Title = "Export SV subscriber verification report",
-            Filter = "Markdown report (*.md)|*.md|All files (*.*)|*.*",
-            FileName = $"arsvin-subscriber-report-{DateTime.Now:yyyyMMdd-HHmmss}.md"
+            Title = "Export SV subscriber evidence bundle",
+            Filter = "ARSVIN evidence bundle (*.md)|*.md|Markdown report (*.md)|*.md|JSON evidence (*.json)|*.json",
+            DefaultExt = ".md",
+            AddExtension = true,
+            FileName = $"arsvin-subscriber-evidence-{DateTime.Now:yyyyMMdd-HHmmss}.md"
         };
 
         if (dialog.ShowDialog() != true)
             return;
 
-        var snapshots = _runtimeStreams.Values.Select(x => x.Snapshot()).OrderBy(x => x.AppId).ThenBy(x => x.SvId).ToArray();
-        var lines = new List<string>
+        try
         {
-            "# ARSVIN Subscriber Verification Report",
-            string.Empty,
-            $"Generated: {DateTimeOffset.Now:yyyy-MM-dd HH:mm:ss zzz}",
-            $"SCL: {(string.IsNullOrWhiteSpace(_selectedSclPath) ? "not loaded" : _selectedSclPath)}",
-            $"Adapter: {SelectedAdapter?.DisplayName ?? "-"}",
-            $"Filter: {(string.IsNullOrWhiteSpace(FilterText) ? "none" : FilterText)}",
-            string.Empty,
-            "> This report is receiver-side evidence from ARSVIN Subscriber. It is not a formal IEC 61850 conformance certificate.",
-            string.Empty,
-            "## Summary",
-            string.Empty,
-            $"- Raw frames: {Interlocked.Read(ref _rawFrames):N0}",
-            $"- SV frames: {Interlocked.Read(ref _svFrames):N0}",
-            $"- Streams: {snapshots.Length:N0}",
-            $"- Health: {HealthText}",
-            string.Empty,
-            "## Streams",
-            string.Empty,
-            "| Health | APPID | svID | Bound | nofASDU | fps | smpCnt | Quality | Issues |",
-            "|---|---:|---|---|---:|---:|---:|---|---:|"
-        };
+            var generatedAt = DateTimeOffset.Now;
+            var snapshots = _runtimeStreams.Values
+                .Select(runtime => runtime.Snapshot())
+                .OrderBy(snapshot => snapshot.AppId)
+                .ThenBy(snapshot => snapshot.SvId)
+                .ToArray();
+            var observations = _latestObservations.ToDictionary(
+                pair => pair.Key,
+                pair => pair.Value,
+                StringComparer.Ordinal);
+            var report = SvSubscriberReportBuilder.Build(new SvSubscriberReportContext
+            {
+                GeneratedAt = generatedAt,
+                CaptureStartedAt = _captureStarted,
+                Health = HealthText,
+                SclPath = _selectedSclPath,
+                Adapter = SelectedAdapter?.DisplayName ?? string.Empty,
+                Filter = string.IsNullOrWhiteSpace(FilterText) ? string.Empty : FilterText,
+                RawFrames = Interlocked.Read(ref _rawFrames),
+                SvFrames = Interlocked.Read(ref _svFrames),
+                ParseErrors = Interlocked.Read(ref _parseErrors),
+                DroppedByFilter = Interlocked.Read(ref _droppedByFilter),
+                Streams = snapshots,
+                Observations = observations
+            });
 
-        foreach (var stream in snapshots)
-        {
-            var issues = stream.SequenceGapCount + stream.DuplicateCount + stream.OutOfOrderCount + stream.PayloadIssueCount + stream.SclMismatchCount;
-            lines.Add($"| {stream.Health} | 0x{stream.AppId:X4} | {Escape(stream.SvId)} | {(stream.IsBoundToScl ? "yes" : "no")} | {stream.NofAsdu} | {stream.ActualFps:0.0} | {stream.LastSmpCnt?.ToString() ?? "-"} | {Escape(stream.QualitySummary)} | {issues} |");
+            var markdownPath = Path.ChangeExtension(dialog.FileName, ".md");
+            var jsonPath = Path.ChangeExtension(dialog.FileName, ".json");
+            var markdown = SvSubscriberEvidenceReportSerializer.ToMarkdown(report);
+            var json = SvSubscriberEvidenceReportSerializer.ToJson(report);
+            await Task.WhenAll(
+                File.WriteAllTextAsync(markdownPath, markdown),
+                File.WriteAllTextAsync(jsonPath, json)).ConfigureAwait(true);
+
+            StatusText = $"Evidence bundle exported: {Path.GetFileName(markdownPath)} + {Path.GetFileName(jsonPath)}";
         }
-
-        lines.Add(string.Empty);
-        lines.Add("## Phasors");
-        lines.Add(string.Empty);
-        foreach (var stream in snapshots)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
         {
-            lines.Add($"### 0x{stream.AppId:X4} — {stream.SvId}");
-            lines.Add(string.Empty);
-            lines.Add($"- Cursor: {stream.CursorSummary}");
-            lines.Add("- Phasors:");
-            if (stream.Phasors.Count == 0)
-            {
-                lines.Add("  - Not enough decoded waveform samples or no SCL binding.");
-            }
-            else
-            {
-                foreach (var phasor in stream.Phasors)
-                    lines.Add($"  - {phasor.Channel}: RMS {phasor.Rms:0.###}, peak {phasor.Peak:0.###}, angle {phasor.AngleDegrees:0.0}°");
-            }
-            lines.Add(string.Empty);
+            StatusText = $"Evidence export failed: {ex.Message}";
         }
-
-        lines.Add("## Diagnostics");
-        lines.Add(string.Empty);
-        foreach (var stream in snapshots)
-        {
-            lines.Add($"### 0x{stream.AppId:X4} — {stream.SvId}");
-            lines.Add(string.Empty);
-            if (stream.Diagnostics.Count == 0)
-            {
-                lines.Add("- No diagnostics.");
-            }
-            else
-            {
-                foreach (var diagnostic in stream.Diagnostics)
-                    lines.Add($"- {diagnostic}");
-            }
-            lines.Add(string.Empty);
-        }
-
-        await File.WriteAllLinesAsync(dialog.FileName, lines).ConfigureAwait(true);
-        StatusText = $"Subscriber report exported: {dialog.FileName}";
     }
-
-    private static string Escape(string value)
-        => string.IsNullOrWhiteSpace(value) ? "-" : value.Replace("|", "\\|", StringComparison.Ordinal);
 }
