@@ -94,23 +94,38 @@ Neither mode stops receive-side capture or decoding. Unknown and conflicting str
 
 Before accepting an SCL candidate, the observation manager requires APPID, destination MAC, and VLAN to identify the same configured stream. A candidate that fails this address gate is rejected instead of contaminating observed facts with the wrong dataset layout.
 
+## Subscriber compact state
+
+The selected stream now exposes one compact analysis strip instead of permanent large evidence cards:
+
+```text
+PROFILE       Generic Layer-2 SV
+CONFIDENCE    Unknown · insufficient evidence
+SCL MATCH     Exact | N warnings | N errors
+WINDOW        duration · observed samples
+```
+
+Detailed detector evidence, configuration findings, and observation diagnostics remain collapsed behind an expandable evidence panel. Capture and visualization continue without requiring repeated manual selection.
+
+Waveform, phasor, and RMS collections use one reset notification per UI refresh. The visual layer withholds partial waveform windows until a complete two-cycle set is available, then retains the most recent complete window if the next refresh is incomplete. Compatible SCL warnings remain warnings and do not force the stream into a blocking `BAD` state.
+
 ## Current integration boundary
 
-`SvStreamObservationManager` now:
+`SvStreamObservationManager` and Subscriber now:
 
-- accepts parsed frames from live Npcap capture and classic-PCAP replay;
-- groups frames by source, destination, VLAN, APPID, `svID`, and dataset reference;
-- deliberately keeps `confRev` outside the key so revision changes remain observable;
-- retains input provenance (`LiveCapture` or `PcapReplay`);
-- validates the SCL candidate against the observed address tuple;
-- converts a bound SCL stream into `SvExpectedStreamConfiguration`;
-- runs Compatible comparison by default, with Strict available per observation call;
-- adds SCL-derived dataset signatures when a stream is bound; and
-- exposes immutable rolling facts plus persistent configuration comparison results to Subscriber runtime snapshots.
+- accept parsed frames from live Npcap capture and classic-PCAP replay;
+- group frames by source, destination, VLAN, APPID, `svID`, and dataset reference;
+- deliberately keep `confRev` outside the key so revision changes remain observable;
+- retain input provenance (`LiveCapture` or `PcapReplay`);
+- validate the SCL candidate against the observed address tuple;
+- convert a bound SCL stream into `SvExpectedStreamConfiguration`;
+- run Compatible comparison by default, with Strict available per observation call;
+- evaluate the built-in evidence-aware profile catalog;
+- expose compact profile, confidence, SCL match, and observation-window state;
+- expose detailed evidence only on demand; and
+- keep full-window waveform, phasor, and RMS visualization stable through bulk collection refreshes.
 
 ## Next integration
 
-1. Present one compact profile/confidence and SCL-match state per selected stream.
-2. Show evidence and mismatch details on demand rather than adding permanent visual noise.
-3. Add profile-specific definitions only after source review and deterministic evidence.
-4. Serialize profile, configuration, provenance, and source evidence into Subscriber reports.
+1. Add profile-specific definitions only after source review and deterministic evidence.
+2. Serialize profile, configuration, provenance, observation-window, and source evidence into Subscriber reports.
