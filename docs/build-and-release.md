@@ -63,12 +63,12 @@ Publisher, Subscriber, and Tests reference the same `ARSVIN.Engine` assembly. Pr
 ## Coverage evidence
 
 ```powershell
-.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 13 -MinimumLineCoverage 70
+.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 14.25 -MinimumLineCoverage 72.5
 ```
 
 The coverage workflow retains TRX, full test logs, and Cobertura output under `artifacts/test-results`, then enforces whole-engine and protocol-core regression floors.
 
-The documented baseline contains 74 deterministic tests, 13.35% whole-engine line coverage, and 70.47% protocol-core line coverage. These values are regression evidence, not formal conformance, complete live-network validation, deterministic timing evidence, or universal device-interoperability evidence.
+The documented baseline contains 88 deterministic tests. Whole-engine coverage is 14.61% with 2,423 of 16,582 lines covered, and protocol-core coverage is 72.76% with 1,739 of 2,390 lines covered. CI enforces floors of 14.25% and 72.5%. These values are regression evidence, not formal conformance, complete live-network validation, deterministic timing evidence, or universal device-interoperability evidence.
 
 ## Build and validate the public site
 

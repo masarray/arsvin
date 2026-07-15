@@ -3,6 +3,7 @@ using System.Collections.ObjectModel;
 using System.Windows;
 using System.Windows.Threading;
 using AR.Iec61850.SampledValues;
+using AR.Iec61850.SampledValues.Profiles;
 using AR.Iec61850.Scl;
 using AR.Iec61850.Transports;
 using AR.Iec61850.Transports.Npcap;
@@ -13,7 +14,8 @@ namespace ARSVIN.Subscriber.ViewModels;
 
 public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
 {
-    private readonly ConcurrentDictionary<string, SvStreamRuntime> _runtimeStreams = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, SvStreamRuntime> _runtimeStreams = new(StringComparer.Ordinal);
+    private readonly SvStreamObservationManager _observationManager = new();
     private readonly Dictionary<string, SvStreamViewModel> _streamRows = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _uiTimer;
     private CancellationTokenSource? _captureCts;
@@ -211,13 +213,16 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
         foreach (var frame in PcapFrames.Read(path))
         {
             total++;
-            ObserveFrame(frame.Timestamp, frame.Frame);
+            ObserveFrame(frame.Timestamp, frame.Frame, SvObservationInputKind.PcapReplay);
         }
 
         return total;
     }
 
-    private void ObserveFrame(DateTimeOffset timestamp, ReadOnlyMemory<byte> ethernetFrame)
+    private void ObserveFrame(
+        DateTimeOffset timestamp,
+        ReadOnlyMemory<byte> ethernetFrame,
+        SvObservationInputKind inputKind)
     {
         Interlocked.Increment(ref _rawFrames);
         if (!SampledValuesFrameParser.TryParseEthernetFrame(ethernetFrame, out var frame))
@@ -234,9 +239,16 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
 
         Interlocked.Increment(ref _svFrames);
         var first = frame.Pdu.Asdus.FirstOrDefault();
-        var key = BuildStreamKey(frame, first?.SvId ?? string.Empty, first?.ConfigurationRevision);
+        var profile = FindProfile(frame, first);
+        if (!_observationManager.TryObserve(timestamp, frame, inputKind, profile, out var observation))
+        {
+            Interlocked.Increment(ref _parseErrors);
+            return;
+        }
+
+        var key = observation.Key.Id;
         var runtime = _runtimeStreams.GetOrAdd(key, _ => new SvStreamRuntime(key));
-        runtime.Observe(timestamp, frame, FindProfile(frame, first));
+        runtime.Observe(timestamp, frame, profile, observation);
     }
 
     private void ToggleCapture()
@@ -290,7 +302,7 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
 
             await foreach (var captured in source.CaptureAsync(options, cancellationToken).ConfigureAwait(false))
             {
-                ObserveFrame(captured.Timestamp, captured.Frame);
+                ObserveFrame(captured.Timestamp, captured.Frame, SvObservationInputKind.LiveCapture);
             }
         }
         catch (OperationCanceledException)
@@ -333,13 +345,6 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
                    string.Equals(profile.Stream.SvId, asdu.SvId, StringComparison.OrdinalIgnoreCase))
                ?? _sclProfiles.FirstOrDefault(profile => profile.AppId == frame.AppId)
                ?? _sclProfiles.FirstOrDefault(profile => string.Equals(profile.Stream.SvId, asdu.SvId, StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static string BuildStreamKey(SampledValuesFrame frame, string svId, uint? confRev)
-    {
-        var vlanText = frame.Vlan.HasValue ? frame.Vlan.Value.VlanId.ToString(CultureInfo.InvariantCulture) : "-";
-        var confRevText = confRev.HasValue ? confRev.Value.ToString(CultureInfo.InvariantCulture) : "-";
-        return $"SV|{frame.AppId:X4}|{frame.Source}|{frame.Destination}|{vlanText}|{svId}|{confRevText}";
     }
 
     private void RefreshUiSnapshots()
@@ -426,6 +431,7 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
     private void ClearRuntimeOnly()
     {
         _runtimeStreams.Clear();
+        _observationManager.Clear();
         _streamRows.Clear();
         Streams.Clear();
         SelectedValues.Clear();

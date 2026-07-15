@@ -1,6 +1,7 @@
 using AR.Iec61850.Mms;
 using System.Buffers.Binary;
 using AR.Iec61850.SampledValues;
+using AR.Iec61850.SampledValues.Profiles;
 using AR.Iec61850.Scl;
 
 namespace ARSVIN.Subscriber.Models;
@@ -32,6 +33,7 @@ internal sealed class SvStreamRuntime
     private string _lastHealthDetail = string.Empty;
     private string _layoutBinding = string.Empty;
     private IReadOnlyList<DecodedValueRow> _decodedValues = Array.Empty<DecodedValueRow>();
+    private SvStreamObservationSnapshot? _observationSnapshot;
 
     public SvStreamRuntime(string key)
     {
@@ -55,7 +57,11 @@ internal sealed class SvStreamRuntime
     public string ControlBlockReference { get; private set; } = string.Empty;
     public string LayoutBinding { get; private set; } = string.Empty;
 
-    public void Observe(DateTimeOffset timestamp, SampledValuesFrame frame, SampledValuesPublisherProfile? profile)
+    public void Observe(
+        DateTimeOffset timestamp,
+        SampledValuesFrame frame,
+        SampledValuesPublisherProfile? profile,
+        SvStreamObservationSnapshot observationSnapshot)
     {
         var asdus = frame.Pdu.Asdus;
         var first = asdus.FirstOrDefault();
@@ -168,6 +174,7 @@ internal sealed class SvStreamRuntime
             _diagnostics.Clear();
             _diagnostics.AddRange(diagnostics.Take(12));
             _decodedValues = latestRows.ToArray();
+            _observationSnapshot = observationSnapshot;
             _lastHealthDetail = diagnostics.Count == 0 ? "SV stream is stable." : diagnostics[0];
         }
     }
@@ -227,7 +234,15 @@ internal sealed class SvStreamRuntime
                 CursorSummary = BuildCursorSummary(visiblePoints),
                 QualitySummary = _qualityGood + _qualityNonZero == 0
                     ? "Quality not decoded"
-                    : $"Quality good {_qualityGood:N0}, non-zero {_qualityNonZero:N0}"
+                    : $"Quality good {_qualityGood:N0}, non-zero {_qualityNonZero:N0}",
+                ObservationInputKinds = _observationSnapshot?.InputKinds ?? Array.Empty<SvObservationInputKind>(),
+                ObservationWindowFrames = _observationSnapshot?.Facts.ObservationCount ?? 0,
+                ObservedFramesPerSecond = _observationSnapshot?.Facts.ObservedFramesPerSecond,
+                ObservedSamplesPerSecond = _observationSnapshot?.Facts.ObservedSamplesPerSecond,
+                ObservedCounterWrap = _observationSnapshot?.Facts.ObservedCounterWrap,
+                ObservationDiagnostics = _observationSnapshot?.Diagnostics ?? Array.Empty<string>(),
+                FactProvenance = _observationSnapshot?.Facts.Provenance
+                    ?? new Dictionary<string, SvFactSource>(StringComparer.Ordinal)
             };
         }
     }

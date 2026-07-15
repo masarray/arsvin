@@ -202,10 +202,10 @@ Build release artifacts except the installer:
 Run tests with both coverage gates:
 
 ```powershell
-.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 13 -MinimumLineCoverage 70
+.\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 14.25 -MinimumLineCoverage 72.5
 ```
 
-The current baseline contains 74 deterministic tests. CI enforces the documented whole-engine and protocol-core coverage floors; current values are engineering regression evidence, not formal protocol conformance evidence.
+The current baseline contains 88 deterministic tests. Whole-engine coverage is 14.61% across 16,582 instrumented lines, while protocol-core coverage is 72.76% across 2,390 lines. CI enforces floors of 14.25% and 72.5% respectively; these values are engineering regression evidence, not formal protocol conformance evidence.
 
 ## Repository architecture
 
