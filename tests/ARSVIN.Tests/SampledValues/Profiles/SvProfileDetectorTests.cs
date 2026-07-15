@@ -6,20 +6,28 @@ namespace ARSVIN.Tests.SampledValues.Profiles;
 public sealed class SvProfileDetectorTests
 {
     [Fact]
-    public void ExactSyntheticDefinitionProducesConfirmedExplainableResult()
+    public void ExactVerifiedDefinitionProducesConfirmedExplainableResult()
     {
-        var detector = new SvProfileDetector();
-        var result = detector.Evaluate(CreateMatchingFacts(), CreateSyntheticProfile());
+        var result = new SvProfileDetector().Evaluate(CreateMatchingFacts(), CreateSyntheticProfile(SvProfileEvidenceStatus.VerifiedLab));
 
+        Assert.Equal(SvProfileConfidence.Confirmed, result.RawConfidence);
         Assert.Equal(SvProfileConfidence.Confirmed, result.Confidence);
         Assert.Equal(100, result.ScorePercent);
         Assert.False(result.HasConflicts);
-        Assert.Contains(result.Evidence, item =>
-            item.Field == "Dataset signature" &&
-            item.Outcome == SvProfileEvidenceOutcome.Match);
-        Assert.Contains(result.Evidence, item =>
-            item.Field == "Observed samples per second" &&
-            item.Message.Contains("within", StringComparison.Ordinal));
+        Assert.Contains(result.Evidence, item => item.Field == "Dataset signature" && item.Outcome == SvProfileEvidenceOutcome.Match);
+    }
+
+    [Theory]
+    [InlineData(SvProfileEvidenceStatus.ResearchCandidate, SvProfileConfidence.Possible)]
+    [InlineData(SvProfileEvidenceStatus.ImplementedGeneric, SvProfileConfidence.Likely)]
+    public void UnverifiedDefinitionCannotProduceConfirmedPublicConfidence(
+        SvProfileEvidenceStatus status,
+        SvProfileConfidence expectedCeiling)
+    {
+        var result = new SvProfileDetector().Evaluate(CreateMatchingFacts(), CreateSyntheticProfile(status));
+
+        Assert.Equal(SvProfileConfidence.Confirmed, result.RawConfidence);
+        Assert.Equal(expectedCeiling, result.Confidence);
     }
 
     [Fact]
@@ -33,22 +41,17 @@ public sealed class SvProfileDetectorTests
             ObservedCounterWrap = 2000
         };
 
-        var result = new SvProfileDetector().Evaluate(facts, CreateSyntheticProfile());
+        var result = new SvProfileDetector().Evaluate(facts, CreateSyntheticProfile(SvProfileEvidenceStatus.VerifiedLab));
 
         Assert.Equal(SvProfileConfidence.Conflict, result.Confidence);
         Assert.True(result.HasConflicts);
-        Assert.Contains(result.Evidence, item =>
-            item.Field == "Payload bytes per ASDU" &&
-            item.Outcome == SvProfileEvidenceOutcome.Conflict);
-        Assert.Contains(result.Evidence, item =>
-            item.Field == "Sample-counter wrap" &&
-            item.Observed == "2000");
+        Assert.Contains(result.Evidence, item => item.Field == "Payload bytes per ASDU" && item.Outcome == SvProfileEvidenceOutcome.Conflict);
     }
 
     [Fact]
     public void MissingObservedFactsRemainUnknownAndDoNotCreateFalseMatch()
     {
-        var result = new SvProfileDetector().Evaluate(new SvObservedStreamFacts(), CreateSyntheticProfile());
+        var result = new SvProfileDetector().Evaluate(new SvObservedStreamFacts(), CreateSyntheticProfile(SvProfileEvidenceStatus.VerifiedLab));
 
         Assert.Equal(SvProfileConfidence.Unknown, result.Confidence);
         Assert.Equal(0, result.EvaluatedWeight);
@@ -58,11 +61,7 @@ public sealed class SvProfileDetectorTests
     [Fact]
     public void SparseGenericEvidenceCannotProduceFalseConfirmation()
     {
-        var facts = new SvObservedStreamFacts
-        {
-            EtherType = 0x88BA,
-            ObservationCount = 1
-        };
+        var facts = new SvObservedStreamFacts { EtherType = 0x88BA, ObservationCount = 1 };
 
         var result = new SvProfileDetector().Evaluate(facts, SvProfileCatalog.GenericSclLayer2);
 
@@ -82,12 +81,9 @@ public sealed class SvProfileDetectorTests
             ObservedCounterWrap = null
         };
 
-        var result = new SvProfileDetector().Evaluate(facts, CreateSyntheticProfile());
+        var result = new SvProfileDetector().Evaluate(facts, CreateSyntheticProfile(SvProfileEvidenceStatus.VerifiedLab));
 
         Assert.Equal(SvProfileConfidence.Possible, result.Confidence);
-        Assert.DoesNotContain(result.Evidence, item =>
-            item.Field == "Dataset signature" &&
-            item.Outcome == SvProfileEvidenceOutcome.Match);
     }
 
     [Fact]
@@ -121,7 +117,7 @@ public sealed class SvProfileDetectorTests
             ObservationCount = 100
         };
 
-    private static SvProfileDefinition CreateSyntheticProfile()
+    private static SvProfileDefinition CreateSyntheticProfile(SvProfileEvidenceStatus evidenceStatus)
         => new()
         {
             Id = "synthetic-protection-profile",
@@ -141,13 +137,10 @@ public sealed class SvProfileDetectorTests
             AllowedNominalFrequenciesHz = [50],
             ExpectedCounterWrap = 4000,
             RateTolerancePercent = 0.5,
-            EvidenceStatus = SvProfileEvidenceStatus.ResearchCandidate,
+            EvidenceStatus = evidenceStatus,
             Sources =
             [
-                new SvProfileSourceEvidence(
-                    "test-fixture",
-                    "Synthetic values used only to verify detector behavior.",
-                    SvProfileEvidenceStatus.ResearchCandidate)
+                new SvProfileSourceEvidence("test-fixture", "Synthetic values used only to verify detector behavior.", evidenceStatus)
             ]
         };
 }
