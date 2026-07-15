@@ -83,17 +83,17 @@ public sealed class SvExpectedConfigurationIntegrationTests
         Assert.Equal("Exact", observed.ConfigurationMatchSummary);
         var persisted = Assert.Single(manager.SnapshotAll());
         Assert.Equal("Exact", persisted.ConfigurationMatchSummary);
-        Assert.True(persisted.ConfigurationComparison?.IsExactMatch);
+        var comparison = Assert.IsType<SvConfigurationComparisonResult>(persisted.ConfigurationComparison);
+        Assert.True(comparison.IsExactMatch);
     }
 
     [Fact]
     public void AddressMismatchRejectsUnsafeSclCandidate()
     {
         var manager = new SvStreamObservationManager();
-        var frame = CreateFrame(configurationRevision: 7) with
-        {
-            Destination = MacAddress.Parse("01:0C:CD:04:00:02")
-        };
+        var frame = CreateFrame(
+            configurationRevision: 7,
+            destinationMac: "01:0C:CD:04:00:02");
 
         Assert.True(manager.TryObserve(
             DateTimeOffset.UnixEpoch,
@@ -109,11 +109,13 @@ public sealed class SvExpectedConfigurationIntegrationTests
         Assert.Contains(snapshot.Diagnostics, item => item.Contains("Rejected SCL candidate", StringComparison.Ordinal));
     }
 
-    private static SampledValuesFrame CreateFrame(uint configurationRevision)
+    private static SampledValuesFrame CreateFrame(
+        uint configurationRevision,
+        string destinationMac = "01:0C:CD:04:00:01")
         => new()
         {
             Source = MacAddress.Parse("02:00:00:00:00:01"),
-            Destination = MacAddress.Parse("01:0C:CD:04:00:01"),
+            Destination = MacAddress.Parse(destinationMac),
             Vlan = new VlanTag(4, 100),
             AppId = 0x4001,
             Pdu = new SampledValuesPdu
