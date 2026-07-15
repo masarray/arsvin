@@ -96,7 +96,7 @@ Before accepting an SCL candidate, the observation manager requires APPID, desti
 
 ## Subscriber compact state
 
-The selected stream now exposes one compact analysis strip instead of permanent large evidence cards:
+The selected stream exposes one compact analysis strip instead of permanent large evidence cards:
 
 ```text
 PROFILE       Generic Layer-2 SV
@@ -108,6 +108,29 @@ WINDOW        duration · observed samples
 Detailed detector evidence, configuration findings, and observation diagnostics remain collapsed behind an expandable evidence panel. Capture and visualization continue without requiring repeated manual selection.
 
 Waveform, phasor, and RMS collections use one reset notification per UI refresh. The visual layer withholds partial waveform windows until a complete two-cycle set is available, then retains the most recent complete window if the next refresh is incomplete. Compatible SCL warnings remain warnings and do not force the stream into a blocking `BAD` state.
+
+## Evidence report bundle
+
+Subscriber Export creates two files from the same report snapshot:
+
+- a Markdown engineering report for review and handover,
+- a JSON evidence document using schema `arsvin.sv-subscriber-evidence/v1` for automation, archival, and later comparison.
+
+Both files include:
+
+- generation time, product version, informational version, repository, and source commit,
+- live, PCAP, or mixed input provenance,
+- SCL path, adapter, user filter, capture duration, frame counts, parse errors, and filtered-frame counts,
+- per-stream identity, runtime integrity, quality, cursor state, waveform readiness, and phasors,
+- first and last observation timestamps, frame and sample counts, measured rates, sample-counter transitions, and wrap evidence,
+- every stable observed fact with its provenance (`WireObserved`, `CaptureCalculated`, `SclDerived`, or trusted context),
+- profile definition, evidence maturity, confidence, weighted match evidence, and source metadata,
+- expected SCL configuration, comparison mode, exact/warning/error summary, and field-level findings,
+- runtime and observation diagnostics.
+
+Unknown values remain explicit `null` values in JSON and `unknown` values in Markdown. They are not silently removed or interpreted as matches. The report schema validates generation time, product identity, stream count, and unique stream keys before serialization.
+
+GitHub Actions injects `GITHUB_SHA` into `SourceRevisionId`; the .NET informational version therefore carries the build commit for release and CI artifacts. Local builds without source revision metadata report the commit as `unknown` rather than inventing one.
 
 ## Current integration boundary
 
@@ -122,10 +145,11 @@ Waveform, phasor, and RMS collections use one reset notification per UI refresh.
 - run Compatible comparison by default, with Strict available per observation call;
 - evaluate the built-in evidence-aware profile catalog;
 - expose compact profile, confidence, SCL match, and observation-window state;
-- expose detailed evidence only on demand; and
-- keep full-window waveform, phasor, and RMS visualization stable through bulk collection refreshes.
+- expose detailed evidence only on demand;
+- keep full-window waveform, phasor, and RMS visualization stable through bulk collection refreshes; and
+- serialize the same observation, profile, configuration, provenance, source, and build evidence into paired Markdown and JSON reports.
 
 ## Next integration
 
 1. Add profile-specific definitions only after source review and deterministic evidence.
-2. Serialize profile, configuration, provenance, observation-window, and source evidence into Subscriber reports.
+2. Add report-to-report comparison after the evidence schema has real capture history and compatibility requirements.
