@@ -128,7 +128,7 @@ Both files include:
 - expected SCL configuration, comparison mode, exact/warning/error summary, and field-level findings,
 - runtime and observation diagnostics.
 
-Unknown values remain explicit `null` values in JSON and `unknown` values in Markdown. They are not silently removed or interpreted as matches. The report schema validates generation time, product identity, stream count, and unique stream keys before serialization.
+Unknown nullable values remain explicit `null`; unknown text fields remain empty strings in JSON and render as `unknown` in Markdown. They are not silently removed or interpreted as matches. The report schema validates generation time, product identity, stream count, and unique stream keys before serialization.
 
 GitHub Actions injects `GITHUB_SHA` into `SourceRevisionId`; the .NET informational version therefore carries the build commit for release and CI artifacts. Local builds without source revision metadata report the commit as `unknown` rather than inventing one.
 
