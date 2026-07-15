@@ -10,6 +10,7 @@ public sealed class SvProfileDetector
     private const int SamplingRateWeight = 25;
     private const int NominalFrequencyWeight = 8;
     private const int CounterWrapWeight = 15;
+    private const int MinimumFamilyWeight = 5;
     private const int MinimumPossibleWeight = 15;
     private const int MinimumLikelyWeight = 40;
     private const int MinimumConfirmedWeight = 70;
@@ -111,16 +112,22 @@ public sealed class SvProfileDetector
         var hasSamplingMatch = HasMatch(evidence, "Observed samples per second") ||
                                HasMatch(evidence, "Samples per cycle");
 
+        var uncappedConfidence = ResolveConfidence(
+            score,
+            matchedWeight,
+            conflictWeight,
+            evaluatedWeight,
+            hasDataSetSignatureMatch,
+            hasSamplingMatch,
+            facts.IsWindowSufficient,
+            profile.ClassificationScope);
+        var confidence = ApplyEvidenceMaturityCeiling(uncappedConfidence, profile.EvidenceStatus);
+
         return new SvProfileDetectionResult
         {
             Profile = profile,
-            Confidence = ResolveConfidence(
-                score,
-                matchedWeight,
-                conflictWeight,
-                evaluatedWeight,
-                hasDataSetSignatureMatch,
-                hasSamplingMatch),
+            Confidence = confidence,
+            UncappedConfidence = uncappedConfidence,
             ScorePercent = score,
             MatchedWeight = matchedWeight,
             ConflictWeight = conflictWeight,
@@ -135,27 +142,68 @@ public sealed class SvProfileDetector
         int conflictWeight,
         int evaluatedWeight,
         bool hasDataSetSignatureMatch,
-        bool hasSamplingMatch)
+        bool hasSamplingMatch,
+        bool observationWindowSufficient,
+        SvProfileClassificationScope scope)
     {
         if (evaluatedWeight == 0)
             return SvProfileConfidence.Unknown;
         if (conflictWeight >= matchedWeight && conflictWeight > 0)
             return SvProfileConfidence.Conflict;
+
+        if (scope == SvProfileClassificationScope.TrafficFamily)
+        {
+            if (conflictWeight == 0 && score >= 90 && evaluatedWeight >= MinimumFamilyWeight)
+                return SvProfileConfidence.Likely;
+            if (score >= 45 && evaluatedWeight >= MinimumFamilyWeight)
+                return SvProfileConfidence.Possible;
+            if (conflictWeight > 0)
+                return SvProfileConfidence.Conflict;
+            return SvProfileConfidence.Unknown;
+        }
+
         if (conflictWeight == 0 &&
             score >= 90 &&
             evaluatedWeight >= MinimumConfirmedWeight &&
             hasDataSetSignatureMatch &&
-            hasSamplingMatch)
+            hasSamplingMatch &&
+            observationWindowSufficient)
         {
             return SvProfileConfidence.Confirmed;
         }
-        if (score >= 70 && evaluatedWeight >= MinimumLikelyWeight)
+        if (score >= 70 &&
+            evaluatedWeight >= MinimumLikelyWeight &&
+            observationWindowSufficient)
+        {
             return SvProfileConfidence.Likely;
+        }
         if (score >= 45 && evaluatedWeight >= MinimumPossibleWeight)
             return SvProfileConfidence.Possible;
         if (conflictWeight > 0)
             return SvProfileConfidence.Conflict;
         return SvProfileConfidence.Unknown;
+    }
+
+    private static SvProfileConfidence ApplyEvidenceMaturityCeiling(
+        SvProfileConfidence confidence,
+        SvProfileEvidenceStatus evidenceStatus)
+    {
+        if (confidence is SvProfileConfidence.Unknown or SvProfileConfidence.Conflict)
+            return confidence;
+
+        var ceiling = evidenceStatus switch
+        {
+            SvProfileEvidenceStatus.ResearchCandidate => SvProfileConfidence.Possible,
+            SvProfileEvidenceStatus.ImplementedGeneric => SvProfileConfidence.Likely,
+            SvProfileEvidenceStatus.VerifiedStandard => SvProfileConfidence.Confirmed,
+            SvProfileEvidenceStatus.VerifiedCapture => SvProfileConfidence.Confirmed,
+            SvProfileEvidenceStatus.VerifiedLab => SvProfileConfidence.Confirmed,
+            _ => SvProfileConfidence.Possible
+        };
+
+        return ConfidenceRank(confidence) > ConfidenceRank(ceiling)
+            ? ceiling
+            : confidence;
     }
 
     private static int ConfidenceRank(SvProfileConfidence confidence)
@@ -382,6 +430,7 @@ public static class SvProfileCatalog
         Id = "generic-scl-layer2",
         DisplayName = "Generic SCL-driven Layer-2 SV",
         Family = "Generic Layer-2 SV",
+        ClassificationScope = SvProfileClassificationScope.TrafficFamily,
         SamplingBasis = SvSamplingBasis.Custom,
         ExpectedEtherType = 0x88BA,
         EvidenceStatus = SvProfileEvidenceStatus.ImplementedGeneric,
