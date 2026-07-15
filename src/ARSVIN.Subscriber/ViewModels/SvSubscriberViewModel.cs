@@ -15,6 +15,7 @@ namespace ARSVIN.Subscriber.ViewModels;
 public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
 {
     private readonly ConcurrentDictionary<string, SvStreamRuntime> _runtimeStreams = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, SvStreamObservationSnapshot> _latestObservations = new(StringComparer.Ordinal);
     private readonly SvStreamObservationManager _observationManager = new();
     private readonly Dictionary<string, SvStreamViewModel> _streamRows = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _uiTimer;
@@ -60,7 +61,7 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
 
     public ObservableCollection<AdapterChoice> Adapters { get; } = new();
     public ObservableCollection<SvStreamViewModel> Streams { get; } = new();
-    public ObservableCollection<DecodedValueRow> SelectedValues { get; } = new();
+    public BulkObservableCollection<DecodedValueRow> SelectedValues { get; } = new();
 
     public RelayCommand RefreshAdaptersCommand { get; }
     public AsyncRelayCommand OpenSclCommand { get; }
@@ -181,7 +182,6 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
         }
     }
 
-
     private async Task OpenCaptureFileAsync()
     {
         var dialog = new OpenFileDialog
@@ -247,8 +247,13 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
         }
 
         var key = observation.Key.Id;
+        _latestObservations[key] = observation;
         var runtime = _runtimeStreams.GetOrAdd(key, _ => new SvStreamRuntime(key));
-        runtime.Observe(timestamp, frame, profile, observation);
+        runtime.Observe(
+            timestamp,
+            frame,
+            observation.IsBoundToScl ? profile : null,
+            observation);
     }
 
     private void ToggleCapture()
@@ -340,11 +345,34 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
         if (asdu is null || _sclProfiles.Count == 0)
             return null;
 
-        return _sclProfiles.FirstOrDefault(profile =>
-                   profile.AppId == frame.AppId &&
-                   string.Equals(profile.Stream.SvId, asdu.SvId, StringComparison.OrdinalIgnoreCase))
-               ?? _sclProfiles.FirstOrDefault(profile => profile.AppId == frame.AppId)
-               ?? _sclProfiles.FirstOrDefault(profile => string.Equals(profile.Stream.SvId, asdu.SvId, StringComparison.OrdinalIgnoreCase));
+        var addressCandidates = _sclProfiles.Where(profile =>
+                profile.AppId == frame.AppId &&
+                string.Equals(profile.Destination.ToString(), frame.Destination.ToString(), StringComparison.OrdinalIgnoreCase) &&
+                profile.Vlan?.VlanId == frame.Vlan?.VlanId)
+            .ToArray();
+        if (addressCandidates.Length == 0)
+            return null;
+
+        var exact = addressCandidates.Where(profile =>
+                string.Equals(profile.Stream.SvId, asdu.SvId, StringComparison.Ordinal) &&
+                string.Equals(profile.Stream.DataSetReference, asdu.DataSetReference, StringComparison.Ordinal))
+            .ToArray();
+        if (exact.Length == 1)
+            return exact[0];
+
+        var svIdMatches = addressCandidates.Where(profile =>
+                string.Equals(profile.Stream.SvId, asdu.SvId, StringComparison.Ordinal))
+            .ToArray();
+        if (svIdMatches.Length == 1)
+            return svIdMatches[0];
+
+        var dataSetMatches = addressCandidates.Where(profile =>
+                string.Equals(profile.Stream.DataSetReference, asdu.DataSetReference, StringComparison.Ordinal))
+            .ToArray();
+        if (dataSetMatches.Length == 1)
+            return dataSetMatches[0];
+
+        return addressCandidates.Length == 1 ? addressCandidates[0] : null;
     }
 
     private void RefreshUiSnapshots()
@@ -360,7 +388,8 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
                 SelectedStream ??= row;
             }
 
-            row.Apply(snapshot);
+            _latestObservations.TryGetValue(snapshot.Key, out var observation);
+            row.Apply(snapshot, observation);
         }
 
         var keys = snapshots.Select(x => x.Key).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -378,12 +407,7 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
 
     private void RefreshSelectedValues()
     {
-        SelectedValues.Clear();
-        if (SelectedStream is null)
-            return;
-
-        foreach (var value in SelectedStream.Values)
-            SelectedValues.Add(value);
+        SelectedValues.ReplaceAll(SelectedStream?.Values ?? Array.Empty<DecodedValueRow>());
     }
 
     private void UpdateGlobalCards(IReadOnlyList<SvStreamSnapshot> snapshots)
@@ -392,7 +416,12 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
         var sv = Interlocked.Read(ref _svFrames);
         var parse = Interlocked.Read(ref _parseErrors);
         var dropped = Interlocked.Read(ref _droppedByFilter);
-        var issues = snapshots.Sum(x => x.SequenceGapCount + x.DuplicateCount + x.OutOfOrderCount + x.PayloadIssueCount + x.SclMismatchCount) + parse;
+        var runtimeIssues = snapshots.Sum(x => x.SequenceGapCount + x.DuplicateCount + x.OutOfOrderCount + x.PayloadIssueCount);
+        var configurationIssues = snapshots.Sum(snapshot =>
+            _latestObservations.TryGetValue(snapshot.Key, out var observation)
+                ? observation.ConfigurationComparison?.Findings.Count ?? 0
+                : 0);
+        var issues = runtimeIssues + configurationIssues + parse;
         var duration = _captureStarted.HasValue ? DateTimeOffset.Now - _captureStarted.Value : TimeSpan.Zero;
         var fps = duration.TotalSeconds > 0.001 ? sv / duration.TotalSeconds : 0;
 
@@ -405,12 +434,14 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
 
         if (!IsCapturing && snapshots.Count == 0)
             HealthText = "IDLE";
-        else if (issues > 0)
-            HealthText = snapshots.Any(x => x.Health == "BAD") || parse > 0 ? "BAD" : "WARN";
+        else if (_streamRows.Values.Any(row => row.Health == "BAD") || parse > 0)
+            HealthText = "BAD";
+        else if (_streamRows.Values.Any(row => row.Health == "WARN"))
+            HealthText = "WARN";
         else if (snapshots.Count == 0)
             HealthText = IsCapturing ? "LISTENING" : "IDLE";
         else
-            HealthText = snapshots.All(x => x.IsBoundToScl) ? "GOOD" : "WARN";
+            HealthText = "GOOD";
 
         if (dropped > 0 && IsCapturing)
             StatusText = $"Listening. User filter dropped {dropped:N0} SV frame(s).";
@@ -420,7 +451,7 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
     {
         ClearRuntimeOnly();
         Streams.Clear();
-        SelectedValues.Clear();
+        SelectedValues.ReplaceAll(Array.Empty<DecodedValueRow>());
         _streamRows.Clear();
         SelectedStream = null;
         HealthText = "IDLE";
@@ -431,10 +462,11 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
     private void ClearRuntimeOnly()
     {
         _runtimeStreams.Clear();
+        _latestObservations.Clear();
         _observationManager.Clear();
         _streamRows.Clear();
         Streams.Clear();
-        SelectedValues.Clear();
+        SelectedValues.ReplaceAll(Array.Empty<DecodedValueRow>());
         SelectedStream = null;
         Interlocked.Exchange(ref _rawFrames, 0);
         Interlocked.Exchange(ref _svFrames, 0);
