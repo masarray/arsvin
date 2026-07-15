@@ -1,0 +1,113 @@
+name: Temporary P3B Integration
+
+on:
+  push:
+    branches: [ agent/p3b-observation-pipeline ]
+
+permissions:
+  contents: write
+
+jobs:
+  integrate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          ref: agent/p3b-observation-pipeline
+          fetch-depth: 0
+
+      - name: Wire live and PCAP paths into the shared observation manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              file = Path(path)
+              text = file.read_text(encoding='utf-8')
+              if old not in text:
+                  raise SystemExit(f'Expected text not found in {path}: {old[:120]!r}')
+              file.write_text(text.replace(old, new, 1), encoding='utf-8', newline='\n')
+
+          manager = 'src/ARSVIN.Engine/AR.Iec61850/SampledValues/Profiles/SvStreamObservationManager.cs'
+          replace_once(
+              manager,
+              '        var payloadLength = asdus.Select(item => item.SamplePayload.Length).Distinct().SingleOrDefault();\n        if (payloadLength <= 0)\n            payloadLength = first.SamplePayload.Length;\n',
+              '        var payloadLengths = asdus.Select(item => item.SamplePayload.Length).Distinct().ToArray();\n        var payloadLength = payloadLengths.Length == 1 ? payloadLengths[0] : first.SamplePayload.Length;\n')
+
+          view_model = 'src/ARSVIN.Subscriber/ViewModels/SvSubscriberViewModel.cs'
+          replace_once(
+              view_model,
+              'using AR.Iec61850.SampledValues;\n',
+              'using AR.Iec61850.SampledValues;\nusing AR.Iec61850.SampledValues.Profiles;\n')
+          replace_once(
+              view_model,
+              '    private readonly ConcurrentDictionary<string, SvStreamRuntime> _runtimeStreams = new(StringComparer.OrdinalIgnoreCase);\n',
+              '    private readonly ConcurrentDictionary<string, SvStreamRuntime> _runtimeStreams = new(StringComparer.Ordinal);\n    private readonly SvStreamObservationManager _observationManager = new();\n')
+          replace_once(
+              view_model,
+              '            ObserveFrame(frame.Timestamp, frame.Frame);\n',
+              '            ObserveFrame(frame.Timestamp, frame.Frame, SvObservationInputKind.PcapReplay);\n')
+          replace_once(
+              view_model,
+              '    private void ObserveFrame(DateTimeOffset timestamp, ReadOnlyMemory<byte> ethernetFrame)\n',
+              '    private void ObserveFrame(\n        DateTimeOffset timestamp,\n        ReadOnlyMemory<byte> ethernetFrame,\n        SvObservationInputKind inputKind)\n')
+          replace_once(
+              view_model,
+              '''        Interlocked.Increment(ref _svFrames);\n        var first = frame.Pdu.Asdus.FirstOrDefault();\n        var key = BuildStreamKey(frame, first?.SvId ?? string.Empty, first?.ConfigurationRevision);\n        var runtime = _runtimeStreams.GetOrAdd(key, _ => new SvStreamRuntime(key));\n        runtime.Observe(timestamp, frame, FindProfile(frame, first));\n''',
+              '''        Interlocked.Increment(ref _svFrames);\n        var first = frame.Pdu.Asdus.FirstOrDefault();\n        var profile = FindProfile(frame, first);\n        if (!_observationManager.TryObserve(timestamp, frame, inputKind, profile, out var observation))\n        {\n            Interlocked.Increment(ref _parseErrors);\n            return;\n        }\n\n        var key = observation.Key.Id;\n        var runtime = _runtimeStreams.GetOrAdd(key, _ => new SvStreamRuntime(key));\n        runtime.Observe(timestamp, frame, profile, observation);\n''')
+          replace_once(
+              view_model,
+              '                ObserveFrame(captured.Timestamp, captured.Frame);\n',
+              '                ObserveFrame(captured.Timestamp, captured.Frame, SvObservationInputKind.LiveCapture);\n')
+          replace_once(
+              view_model,
+              '''    private static string BuildStreamKey(SampledValuesFrame frame, string svId, uint? confRev)\n    {\n        var vlanText = frame.Vlan.HasValue ? frame.Vlan.Value.VlanId.ToString(CultureInfo.InvariantCulture) : "-";\n        var confRevText = confRev.HasValue ? confRev.Value.ToString(CultureInfo.InvariantCulture) : "-";\n        return $"SV|{frame.AppId:X4}|{frame.Source}|{frame.Destination}|{vlanText}|{svId}|{confRevText}";\n    }\n\n''',
+              '')
+          replace_once(
+              view_model,
+              '        _runtimeStreams.Clear();\n',
+              '        _runtimeStreams.Clear();\n        _observationManager.Clear();\n')
+
+          runtime = 'src/ARSVIN.Subscriber/Models/SvStreamRuntime.cs'
+          replace_once(
+              runtime,
+              'using AR.Iec61850.SampledValues;\n',
+              'using AR.Iec61850.SampledValues;\nusing AR.Iec61850.SampledValues.Profiles;\n')
+          replace_once(
+              runtime,
+              '    private IReadOnlyList<DecodedValueRow> _decodedValues = Array.Empty<DecodedValueRow>();\n',
+              '    private IReadOnlyList<DecodedValueRow> _decodedValues = Array.Empty<DecodedValueRow>();\n    private SvStreamObservationSnapshot? _observationSnapshot;\n')
+          replace_once(
+              runtime,
+              '    public void Observe(DateTimeOffset timestamp, SampledValuesFrame frame, SampledValuesPublisherProfile? profile)\n',
+              '    public void Observe(\n        DateTimeOffset timestamp,\n        SampledValuesFrame frame,\n        SampledValuesPublisherProfile? profile,\n        SvStreamObservationSnapshot observationSnapshot)\n')
+          replace_once(
+              runtime,
+              '            _decodedValues = latestRows.ToArray();\n            _lastHealthDetail = diagnostics.Count == 0 ? "SV stream is stable." : diagnostics[0];\n',
+              '            _decodedValues = latestRows.ToArray();\n            _observationSnapshot = observationSnapshot;\n            _lastHealthDetail = diagnostics.Count == 0 ? "SV stream is stable." : diagnostics[0];\n')
+          replace_once(
+              runtime,
+              '''                QualitySummary = _qualityGood + _qualityNonZero == 0\n                    ? "Quality not decoded"\n                    : $"Quality good {_qualityGood:N0}, non-zero {_qualityNonZero:N0}"\n''',
+              '''                QualitySummary = _qualityGood + _qualityNonZero == 0\n                    ? "Quality not decoded"\n                    : $"Quality good {_qualityGood:N0}, non-zero {_qualityNonZero:N0}",\n                ObservationInputKinds = _observationSnapshot?.InputKinds ?? Array.Empty<SvObservationInputKind>(),\n                ObservationWindowFrames = _observationSnapshot?.Facts.ObservationCount ?? 0,\n                ObservedFramesPerSecond = _observationSnapshot?.Facts.ObservedFramesPerSecond,\n                ObservedSamplesPerSecond = _observationSnapshot?.Facts.ObservedSamplesPerSecond,\n                ObservedCounterWrap = _observationSnapshot?.Facts.ObservedCounterWrap,\n                ObservationDiagnostics = _observationSnapshot?.Diagnostics ?? Array.Empty<string>(),\n                FactProvenance = _observationSnapshot?.Facts.Provenance\n                    ?? new Dictionary<string, SvFactSource>(StringComparer.Ordinal)\n''')
+
+          snapshot = 'src/ARSVIN.Subscriber/Models/SvStreamSnapshot.cs'
+          replace_once(
+              snapshot,
+              'namespace ARSVIN.Subscriber.Models;\n',
+              'using AR.Iec61850.SampledValues.Profiles;\n\nnamespace ARSVIN.Subscriber.Models;\n')
+          replace_once(
+              snapshot,
+              '    public string QualitySummary { get; init; } = string.Empty;\n',
+              '''    public string QualitySummary { get; init; } = string.Empty;\n    public IReadOnlyList<SvObservationInputKind> ObservationInputKinds { get; init; }\n        = Array.Empty<SvObservationInputKind>();\n    public int ObservationWindowFrames { get; init; }\n    public double? ObservedFramesPerSecond { get; init; }\n    public double? ObservedSamplesPerSecond { get; init; }\n    public int? ObservedCounterWrap { get; init; }\n    public IReadOnlyList<string> ObservationDiagnostics { get; init; } = Array.Empty<string>();\n    public IReadOnlyDictionary<string, SvFactSource> FactProvenance { get; init; }\n        = new Dictionary<string, SvFactSource>(StringComparer.Ordinal);\n''')
+          PY
+
+          rm .github/workflows/p3b-integrate.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Integrate live and PCAP paths with shared observation pipeline'
+          git push origin HEAD:agent/p3b-observation-pipeline
