@@ -1,7 +1,4 @@
 using System.Globalization;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using AR.Iec61850.SampledValues.Profiles;
 
 namespace AR.Iec61850.SampledValues.Reporting;
@@ -43,20 +40,22 @@ public sealed record SvSubscriberEvidenceComparison
             throw new InvalidOperationException("SV comparison requires a generation timestamp.");
         if (string.IsNullOrWhiteSpace(Baseline.SchemaVersion) || string.IsNullOrWhiteSpace(Candidate.SchemaVersion))
             throw new InvalidOperationException("SV comparison requires baseline and candidate schema metadata.");
+        if (Streams.Any(stream => string.IsNullOrWhiteSpace(stream.ComparisonKey)))
+            throw new InvalidOperationException("Every stream comparison requires a stable comparison key.");
         if (Streams.Select(stream => stream.ComparisonKey).Distinct(StringComparer.Ordinal).Count() != Streams.Count)
-            throw new InvalidOperationException("SV comparison stream keys must be unique.");
+            throw new InvalidOperationException("SV comparison keys must be unique.");
 
         var classified = Summary.AddedStreamCount + Summary.RemovedStreamCount +
                          Summary.ChangedStreamCount + Summary.UnchangedStreamCount;
         if (classified != Streams.Count)
-            throw new InvalidOperationException("SV comparison summary does not match the stream comparison collection.");
+            throw new InvalidOperationException("SV comparison summary does not match the stream collection.");
 
-        var allChanges = ReportChanges.Concat(Streams.SelectMany(stream => stream.Changes)).ToArray();
-        if (Summary.InfoChangeCount != allChanges.Count(change => change.Severity == SvEvidenceChangeSeverity.Info) ||
-            Summary.WarningChangeCount != allChanges.Count(change => change.Severity == SvEvidenceChangeSeverity.Warning) ||
-            Summary.ErrorChangeCount != allChanges.Count(change => change.Severity == SvEvidenceChangeSeverity.Error))
+        var changes = ReportChanges.Concat(Streams.SelectMany(stream => stream.Changes)).ToArray();
+        if (Summary.InfoChangeCount != changes.Count(change => change.Severity == SvEvidenceChangeSeverity.Info) ||
+            Summary.WarningChangeCount != changes.Count(change => change.Severity == SvEvidenceChangeSeverity.Warning) ||
+            Summary.ErrorChangeCount != changes.Count(change => change.Severity == SvEvidenceChangeSeverity.Error))
         {
-            throw new InvalidOperationException("SV comparison severity totals do not match the comparison evidence.");
+            throw new InvalidOperationException("SV comparison severity totals do not match the evidence.");
         }
     }
 }
@@ -90,6 +89,7 @@ public sealed record SvEvidenceComparisonSummary
 public sealed record SvSubscriberStreamComparison
 {
     public string ComparisonKey { get; init; } = string.Empty;
+    public string LogicalStreamKey { get; init; } = string.Empty;
     public SvEvidenceChangeKind Kind { get; init; }
     public SvEvidenceChangeSeverity Severity { get; init; }
     public string BaselineStreamKey { get; init; } = string.Empty;
@@ -126,31 +126,30 @@ public sealed class SvSubscriberEvidenceComparator
             throw new ArgumentException("Comparison requires a generation timestamp.", nameof(generatedAt));
 
         var reportChanges = CompareReportMetadata(baseline, candidate);
-        var streamComparisons = CompareStreams(baseline.Streams, candidate.Streams);
-        var allChanges = reportChanges.Concat(streamComparisons.SelectMany(stream => stream.Changes)).ToArray();
-
-        var result = new SvSubscriberEvidenceComparison
+        var streams = CompareStreams(baseline.Streams, candidate.Streams);
+        var allChanges = reportChanges.Concat(streams.SelectMany(stream => stream.Changes)).ToArray();
+        var comparison = new SvSubscriberEvidenceComparison
         {
             GeneratedAt = generatedAt,
-            Baseline = ToReference(baseline),
-            Candidate = ToReference(candidate),
+            Baseline = Reference(baseline),
+            Candidate = Reference(candidate),
+            ReportChanges = reportChanges,
+            Streams = streams,
             Summary = new SvEvidenceComparisonSummary
             {
                 BaselineStreamCount = baseline.Streams.Count,
                 CandidateStreamCount = candidate.Streams.Count,
-                AddedStreamCount = streamComparisons.Count(stream => stream.Kind == SvEvidenceChangeKind.Added),
-                RemovedStreamCount = streamComparisons.Count(stream => stream.Kind == SvEvidenceChangeKind.Removed),
-                ChangedStreamCount = streamComparisons.Count(stream => stream.Kind == SvEvidenceChangeKind.Changed),
-                UnchangedStreamCount = streamComparisons.Count(stream => stream.Kind == SvEvidenceChangeKind.Unchanged),
+                AddedStreamCount = streams.Count(stream => stream.Kind == SvEvidenceChangeKind.Added),
+                RemovedStreamCount = streams.Count(stream => stream.Kind == SvEvidenceChangeKind.Removed),
+                ChangedStreamCount = streams.Count(stream => stream.Kind == SvEvidenceChangeKind.Changed),
+                UnchangedStreamCount = streams.Count(stream => stream.Kind == SvEvidenceChangeKind.Unchanged),
                 InfoChangeCount = allChanges.Count(change => change.Severity == SvEvidenceChangeSeverity.Info),
                 WarningChangeCount = allChanges.Count(change => change.Severity == SvEvidenceChangeSeverity.Warning),
                 ErrorChangeCount = allChanges.Count(change => change.Severity == SvEvidenceChangeSeverity.Error)
-            },
-            ReportChanges = reportChanges,
-            Streams = streamComparisons
+            }
         };
-        result.Validate();
-        return result;
+        comparison.Validate();
+        return comparison;
     }
 
     private static IReadOnlyList<SvEvidenceFieldChange> CompareReportMetadata(
@@ -158,123 +157,126 @@ public sealed class SvSubscriberEvidenceComparator
         SvSubscriberEvidenceReport candidate)
     {
         var changes = new List<SvEvidenceFieldChange>();
-        AddTextChange(changes, "Report", "Schema version", baseline.SchemaVersion, candidate.SchemaVersion,
+        TextChange(changes, "Report", "Schema version", baseline.SchemaVersion, candidate.SchemaVersion,
             SvEvidenceChangeSeverity.Error, "Evidence schema changed; compatibility must be reviewed.");
-        AddTextChange(changes, "Software", "Product", baseline.Software.Product, candidate.Software.Product,
-            SvEvidenceChangeSeverity.Warning, "Product identity changed between reports.");
-        AddTextChange(changes, "Software", "Version", baseline.Software.Version, candidate.Software.Version,
+        TextChange(changes, "Software", "Product", baseline.Software.Product, candidate.Software.Product,
+            SvEvidenceChangeSeverity.Warning, "Product identity changed.");
+        TextChange(changes, "Software", "Version", baseline.Software.Version, candidate.Software.Version,
             SvEvidenceChangeSeverity.Info, "Software version changed.");
-        AddTextChange(changes, "Software", "Commit", baseline.Software.Commit, candidate.Software.Commit,
+        TextChange(changes, "Software", "Commit", baseline.Software.Commit, candidate.Software.Commit,
             SvEvidenceChangeSeverity.Info, "Build commit changed.");
-        AddTextChange(changes, "Capture", "Source", baseline.Capture.Source, candidate.Capture.Source,
+        TextChange(changes, "Capture", "Source", baseline.Capture.Source, candidate.Capture.Source,
             SvEvidenceChangeSeverity.Info, "Capture source changed.");
-        AddTextChange(changes, "Capture", "SCL path", baseline.Capture.SclPath, candidate.Capture.SclPath,
+        TextChange(changes, "Capture", "SCL path", baseline.Capture.SclPath, candidate.Capture.SclPath,
             SvEvidenceChangeSeverity.Info, "SCL source changed.");
-        AddHealthChange(changes, "Report", baseline.Summary.Health, candidate.Summary.Health);
+        HealthChange(changes, "Report", baseline.Summary.Health, candidate.Summary.Health);
         return changes;
     }
 
     private static IReadOnlyList<SvSubscriberStreamComparison> CompareStreams(
-        IReadOnlyList<SvSubscriberStreamEvidence> baselineStreams,
-        IReadOnlyList<SvSubscriberStreamEvidence> candidateStreams)
+        IReadOnlyList<SvSubscriberStreamEvidence> baseline,
+        IReadOnlyList<SvSubscriberStreamEvidence> candidate)
     {
-        var result = new List<SvSubscriberStreamComparison>();
-        var candidateByKey = candidateStreams.ToDictionary(stream => stream.Key, StringComparer.Ordinal);
+        var comparisons = new List<SvSubscriberStreamComparison>();
+        var candidateByKey = candidate.ToDictionary(stream => stream.Key, StringComparer.Ordinal);
         var usedCandidateKeys = new HashSet<string>(StringComparer.Ordinal);
         var unmatchedBaseline = new List<SvSubscriberStreamEvidence>();
 
-        foreach (var baseline in baselineStreams)
+        foreach (var baselineStream in baseline)
         {
-            if (candidateByKey.TryGetValue(baseline.Key, out var exact))
+            if (candidateByKey.TryGetValue(baselineStream.Key, out var exact))
             {
-                result.Add(ComparePair(baseline, exact));
+                comparisons.Add(Pair(baselineStream, exact));
                 usedCandidateKeys.Add(exact.Key);
             }
             else
             {
-                unmatchedBaseline.Add(baseline);
+                unmatchedBaseline.Add(baselineStream);
             }
         }
 
-        var unmatchedCandidate = candidateStreams
-            .Where(stream => !usedCandidateKeys.Contains(stream.Key))
-            .ToArray();
-        var baselineLogicalGroups = unmatchedBaseline.GroupBy(LogicalKey, StringComparer.Ordinal)
+        var unmatchedCandidate = candidate.Where(stream => !usedCandidateKeys.Contains(stream.Key)).ToArray();
+        var baselineLogical = unmatchedBaseline.GroupBy(LogicalKey, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
-        var candidateLogicalGroups = unmatchedCandidate.GroupBy(LogicalKey, StringComparer.Ordinal)
+        var candidateLogical = unmatchedCandidate.GroupBy(LogicalKey, StringComparer.Ordinal)
             .ToDictionary(group => group.Key, group => group.ToArray(), StringComparer.Ordinal);
 
-        foreach (var baseline in unmatchedBaseline)
+        foreach (var baselineStream in unmatchedBaseline)
         {
-            var logicalKey = LogicalKey(baseline);
-            if (baselineLogicalGroups[logicalKey].Length == 1 &&
-                candidateLogicalGroups.TryGetValue(logicalKey, out var candidates) &&
+            var logicalKey = LogicalKey(baselineStream);
+            if (baselineLogical[logicalKey].Length == 1 &&
+                candidateLogical.TryGetValue(logicalKey, out var candidates) &&
                 candidates.Length == 1 &&
                 usedCandidateKeys.Add(candidates[0].Key))
             {
-                result.Add(ComparePair(baseline, candidates[0]));
-                continue;
+                comparisons.Add(Pair(baselineStream, candidates[0]));
             }
-
-            result.Add(Removed(baseline));
+            else
+            {
+                comparisons.Add(Removed(baselineStream));
+            }
         }
 
-        foreach (var candidate in candidateStreams.Where(stream => !usedCandidateKeys.Contains(stream.Key)))
-            result.Add(Added(candidate));
+        foreach (var candidateStream in candidate.Where(stream => !usedCandidateKeys.Contains(stream.Key)))
+            comparisons.Add(Added(candidateStream));
 
-        return result
-            .OrderBy(stream => stream.Identity.AppId)
+        return comparisons.OrderBy(stream => stream.Identity.AppId)
             .ThenBy(stream => stream.Identity.SvId, StringComparer.Ordinal)
             .ThenBy(stream => stream.Kind)
+            .ThenBy(stream => stream.ComparisonKey, StringComparer.Ordinal)
             .ToArray();
     }
 
-    private static SvSubscriberStreamComparison ComparePair(
+    private static SvSubscriberStreamComparison Pair(
         SvSubscriberStreamEvidence baseline,
         SvSubscriberStreamEvidence candidate)
     {
         var changes = new List<SvEvidenceFieldChange>();
-        AddHealthChange(changes, "Stream", baseline.Health, candidate.Health);
-        AddTextChange(changes, "Identity", "Source MAC", baseline.Identity.SourceMac, candidate.Identity.SourceMac,
-            SvEvidenceChangeSeverity.Info, "Publisher source MAC changed while the logical stream identity remained stable.");
-        AddNullableChange(changes, "Identity", "confRev", baseline.Identity.ConfigurationRevision,
+        HealthChange(changes, "Stream", baseline.Health, candidate.Health);
+        TextChange(changes, "Identity", "Source MAC", baseline.Identity.SourceMac, candidate.Identity.SourceMac,
+            SvEvidenceChangeSeverity.Info, "Publisher source MAC changed while logical identity remained stable.");
+        UIntChange(changes, "Identity", "confRev", baseline.Identity.ConfigurationRevision,
             candidate.Identity.ConfigurationRevision, SvEvidenceChangeSeverity.Warning, "Configuration revision changed.");
-        AddNullableChange(changes, "Identity", "ASDU per frame", baseline.Identity.AsduPerFrame,
+        IntChange(changes, "Identity", "ASDU per frame", baseline.Identity.AsduPerFrame,
             candidate.Identity.AsduPerFrame, SvEvidenceChangeSeverity.Warning, "ASDU packing changed.");
-        AddNullableChange(changes, "Identity", "Declared sample rate", baseline.Identity.DeclaredSampleRate,
+        UShortChange(changes, "Identity", "Declared sample rate", baseline.Identity.DeclaredSampleRate,
             candidate.Identity.DeclaredSampleRate, SvEvidenceChangeSeverity.Warning, "Declared sample rate changed.");
-        AddNullableChange(changes, "Identity", "Declared sample mode", baseline.Identity.DeclaredSampleMode,
+        UShortChange(changes, "Identity", "Declared sample mode", baseline.Identity.DeclaredSampleMode,
             candidate.Identity.DeclaredSampleMode, SvEvidenceChangeSeverity.Warning, "Declared sample mode changed.");
 
-        CompareIssueCounter(changes, "Sequence gaps", baseline.Runtime.SequenceGapCount, candidate.Runtime.SequenceGapCount,
+        IssueCounter(changes, "Sequence gaps", baseline.Runtime.SequenceGapCount, candidate.Runtime.SequenceGapCount,
             SvEvidenceChangeSeverity.Warning);
-        CompareIssueCounter(changes, "Duplicates", baseline.Runtime.DuplicateCount, candidate.Runtime.DuplicateCount,
+        IssueCounter(changes, "Duplicates", baseline.Runtime.DuplicateCount, candidate.Runtime.DuplicateCount,
             SvEvidenceChangeSeverity.Warning);
-        CompareIssueCounter(changes, "Out-of-order", baseline.Runtime.OutOfOrderCount, candidate.Runtime.OutOfOrderCount,
+        IssueCounter(changes, "Out-of-order", baseline.Runtime.OutOfOrderCount, candidate.Runtime.OutOfOrderCount,
             SvEvidenceChangeSeverity.Error);
-        CompareIssueCounter(changes, "Payload issues", baseline.Runtime.PayloadIssueCount, candidate.Runtime.PayloadIssueCount,
+        IssueCounter(changes, "Payload issues", baseline.Runtime.PayloadIssueCount, candidate.Runtime.PayloadIssueCount,
             SvEvidenceChangeSeverity.Error);
-        CompareIssueCounter(changes, "SCL mismatches", baseline.Runtime.SclMismatchCount, candidate.Runtime.SclMismatchCount,
+        IssueCounter(changes, "SCL mismatches", baseline.Runtime.SclMismatchCount, candidate.Runtime.SclMismatchCount,
             SvEvidenceChangeSeverity.Warning);
-        CompareRate(changes, "Observed frames/s", baseline.Observation.Facts.ObservedFramesPerSecond,
+
+        RateChange(changes, "Observed frames/s", baseline.Observation.Facts.ObservedFramesPerSecond,
             candidate.Observation.Facts.ObservedFramesPerSecond);
-        CompareRate(changes, "Observed samples/s", baseline.Observation.Facts.ObservedSamplesPerSecond,
+        RateChange(changes, "Observed samples/s", baseline.Observation.Facts.ObservedSamplesPerSecond,
             candidate.Observation.Facts.ObservedSamplesPerSecond);
-        CompareWindow(changes, baseline.Observation, candidate.Observation);
-        CompareBinding(changes, baseline.Observation, candidate.Observation);
-        CompareProfile(changes, baseline.Observation.ProfileDetection, candidate.Observation.ProfileDetection);
-        CompareConfiguration(changes, baseline.Observation.ConfigurationComparison,
+        WindowChanges(changes, baseline.Observation, candidate.Observation);
+        BindingChanges(changes, baseline.Observation, candidate.Observation);
+        ProfileChanges(changes, baseline.Observation.ProfileDetection, candidate.Observation.ProfileDetection);
+        ConfigurationChanges(changes, baseline.Observation.ConfigurationComparison,
             candidate.Observation.ConfigurationComparison);
-        CompareFacts(changes, baseline.Observation.Facts, candidate.Observation.Facts);
-        CompareDiagnostics(changes, baseline.Diagnostics.Concat(baseline.Observation.Diagnostics),
+        FactChanges(changes, baseline.Observation.Facts, candidate.Observation.Facts);
+        DiagnosticChanges(changes,
+            baseline.Diagnostics.Concat(baseline.Observation.Diagnostics),
             candidate.Diagnostics.Concat(candidate.Observation.Diagnostics));
 
-        var kind = changes.Count == 0 ? SvEvidenceChangeKind.Unchanged : SvEvidenceChangeKind.Changed;
+        var logicalKey = LogicalKey(candidate);
         return new SvSubscriberStreamComparison
         {
-            ComparisonKey = LogicalKey(candidate),
-            Kind = kind,
-            Severity = MaximumSeverity(changes),
+            ComparisonKey = $"PAIR|{baseline.Key}|{candidate.Key}",
+            LogicalStreamKey = logicalKey,
+            Kind = changes.Count == 0 ? SvEvidenceChangeKind.Unchanged : SvEvidenceChangeKind.Changed,
+            Severity = changes.Select(change => change.Severity)
+                .DefaultIfEmpty(SvEvidenceChangeSeverity.Info).Max(),
             BaselineStreamKey = baseline.Key,
             CandidateStreamKey = candidate.Key,
             Identity = candidate.Identity,
@@ -282,7 +284,7 @@ public sealed class SvSubscriberEvidenceComparator
         };
     }
 
-    private static void CompareWindow(
+    private static void WindowChanges(
         ICollection<SvEvidenceFieldChange> changes,
         SvSubscriberObservationEvidence baseline,
         SvSubscriberObservationEvidence candidate)
@@ -292,7 +294,7 @@ public sealed class SvSubscriberEvidenceComparator
             var severity = baseline.WindowSamples > 0 && candidate.WindowSamples < baseline.WindowSamples / 2
                 ? SvEvidenceChangeSeverity.Warning
                 : SvEvidenceChangeSeverity.Info;
-            Add(changes, "Observation window", "Samples", severity,
+            Change(changes, "Observation window", "Samples", severity,
                 baseline.WindowSamples.ToString(CultureInfo.InvariantCulture),
                 candidate.WindowSamples.ToString(CultureInfo.InvariantCulture),
                 severity == SvEvidenceChangeSeverity.Warning
@@ -300,15 +302,19 @@ public sealed class SvSubscriberEvidenceComparator
                     : "Observation-window sample count changed.");
         }
 
-        if (!ApproximatelyEqual(baseline.WindowDurationSeconds, candidate.WindowDurationSeconds, 0.01))
+        if (!WithinPercent(baseline.WindowDurationSeconds, candidate.WindowDurationSeconds, 0.01))
         {
-            Add(changes, "Observation window", "Duration", SvEvidenceChangeSeverity.Info,
+            Change(changes, "Observation window", "Duration", SvEvidenceChangeSeverity.Info,
                 Number(baseline.WindowDurationSeconds), Number(candidate.WindowDurationSeconds),
                 "Observation-window duration changed.");
         }
+
+        TextChange(changes, "Observation window", "Input kinds",
+            string.Join(", ", baseline.InputKinds), string.Join(", ", candidate.InputKinds),
+            SvEvidenceChangeSeverity.Info, "Observation input provenance changed.");
     }
 
-    private static void CompareBinding(
+    private static void BindingChanges(
         ICollection<SvEvidenceFieldChange> changes,
         SvSubscriberObservationEvidence baseline,
         SvSubscriberObservationEvidence candidate)
@@ -318,7 +324,7 @@ public sealed class SvSubscriberEvidenceComparator
             var severity = baseline.IsBoundToScl && !candidate.IsBoundToScl
                 ? SvEvidenceChangeSeverity.Warning
                 : SvEvidenceChangeSeverity.Info;
-            Add(changes, "SCL", "Binding", severity,
+            Change(changes, "SCL", "Binding", severity,
                 baseline.IsBoundToScl ? "bound" : "not bound",
                 candidate.IsBoundToScl ? "bound" : "not bound",
                 severity == SvEvidenceChangeSeverity.Warning
@@ -326,19 +332,18 @@ public sealed class SvSubscriberEvidenceComparator
                     : "Candidate stream gained an SCL binding.");
         }
 
-        AddTextChange(changes, "SCL", "Control block", baseline.ControlBlockReference,
+        TextChange(changes, "SCL", "Control block", baseline.ControlBlockReference,
             candidate.ControlBlockReference, SvEvidenceChangeSeverity.Info,
             "SCL control-block reference changed.");
     }
 
-    private static void CompareProfile(
+    private static void ProfileChanges(
         ICollection<SvEvidenceFieldChange> changes,
         SvProfileDetectionResult? baseline,
         SvProfileDetectionResult? candidate)
     {
-        AddTextChange(changes, "Profile", "Profile ID", baseline?.Profile.Id ?? string.Empty,
-            candidate?.Profile.Id ?? string.Empty, SvEvidenceChangeSeverity.Warning,
-            "Detected profile changed.");
+        TextChange(changes, "Profile", "Profile ID", baseline?.Profile.Id, candidate?.Profile.Id,
+            SvEvidenceChangeSeverity.Warning, "Detected profile changed.");
 
         var baselineConfidence = baseline?.Confidence ?? SvProfileConfidence.Unknown;
         var candidateConfidence = candidate?.Confidence ?? SvProfileConfidence.Unknown;
@@ -350,16 +355,16 @@ public sealed class SvSubscriberEvidenceComparator
             : ConfidenceRank(candidateConfidence) < ConfidenceRank(baselineConfidence)
                 ? SvEvidenceChangeSeverity.Warning
                 : SvEvidenceChangeSeverity.Info;
-        Add(changes, "Profile", "Confidence", severity, baselineConfidence.ToString(),
-            candidateConfidence.ToString(),
+        Change(changes, "Profile", "Confidence", severity,
+            baselineConfidence.ToString(), candidateConfidence.ToString(),
             severity == SvEvidenceChangeSeverity.Error
-                ? "Candidate profile classification is conflicting."
+                ? "Candidate profile classification conflicts with observed evidence."
                 : severity == SvEvidenceChangeSeverity.Warning
                     ? "Candidate profile confidence decreased."
                     : "Candidate profile confidence improved.");
     }
 
-    private static void CompareConfiguration(
+    private static void ConfigurationChanges(
         ICollection<SvEvidenceFieldChange> changes,
         SvConfigurationComparisonResult? baseline,
         SvConfigurationComparisonResult? candidate)
@@ -370,76 +375,75 @@ public sealed class SvSubscriberEvidenceComparator
             baseline?.Mode == candidate?.Mode)
             return;
 
-        var introducedBlocking = candidate?.HasBlockingErrors == true && baseline?.HasBlockingErrors != true;
-        var warningIncrease = (candidate?.WarningCount ?? 0) > (baseline?.WarningCount ?? 0);
-        var severity = introducedBlocking
+        var blockingIntroduced = candidate?.HasBlockingErrors == true && baseline?.HasBlockingErrors != true;
+        var warningsIncreased = (candidate?.WarningCount ?? 0) > (baseline?.WarningCount ?? 0);
+        var severity = blockingIntroduced
             ? SvEvidenceChangeSeverity.Error
-            : warningIncrease || (baseline is not null && candidate is null)
+            : warningsIncreased || (baseline is not null && candidate is null)
                 ? SvEvidenceChangeSeverity.Warning
                 : SvEvidenceChangeSeverity.Info;
-        Add(changes, "Configuration", "Comparison", severity, baselineSummary, candidateSummary,
-            introducedBlocking
+        Change(changes, "Configuration", "Comparison", severity, baselineSummary, candidateSummary,
+            blockingIntroduced
                 ? "Candidate introduced blocking configuration errors."
                 : severity == SvEvidenceChangeSeverity.Warning
                     ? "Candidate configuration evidence regressed."
                     : "Configuration comparison result changed.");
     }
 
-    private static void CompareFacts(
+    private static void FactChanges(
         ICollection<SvEvidenceFieldChange> changes,
         SvObservedStreamFacts baseline,
         SvObservedStreamFacts candidate)
     {
-        AddNullableChange(changes, "Observed facts", "Payload bytes per ASDU",
-            baseline.PayloadBytesPerAsdu, candidate.PayloadBytesPerAsdu,
-            SvEvidenceChangeSeverity.Warning, "Observed payload length changed.");
-        AddNullableChange(changes, "Observed facts", "Counter wrap", baseline.ObservedCounterWrap,
-            candidate.ObservedCounterWrap, SvEvidenceChangeSeverity.Warning,
-            "Observed sample-counter wrap changed.");
-        AddNullableChange(changes, "Observed facts", "Nominal frequency", baseline.NominalFrequencyHz,
-            candidate.NominalFrequencyHz, SvEvidenceChangeSeverity.Warning,
-            "Nominal-frequency context changed.");
-
-        var baselineSignature = Signature(baseline.DataSetSignature);
-        var candidateSignature = Signature(candidate.DataSetSignature);
-        AddTextChange(changes, "Observed facts", "Dataset signature", baselineSignature,
-            candidateSignature, SvEvidenceChangeSeverity.Error,
+        IntChange(changes, "Observed facts", "Payload bytes per ASDU", baseline.PayloadBytesPerAsdu,
+            candidate.PayloadBytesPerAsdu, SvEvidenceChangeSeverity.Warning, "Observed payload length changed.");
+        IntChange(changes, "Observed facts", "Counter wrap", baseline.ObservedCounterWrap,
+            candidate.ObservedCounterWrap, SvEvidenceChangeSeverity.Warning, "Observed sample-counter wrap changed.");
+        DoubleChange(changes, "Observed facts", "Nominal frequency", baseline.NominalFrequencyHz,
+            candidate.NominalFrequencyHz, SvEvidenceChangeSeverity.Warning, "Nominal-frequency context changed.");
+        TextChange(changes, "Observed facts", "Dataset signature", Signature(baseline.DataSetSignature),
+            Signature(candidate.DataSetSignature), SvEvidenceChangeSeverity.Error,
             "Observed dataset element order or types changed.");
 
-        var provenanceKeys = baseline.Provenance.Keys.Concat(candidate.Provenance.Keys)
-            .Distinct(StringComparer.Ordinal);
-        foreach (var key in provenanceKeys)
+        foreach (var key in baseline.Provenance.Keys.Concat(candidate.Provenance.Keys)
+                     .Distinct(StringComparer.Ordinal))
         {
             var baselineSource = baseline.Provenance.TryGetValue(key, out var b) ? b : SvFactSource.Unknown;
             var candidateSource = candidate.Provenance.TryGetValue(key, out var c) ? c : SvFactSource.Unknown;
             if (baselineSource != candidateSource)
             {
-                Add(changes, "Provenance", key, SvEvidenceChangeSeverity.Info,
-                    baselineSource.ToString(), candidateSource.ToString(),
-                    "Fact provenance changed.");
+                Change(changes, "Provenance", key, SvEvidenceChangeSeverity.Info,
+                    baselineSource.ToString(), candidateSource.ToString(), "Fact provenance changed.");
             }
         }
     }
 
-    private static void CompareDiagnostics(
+    private static void DiagnosticChanges(
         ICollection<SvEvidenceFieldChange> changes,
         IEnumerable<string> baseline,
         IEnumerable<string> candidate)
     {
-        var baselineSet = baseline.Where(item => !string.IsNullOrWhiteSpace(item))
+        var baselineSet = baseline.Where(value => !string.IsNullOrWhiteSpace(value))
             .ToHashSet(StringComparer.Ordinal);
-        var candidateSet = candidate.Where(item => !string.IsNullOrWhiteSpace(item))
+        var candidateSet = candidate.Where(value => !string.IsNullOrWhiteSpace(value))
             .ToHashSet(StringComparer.Ordinal);
 
-        foreach (var added in candidateSet.Except(baselineSet, StringComparer.Ordinal).Order(StringComparer.Ordinal))
-            Add(changes, "Diagnostics", "Added", SvEvidenceChangeSeverity.Warning, "-", added,
-                "Candidate introduced a diagnostic.");
-        foreach (var removed in baselineSet.Except(candidateSet, StringComparer.Ordinal).Order(StringComparer.Ordinal))
-            Add(changes, "Diagnostics", "Resolved", SvEvidenceChangeSeverity.Info, removed, "-",
-                "A baseline diagnostic is no longer present.");
+        foreach (var value in candidateSet.Except(baselineSet, StringComparer.Ordinal)
+                     .OrderBy(value => value, StringComparer.Ordinal))
+        {
+            Change(changes, "Diagnostics", "Added", SvEvidenceChangeSeverity.Warning,
+                "-", value, "Candidate introduced a diagnostic.");
+        }
+
+        foreach (var value in baselineSet.Except(candidateSet, StringComparer.Ordinal)
+                     .OrderBy(value => value, StringComparer.Ordinal))
+        {
+            Change(changes, "Diagnostics", "Resolved", SvEvidenceChangeSeverity.Info,
+                value, "-", "A baseline diagnostic is no longer present.");
+        }
     }
 
-    private static void CompareIssueCounter(
+    private static void IssueCounter(
         ICollection<SvEvidenceFieldChange> changes,
         string field,
         int baseline,
@@ -449,13 +453,12 @@ public sealed class SvSubscriberEvidenceComparator
         if (baseline == candidate)
             return;
         var severity = candidate > baseline ? regressionSeverity : SvEvidenceChangeSeverity.Info;
-        Add(changes, "Runtime integrity", field, severity,
-            baseline.ToString(CultureInfo.InvariantCulture),
-            candidate.ToString(CultureInfo.InvariantCulture),
+        Change(changes, "Runtime integrity", field, severity,
+            baseline.ToString(CultureInfo.InvariantCulture), candidate.ToString(CultureInfo.InvariantCulture),
             candidate > baseline ? $"Candidate {field.ToLowerInvariant()} increased." : $"Candidate {field.ToLowerInvariant()} decreased.");
     }
 
-    private static void CompareRate(
+    private static void RateChange(
         ICollection<SvEvidenceFieldChange> changes,
         string field,
         double? baseline,
@@ -465,61 +468,100 @@ public sealed class SvSubscriberEvidenceComparator
             return;
         if (!baseline.HasValue || !candidate.HasValue)
         {
-            Add(changes, "Observed rate", field, SvEvidenceChangeSeverity.Warning,
+            Change(changes, "Observed rate", field, SvEvidenceChangeSeverity.Warning,
                 Number(baseline), Number(candidate), "Observed rate availability changed.");
             return;
         }
-        if (ApproximatelyEqual(baseline.Value, candidate.Value, RateTolerancePercent))
+        if (WithinPercent(baseline.Value, candidate.Value, RateTolerancePercent))
             return;
 
-        Add(changes, "Observed rate", field, SvEvidenceChangeSeverity.Warning,
+        Change(changes, "Observed rate", field, SvEvidenceChangeSeverity.Warning,
             Number(baseline), Number(candidate),
             $"Observed rate changed by more than {RateTolerancePercent:0.###}%.");
     }
 
-    private static void AddHealthChange(
+    private static void HealthChange(
         ICollection<SvEvidenceFieldChange> changes,
         string category,
-        string baseline,
-        string candidate)
+        string? baseline,
+        string? candidate)
     {
         if (string.Equals(baseline, candidate, StringComparison.OrdinalIgnoreCase))
             return;
-        var severity = HealthRank(candidate) > HealthRank(baseline)
-            ? HealthRank(candidate) >= 2 ? SvEvidenceChangeSeverity.Error : SvEvidenceChangeSeverity.Warning
+        var candidateRank = HealthRank(candidate);
+        var severity = candidateRank > HealthRank(baseline)
+            ? candidateRank >= 2 ? SvEvidenceChangeSeverity.Error : SvEvidenceChangeSeverity.Warning
             : SvEvidenceChangeSeverity.Info;
-        Add(changes, category, "Health", severity, baseline, candidate,
+        Change(changes, category, "Health", severity, Text(baseline), Text(candidate),
             severity == SvEvidenceChangeSeverity.Info ? "Health improved or changed without regression." : "Health regressed.");
     }
 
-    private static void AddTextChange(
+    private static void TextChange(
         ICollection<SvEvidenceFieldChange> changes,
         string category,
         string field,
-        string baseline,
-        string candidate,
+        string? baseline,
+        string? candidate,
         SvEvidenceChangeSeverity severity,
         string message)
     {
         if (!string.Equals(baseline ?? string.Empty, candidate ?? string.Empty, StringComparison.Ordinal))
-            Add(changes, category, field, severity, Empty(baseline), Empty(candidate), message);
+            Change(changes, category, field, severity, Text(baseline), Text(candidate), message);
     }
 
-    private static void AddNullableChange<T>(
+    private static void IntChange(
         ICollection<SvEvidenceFieldChange> changes,
         string category,
         string field,
-        T? baseline,
-        T? candidate,
+        int? baseline,
+        int? candidate,
         SvEvidenceChangeSeverity severity,
         string message)
-        where T : struct, IEquatable<T>
     {
-        if (!Nullable.Equals(baseline, candidate))
-            Add(changes, category, field, severity, Value(baseline), Value(candidate), message);
+        if (baseline != candidate)
+            Change(changes, category, field, severity, Value(baseline), Value(candidate), message);
     }
 
-    private static void Add(
+    private static void UIntChange(
+        ICollection<SvEvidenceFieldChange> changes,
+        string category,
+        string field,
+        uint? baseline,
+        uint? candidate,
+        SvEvidenceChangeSeverity severity,
+        string message)
+    {
+        if (baseline != candidate)
+            Change(changes, category, field, severity, Value(baseline), Value(candidate), message);
+    }
+
+    private static void UShortChange(
+        ICollection<SvEvidenceFieldChange> changes,
+        string category,
+        string field,
+        ushort? baseline,
+        ushort? candidate,
+        SvEvidenceChangeSeverity severity,
+        string message)
+    {
+        if (baseline != candidate)
+            Change(changes, category, field, severity, Value(baseline), Value(candidate), message);
+    }
+
+    private static void DoubleChange(
+        ICollection<SvEvidenceFieldChange> changes,
+        string category,
+        string field,
+        double? baseline,
+        double? candidate,
+        SvEvidenceChangeSeverity severity,
+        string message)
+    {
+        if (baseline != candidate)
+            Change(changes, category, field, severity, Number(baseline), Number(candidate), message);
+    }
+
+    private static void Change(
         ICollection<SvEvidenceFieldChange> changes,
         string category,
         string field,
@@ -538,9 +580,12 @@ public sealed class SvSubscriberEvidenceComparator
         });
 
     private static SvSubscriberStreamComparison Added(SvSubscriberStreamEvidence stream)
-        => new()
+    {
+        var logicalKey = LogicalKey(stream);
+        return new SvSubscriberStreamComparison
         {
-            ComparisonKey = LogicalKey(stream),
+            ComparisonKey = $"ADD|{stream.Key}",
+            LogicalStreamKey = logicalKey,
             Kind = SvEvidenceChangeKind.Added,
             Severity = SvEvidenceChangeSeverity.Info,
             CandidateStreamKey = stream.Key,
@@ -558,11 +603,15 @@ public sealed class SvSubscriberEvidenceComparator
                 }
             ]
         };
+    }
 
     private static SvSubscriberStreamComparison Removed(SvSubscriberStreamEvidence stream)
-        => new()
+    {
+        var logicalKey = LogicalKey(stream);
+        return new SvSubscriberStreamComparison
         {
-            ComparisonKey = LogicalKey(stream),
+            ComparisonKey = $"REMOVE|{stream.Key}",
+            LogicalStreamKey = logicalKey,
             Kind = SvEvidenceChangeKind.Removed,
             Severity = SvEvidenceChangeSeverity.Error,
             BaselineStreamKey = stream.Key,
@@ -580,8 +629,9 @@ public sealed class SvSubscriberEvidenceComparator
                 }
             ]
         };
+    }
 
-    private static SvEvidenceReportReference ToReference(SvSubscriberEvidenceReport report)
+    private static SvEvidenceReportReference Reference(SvSubscriberEvidenceReport report)
         => new()
         {
             SchemaVersion = report.SchemaVersion,
@@ -594,24 +644,21 @@ public sealed class SvSubscriberEvidenceComparator
             StreamCount = report.Streams.Count
         };
 
-    private static SvEvidenceChangeSeverity MaximumSeverity(IEnumerable<SvEvidenceFieldChange> changes)
-        => changes.Select(change => change.Severity).DefaultIfEmpty(SvEvidenceChangeSeverity.Info).Max();
-
     private static string LogicalKey(SvSubscriberStreamEvidence stream)
     {
         var identity = stream.Identity;
         var vlan = identity.VlanId?.ToString(CultureInfo.InvariantCulture) ?? "-";
         return $"SV|{identity.AppId:X4}|{NormalizeMac(identity.DestinationMac)}|{vlan}|" +
-               $"{NormalizeIdentifier(identity.SvId)}|{NormalizeIdentifier(identity.DataSetReference)}";
+               $"{NormalizeId(identity.SvId)}|{NormalizeId(identity.DataSetReference)}";
     }
 
-    private static string NormalizeMac(string value)
+    private static string NormalizeMac(string? value)
         => new((value ?? string.Empty).Where(Uri.IsHexDigit).Select(char.ToUpperInvariant).ToArray());
 
-    private static string NormalizeIdentifier(string value)
+    private static string NormalizeId(string? value)
         => (value ?? string.Empty).Trim().ToUpperInvariant();
 
-    private static int HealthRank(string value)
+    private static int HealthRank(string? value)
         => (value ?? string.Empty).Trim().ToUpperInvariant() switch
         {
             "GOOD" => 0,
@@ -634,7 +681,7 @@ public sealed class SvSubscriberEvidenceComparator
             _ => 0
         };
 
-    private static bool ApproximatelyEqual(double baseline, double candidate, double tolerancePercent)
+    private static bool WithinPercent(double baseline, double candidate, double tolerancePercent)
     {
         if (baseline == 0)
             return candidate == 0;
@@ -656,172 +703,6 @@ public sealed class SvSubscriberEvidenceComparator
     private static string Value<T>(T? value) where T : struct
         => value.HasValue ? Convert.ToString(value.Value, CultureInfo.InvariantCulture) ?? "unknown" : "unknown";
 
-    private static string Empty(string? value)
+    private static string Text(string? value)
         => string.IsNullOrWhiteSpace(value) ? "unknown" : value;
-}
-
-public static class SvSubscriberEvidenceComparisonSerializer
-{
-    private static readonly JsonSerializerOptions JsonOptions = CreateJsonOptions();
-
-    public static string ToJson(SvSubscriberEvidenceComparison comparison)
-    {
-        ArgumentNullException.ThrowIfNull(comparison);
-        comparison.Validate();
-        return JsonSerializer.Serialize(comparison, JsonOptions);
-    }
-
-    public static SvSubscriberEvidenceComparison FromJson(string json)
-    {
-        if (string.IsNullOrWhiteSpace(json))
-            throw new ArgumentException("SV comparison JSON cannot be empty.", nameof(json));
-        var comparison = JsonSerializer.Deserialize<SvSubscriberEvidenceComparison>(json, JsonOptions)
-            ?? throw new InvalidDataException("SV comparison JSON did not contain a comparison document.");
-        comparison.Validate();
-        return comparison;
-    }
-
-    public static string ToMarkdown(SvSubscriberEvidenceComparison comparison)
-    {
-        ArgumentNullException.ThrowIfNull(comparison);
-        comparison.Validate();
-
-        var builder = new StringBuilder();
-        builder.AppendLine("# ARSVIN Subscriber Evidence Comparison");
-        builder.AppendLine();
-        builder.AppendLine("> Baseline-versus-candidate engineering evidence. Warnings and errors identify regressions for review; this is not a formal IEC 61850 conformance certificate.");
-        builder.AppendLine();
-        builder.AppendLine("## Comparison metadata");
-        builder.AppendLine();
-        AppendKeyValueTable(builder,
-        [
-            ("Schema", comparison.SchemaVersion),
-            ("Generated", Timestamp(comparison.GeneratedAt)),
-            ("Baseline generated", Timestamp(comparison.Baseline.GeneratedAt)),
-            ("Baseline version", comparison.Baseline.Version),
-            ("Baseline commit", comparison.Baseline.Commit),
-            ("Baseline capture", comparison.Baseline.CaptureSource),
-            ("Candidate generated", Timestamp(comparison.Candidate.GeneratedAt)),
-            ("Candidate version", comparison.Candidate.Version),
-            ("Candidate commit", comparison.Candidate.Commit),
-            ("Candidate capture", comparison.Candidate.CaptureSource)
-        ]);
-
-        builder.AppendLine("## Summary");
-        builder.AppendLine();
-        AppendKeyValueTable(builder,
-        [
-            ("Baseline streams", comparison.Summary.BaselineStreamCount.ToString(CultureInfo.InvariantCulture)),
-            ("Candidate streams", comparison.Summary.CandidateStreamCount.ToString(CultureInfo.InvariantCulture)),
-            ("Added", comparison.Summary.AddedStreamCount.ToString(CultureInfo.InvariantCulture)),
-            ("Removed", comparison.Summary.RemovedStreamCount.ToString(CultureInfo.InvariantCulture)),
-            ("Changed", comparison.Summary.ChangedStreamCount.ToString(CultureInfo.InvariantCulture)),
-            ("Unchanged", comparison.Summary.UnchangedStreamCount.ToString(CultureInfo.InvariantCulture)),
-            ("Info changes", comparison.Summary.InfoChangeCount.ToString(CultureInfo.InvariantCulture)),
-            ("Warnings", comparison.Summary.WarningChangeCount.ToString(CultureInfo.InvariantCulture)),
-            ("Errors", comparison.Summary.ErrorChangeCount.ToString(CultureInfo.InvariantCulture)),
-            ("Regression status", comparison.Summary.HasRegressions ? "REVIEW REQUIRED" : "NO REGRESSION DETECTED")
-        ]);
-
-        AppendChanges(builder, "Report-level changes", comparison.ReportChanges);
-
-        builder.AppendLine("## Stream comparison");
-        builder.AppendLine();
-        builder.AppendLine("| Kind | Severity | APPID | svID | Dataset | Changes |");
-        builder.AppendLine("|---|---|---:|---|---|---:|");
-        foreach (var stream in comparison.Streams)
-        {
-            builder.Append("| ").Append(Cell(stream.Kind.ToString()))
-                .Append(" | ").Append(Cell(stream.Severity.ToString()))
-                .Append(" | 0x").Append(stream.Identity.AppId.ToString("X4", CultureInfo.InvariantCulture))
-                .Append(" | ").Append(Cell(stream.Identity.SvId))
-                .Append(" | ").Append(Cell(stream.Identity.DataSetReference))
-                .Append(" | ").Append(stream.Changes.Count.ToString(CultureInfo.InvariantCulture)).AppendLine(" |");
-        }
-        builder.AppendLine();
-
-        foreach (var stream in comparison.Streams.Where(stream => stream.Changes.Count > 0))
-        {
-            builder.Append("## 0x").Append(stream.Identity.AppId.ToString("X4", CultureInfo.InvariantCulture))
-                .Append(" — ").AppendLine(Heading(stream.Identity.SvId));
-            builder.AppendLine();
-            AppendKeyValueTable(builder,
-            [
-                ("Kind", stream.Kind.ToString()),
-                ("Severity", stream.Severity.ToString()),
-                ("Logical key", stream.ComparisonKey),
-                ("Baseline stream key", Empty(stream.BaselineStreamKey)),
-                ("Candidate stream key", Empty(stream.CandidateStreamKey)),
-                ("Destination MAC", stream.Identity.DestinationMac),
-                ("VLAN", stream.Identity.VlanId?.ToString(CultureInfo.InvariantCulture) ?? "untagged"),
-                ("Dataset", stream.Identity.DataSetReference)
-            ]);
-            AppendChanges(builder, "Changes", stream.Changes);
-        }
-
-        return builder.ToString();
-    }
-
-    private static void AppendChanges(
-        StringBuilder builder,
-        string title,
-        IReadOnlyList<SvEvidenceFieldChange> changes)
-    {
-        builder.Append("## ").AppendLine(title);
-        builder.AppendLine();
-        if (changes.Count == 0)
-        {
-            builder.AppendLine("- No changes.");
-            builder.AppendLine();
-            return;
-        }
-
-        builder.AppendLine("| Severity | Category | Field | Baseline | Candidate | Message |");
-        builder.AppendLine("|---|---|---|---|---|---|");
-        foreach (var change in changes)
-        {
-            builder.Append("| ").Append(Cell(change.Severity.ToString()))
-                .Append(" | ").Append(Cell(change.Category))
-                .Append(" | ").Append(Cell(change.Field))
-                .Append(" | ").Append(Cell(change.Baseline))
-                .Append(" | ").Append(Cell(change.Candidate))
-                .Append(" | ").Append(Cell(change.Message)).AppendLine(" |");
-        }
-        builder.AppendLine();
-    }
-
-    private static void AppendKeyValueTable(StringBuilder builder, IEnumerable<(string Key, string Value)> rows)
-    {
-        builder.AppendLine("| Field | Value |");
-        builder.AppendLine("|---|---|");
-        foreach (var row in rows)
-            builder.Append("| ").Append(Cell(row.Key)).Append(" | ").Append(Cell(Empty(row.Value))).AppendLine(" |");
-        builder.AppendLine();
-    }
-
-    private static JsonSerializerOptions CreateJsonOptions()
-    {
-        var options = new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            WriteIndented = true
-        };
-        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase));
-        return options;
-    }
-
-    private static string Timestamp(DateTimeOffset value)
-        => value.ToString("yyyy-MM-dd HH:mm:ss.fff zzz", CultureInfo.InvariantCulture);
-
-    private static string Empty(string? value)
-        => string.IsNullOrWhiteSpace(value) ? "-" : value;
-
-    private static string Cell(string? value)
-        => Empty(value).Replace("|", "\\|", StringComparison.Ordinal)
-            .Replace("\r", " ", StringComparison.Ordinal)
-            .Replace("\n", " ", StringComparison.Ordinal);
-
-    private static string Heading(string? value)
-        => Empty(value).Replace("\r", " ", StringComparison.Ordinal)
-            .Replace("\n", " ", StringComparison.Ordinal);
 }
