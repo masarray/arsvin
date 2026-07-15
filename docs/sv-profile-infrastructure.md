@@ -132,6 +132,30 @@ Unknown nullable values remain explicit `null`; unknown text fields remain empty
 
 GitHub Actions injects `GITHUB_SHA` into `SourceRevisionId`; the .NET informational version therefore carries the build commit for release and CI artifacts. Local builds without source revision metadata report the commit as `unknown` rather than inventing one.
 
+## Evidence report comparison
+
+The Subscriber **Compare** action accepts a baseline and candidate `arsvin.sv-subscriber-evidence/v1` JSON report and writes a paired comparison bundle:
+
+- Markdown for engineering review,
+- JSON using schema `arsvin.sv-subscriber-evidence-comparison/v1` for automation and regression gates.
+
+Comparison uses the full stable stream key first. Unmatched streams are then paired through a logical identity made from APPID, destination MAC, VLAN, `svID`, and dataset reference. Source MAC is deliberately excluded from that fallback identity so publisher/NIC failover is reported as a source change rather than a false removed-plus-added stream.
+
+The comparison classifies:
+
+- report-level schema, software, commit, capture-source, SCL-source, and health changes,
+- added, removed, changed, and unchanged logical streams,
+- health regression or recovery,
+- source-MAC failover,
+- `confRev`, ASDU packing, sample-rate, and sample-mode changes,
+- sequence gaps, duplicates, out-of-order frames, payload issues, and SCL mismatches,
+- observation-window size and measured-rate changes,
+- SCL binding and configuration-comparison regression,
+- profile identity and confidence changes,
+- payload, counter-wrap, nominal-frequency, dataset-signature, provenance, and diagnostic changes.
+
+Changes are assigned `Info`, `Warning`, or `Error` severity. Removed streams, health transitions to `BAD`/`ERROR`, new out-of-order or payload failures, blocking configuration errors, profile conflicts, and dataset-signature changes are treated as high-signal regressions. Measured-rate changes within the one-percent comparison tolerance do not create false warnings.
+
 ## Current integration boundary
 
 `SvStreamObservationManager` and Subscriber now:
@@ -146,10 +170,11 @@ GitHub Actions injects `GITHUB_SHA` into `SourceRevisionId`; the .NET informatio
 - evaluate the built-in evidence-aware profile catalog;
 - expose compact profile, confidence, SCL match, and observation-window state;
 - expose detailed evidence only on demand;
-- keep full-window waveform, phasor, and RMS visualization stable through bulk collection refreshes; and
-- serialize the same observation, profile, configuration, provenance, source, and build evidence into paired Markdown and JSON reports.
+- keep full-window waveform, phasor, and RMS visualization stable through bulk collection refreshes;
+- serialize the same observation, profile, configuration, provenance, source, and build evidence into paired Markdown and JSON reports; and
+- compare baseline and candidate evidence reports through deterministic, severity-ranked Markdown and JSON output.
 
 ## Next integration
 
 1. Add profile-specific definitions only after source review and deterministic evidence.
-2. Add report-to-report comparison after the evidence schema has real capture history and compatibility requirements.
+2. Accumulate real comparison history before defining organization-specific pass/fail policy or CI blocking thresholds.
