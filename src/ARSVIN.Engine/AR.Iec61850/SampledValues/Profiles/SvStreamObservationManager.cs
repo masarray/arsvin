@@ -68,6 +68,8 @@ public sealed class SvStreamObservationManager
         private readonly object _gate = new();
         private readonly HashSet<SvObservationInputKind> _inputKinds = [];
         private readonly Queue<string> _diagnostics = new();
+        private SvExpectedStreamConfiguration? _expectedConfiguration;
+        private SvComparisonMode _comparisonMode = SvComparisonMode.Compatible;
 
         public StreamState(int maximumObservations, TimeSpan maximumAge)
         {
@@ -83,6 +85,7 @@ public sealed class SvStreamObservationManager
             SvFrameObservation observation,
             SvObservationInputKind inputKind,
             SampledValuesPublisherProfile? profile,
+            SvComparisonMode comparisonMode,
             IEnumerable<string> diagnostics)
         {
             Accumulator.Add(observation);
@@ -94,6 +97,8 @@ public sealed class SvStreamObservationManager
                 {
                     IsBoundToScl = true;
                     ControlBlockReference = profile.Stream.ControlBlockReference;
+                    _expectedConfiguration = SvExpectedStreamConfigurationFactory.Create(profile);
+                    _comparisonMode = comparisonMode;
                 }
 
                 foreach (var diagnostic in diagnostics.Where(item => !string.IsNullOrWhiteSpace(item)))
@@ -113,6 +118,13 @@ public sealed class SvStreamObservationManager
             var facts = Accumulator.BuildFacts();
             lock (_gate)
             {
+                var comparison = _expectedConfiguration is null
+                    ? null
+                    : new SvConfigurationComparer().Compare(
+                        _expectedConfiguration,
+                        facts,
+                        _comparisonMode);
+
                 return new SvStreamObservationSnapshot
                 {
                     Key = key,
@@ -121,6 +133,8 @@ public sealed class SvStreamObservationManager
                     LastInputKind = LastInputKind,
                     IsBoundToScl = IsBoundToScl,
                     ControlBlockReference = ControlBlockReference,
+                    ExpectedConfiguration = _expectedConfiguration,
+                    ConfigurationComparison = comparison,
                     Diagnostics = facts.Diagnostics.Concat(_diagnostics).Distinct(StringComparer.Ordinal).ToArray()
                 };
             }
@@ -194,25 +208,8 @@ public sealed class SvStreamObservationManager
         var state = _streams.GetOrAdd(
             key,
             _ => new StreamState(_maximumObservations, _maximumAge));
-        state.Add(observation, inputKind, boundProfile, diagnostics);
-
-        var observedSnapshot = state.Snapshot(key);
-        if (boundProfile is null)
-        {
-            snapshot = observedSnapshot;
-            return true;
-        }
-
-        var expected = SvExpectedStreamConfigurationFactory.Create(boundProfile);
-        var comparison = new SvConfigurationComparer().Compare(
-            expected,
-            observedSnapshot.Facts,
-            comparisonMode);
-        snapshot = observedSnapshot with
-        {
-            ExpectedConfiguration = expected,
-            ConfigurationComparison = comparison
-        };
+        state.Add(observation, inputKind, boundProfile, comparisonMode, diagnostics);
+        snapshot = state.Snapshot(key);
         return true;
     }
 
@@ -270,7 +267,8 @@ public sealed class SvStreamObservationManager
             diagnostics.Add("ASDUs inside one Ethernet frame expose different svID values.");
         if (asdus.Any(item => !string.Equals(item.DataSetReference, first.DataSetReference, StringComparison.Ordinal)))
             diagnostics.Add("ASDUs inside one Ethernet frame expose different dataset references.");
-        if (asdus.Any(item => item.ConfigurationRevision != first.ConfigurationRevision))
+        if (asdus.Any(item => item.ConfigurationRevision != first.ConfigurationRevision)
+            )
             diagnostics.Add("ASDUs inside one Ethernet frame expose different confRev values.");
         if (asdus.Select(item => item.SamplePayload.Length).Distinct().Count() > 1)
             diagnostics.Add("ASDUs inside one Ethernet frame expose different payload lengths.");
