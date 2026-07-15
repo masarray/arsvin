@@ -46,9 +46,27 @@ public sealed record SvConfigurationComparisonResult
         = Array.Empty<SvConfigurationFinding>();
 
     public bool HasBlockingErrors => Findings.Any(item => item.Severity == SvConfigurationFindingSeverity.Error);
+    public int InfoCount => Findings.Count(item => item.Severity == SvConfigurationFindingSeverity.Info);
     public int ErrorCount => Findings.Count(item => item.Severity == SvConfigurationFindingSeverity.Error);
     public int WarningCount => Findings.Count(item => item.Severity == SvConfigurationFindingSeverity.Warning);
     public bool IsExactMatch => Findings.Count == 0;
+
+    public string Summary
+    {
+        get
+        {
+            if (IsExactMatch)
+                return "Exact";
+            if (ErrorCount > 0)
+                return CountText(ErrorCount, "error");
+            if (WarningCount > 0)
+                return CountText(WarningCount, "warning");
+            return CountText(InfoCount, "info");
+        }
+    }
+
+    private static string CountText(int count, string label)
+        => $"{count} {label}{(count == 1 ? string.Empty : "s")}";
 }
 
 public sealed class SvConfigurationComparer
