@@ -43,11 +43,15 @@ public sealed class SvStreamSnapshot
     public IReadOnlyList<SvObservationInputKind> ObservationInputKinds { get; init; }
         = Array.Empty<SvObservationInputKind>();
     public int ObservationWindowFrames { get; init; }
+    public int ObservationWindowSamples { get; init; }
+    public double ObservationWindowDurationSeconds { get; init; }
     public double? ObservedFramesPerSecond { get; init; }
     public double? ObservedSamplesPerSecond { get; init; }
     public int? ObservedCounterWrap { get; init; }
+    public bool IsWaveformWindowReady { get; init; }
+    public SvProfileDetectionResult? ProfileDetection { get; init; }
+    public SvConfigurationComparisonResult? ConfigurationComparison { get; init; }
     public IReadOnlyList<string> ObservationDiagnostics { get; init; } = Array.Empty<string>();
     public IReadOnlyDictionary<string, SvFactSource> FactProvenance { get; init; }
         = new Dictionary<string, SvFactSource>(StringComparer.Ordinal);
 }
-
