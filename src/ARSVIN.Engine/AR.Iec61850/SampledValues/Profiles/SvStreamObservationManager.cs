@@ -267,8 +267,7 @@ public sealed class SvStreamObservationManager
             diagnostics.Add("ASDUs inside one Ethernet frame expose different svID values.");
         if (asdus.Any(item => !string.Equals(item.DataSetReference, first.DataSetReference, StringComparison.Ordinal)))
             diagnostics.Add("ASDUs inside one Ethernet frame expose different dataset references.");
-        if (asdus.Any(item => item.ConfigurationRevision != first.ConfigurationRevision)
-            )
+        if (asdus.Any(item => item.ConfigurationRevision != first.ConfigurationRevision))
             diagnostics.Add("ASDUs inside one Ethernet frame expose different confRev values.");
         if (asdus.Select(item => item.SamplePayload.Length).Distinct().Count() > 1)
             diagnostics.Add("ASDUs inside one Ethernet frame expose different payload lengths.");
