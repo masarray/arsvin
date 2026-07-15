@@ -20,6 +20,9 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 - Added strict and compatible configuration-versus-wire comparison findings without blocking capture or decoding.
 - Added deterministic tests for observation windows, profile detection, evidence explanations, configuration mismatch handling, sparse-evidence confidence, and profile-definition provenance.
 - Added public terminology-neutrality validation to CI and Pages deployment with retained validation evidence.
+- Added bounded, thread-safe SV observation windows with fact provenance and explicit sequential, gap, duplicate, out-of-order/reset, and confirmed-wrap analysis.
+- Added a shared per-stream observation manager used identically by live Npcap capture and PCAP replay.
+- Added stable stream identity, input-source tracking, SCL-derived dataset signatures, immutable observation snapshots, and deterministic live/PCAP pipeline tests.
 
 ### Changed
 
@@ -29,9 +32,16 @@ All notable ARSVIN changes are documented here using a lightweight Keep a Change
 - Public engineering workflow targets are described generically without proprietary product comparisons or branding.
 - The built-in profile catalog contains only the generic SCL-driven Layer-2 SV fallback until profile-specific requirements are verified.
 - Sparse evidence can no longer produce a `Confirmed` profile result; confirmation requires sufficient evaluated evidence plus matching dataset and sampling behavior.
-- Expanded the deterministic suite from 54 to 74 tests.
-- Raised whole-engine coverage from 10.74% to 13.35% and the enforced floor from 10.5% to 13%.
-- Raised protocol-core coverage from 64.97% to 70.47% and the enforced floor from 60% to 70%.
+- Research-candidate confidence is capped at `Possible`, generic implemented profiles are capped at `Likely`, and raw detector confidence remains available separately.
+- Subscriber live and PCAP paths now share one observation pipeline and no longer split a stream solely because `confRev` changes.
+- Expanded the deterministic suite from 54 to 88 tests.
+- Raised whole-engine coverage from 10.74% to 14.61% and the enforced floor from 10.5% to 14.25%.
+- Raised protocol-core coverage from 64.97% to 72.76% and the enforced floor from 60% to 72.5%.
+
+### Fixed
+
+- MAC-address formatting normalization is no longer applied to `svID` or dataset references, preventing punctuation-related false matches.
+- Backward sample-counter transitions require zero plus sequential recovery before they are classified as wraps.
 
 ## 0.4.0 — 2026-07-12
 

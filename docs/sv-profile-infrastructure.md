@@ -5,18 +5,17 @@ ARSVIN separates observed wire facts, configured expectations, and profile claim
 ## Data flow
 
 ```text
-Parsed live or PCAP frame
-        ↓
-SvFrameObservation
-        ↓
-SvObservationAccumulator
-        ↓
-SvObservedStreamFacts
-        ├── SvProfileDetector
-        └── SvConfigurationComparer
+Live Npcap frame ─┐
+                  ├── SvStreamObservationManager
+Imported PCAP ────┘          ↓
+                     per-stream bounded window
+                              ↓
+                    SvObservedStreamFacts
+                         ├── SvProfileDetector
+                         └── SvConfigurationComparer
 ```
 
-The profile infrastructure is part of the shared `ARSVIN.Engine` assembly and has no dependency on WPF or Npcap.
+The profile infrastructure is part of the shared `ARSVIN.Engine` assembly and has no dependency on WPF or Npcap. Subscriber live capture and PCAP replay now use the same manager and stable stream identity, so both paths produce the same facts and diagnostics contract.
 
 ## Observed facts
 
@@ -85,10 +84,21 @@ Two modes are available:
 
 Neither mode stops receive-side capture or decoding. Unknown and conflicting streams remain visible.
 
+## Current integration boundary
+
+`SvStreamObservationManager` now:
+
+- accepts parsed frames from live Npcap capture and classic-PCAP replay;
+- groups frames by source, destination, VLAN, APPID, `svID`, and dataset reference;
+- deliberately keeps `confRev` outside the key so revision changes remain observable;
+- retains input provenance (`LiveCapture` or `PcapReplay`);
+- adds SCL-derived dataset signatures when a stream is bound; and
+- exposes immutable rolling facts to the Subscriber runtime snapshot.
+
 ## Next integration
 
-1. Feed parsed live and PCAP frames into `SvObservationAccumulator`.
-2. Convert selected SCL stream bindings into `SvExpectedStreamConfiguration`.
-3. Present one compact profile/confidence state per observed stream.
-4. Show configuration mismatch details on demand rather than adding permanent visual noise.
+1. Convert selected SCL stream bindings into `SvExpectedStreamConfiguration`.
+2. Run strict or compatible configuration comparison per observed stream.
+3. Present one compact profile/confidence and SCL-match state per selected stream.
+4. Show evidence and mismatch details on demand rather than adding permanent visual noise.
 5. Add profile-specific definitions only after source review and deterministic evidence.
