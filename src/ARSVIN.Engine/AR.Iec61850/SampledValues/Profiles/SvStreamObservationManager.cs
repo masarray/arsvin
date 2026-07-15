@@ -55,16 +55,25 @@ public sealed record SvStreamObservationSnapshot
     public SvObservationInputKind LastInputKind { get; init; }
     public bool IsBoundToScl { get; init; }
     public string ControlBlockReference { get; init; } = string.Empty;
+    public SvExpectedStreamConfiguration? ExpectedConfiguration { get; init; }
+    public SvConfigurationComparisonResult? ConfigurationComparison { get; init; }
+    public SvProfileDetectionResult? ProfileDetection { get; init; }
+    public string ConfigurationMatchSummary => ConfigurationComparison?.Summary ?? "Not configured";
     public IReadOnlyList<string> Diagnostics { get; init; } = Array.Empty<string>();
 }
 
 public sealed class SvStreamObservationManager
 {
+    public const int DefaultMaximumObservations = 12_288;
+    public static readonly TimeSpan DefaultMaximumAge = TimeSpan.FromSeconds(2);
+
     private sealed class StreamState
     {
         private readonly object _gate = new();
         private readonly HashSet<SvObservationInputKind> _inputKinds = [];
         private readonly Queue<string> _diagnostics = new();
+        private SvExpectedStreamConfiguration? _expectedConfiguration;
+        private SvComparisonMode _comparisonMode = SvComparisonMode.Compatible;
 
         public StreamState(int maximumObservations, TimeSpan maximumAge)
         {
@@ -80,6 +89,7 @@ public sealed class SvStreamObservationManager
             SvFrameObservation observation,
             SvObservationInputKind inputKind,
             SampledValuesPublisherProfile? profile,
+            SvComparisonMode comparisonMode,
             IEnumerable<string> diagnostics)
         {
             Accumulator.Add(observation);
@@ -91,6 +101,8 @@ public sealed class SvStreamObservationManager
                 {
                     IsBoundToScl = true;
                     ControlBlockReference = profile.Stream.ControlBlockReference;
+                    _expectedConfiguration = SvExpectedStreamConfigurationFactory.Create(profile);
+                    _comparisonMode = comparisonMode;
                 }
 
                 foreach (var diagnostic in diagnostics.Where(item => !string.IsNullOrWhiteSpace(item)))
@@ -110,6 +122,16 @@ public sealed class SvStreamObservationManager
             var facts = Accumulator.BuildFacts();
             lock (_gate)
             {
+                var comparison = _expectedConfiguration is null
+                    ? null
+                    : new SvConfigurationComparer().Compare(
+                        _expectedConfiguration,
+                        facts,
+                        _comparisonMode);
+                var profileDetection = new SvProfileDetector().DetectBest(
+                    facts,
+                    SvProfileCatalog.BuiltIn);
+
                 return new SvStreamObservationSnapshot
                 {
                     Key = key,
@@ -118,6 +140,9 @@ public sealed class SvStreamObservationManager
                     LastInputKind = LastInputKind,
                     IsBoundToScl = IsBoundToScl,
                     ControlBlockReference = ControlBlockReference,
+                    ExpectedConfiguration = _expectedConfiguration,
+                    ConfigurationComparison = comparison,
+                    ProfileDetection = profileDetection,
                     Diagnostics = facts.Diagnostics.Concat(_diagnostics).Distinct(StringComparer.Ordinal).ToArray()
                 };
             }
@@ -129,13 +154,13 @@ public sealed class SvStreamObservationManager
     private readonly TimeSpan _maximumAge;
 
     public SvStreamObservationManager(
-        int maximumObservations = SvObservationAccumulator.DefaultMaximumObservations,
+        int maximumObservations = DefaultMaximumObservations,
         TimeSpan? maximumAge = null)
     {
         if (maximumObservations < 2)
             throw new ArgumentOutOfRangeException(nameof(maximumObservations));
 
-        _maximumAge = maximumAge ?? SvObservationAccumulator.DefaultMaximumAge;
+        _maximumAge = maximumAge ?? DefaultMaximumAge;
         if (_maximumAge <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(maximumAge));
 
@@ -150,7 +175,8 @@ public sealed class SvStreamObservationManager
         SvObservationInputKind inputKind,
         SampledValuesPublisherProfile? profile,
         out SvStreamObservationSnapshot snapshot,
-        double? nominalFrequencyHz = null)
+        double? nominalFrequencyHz = null,
+        SvComparisonMode comparisonMode = SvComparisonMode.Compatible)
     {
         ArgumentNullException.ThrowIfNull(frame);
         snapshot = new SvStreamObservationSnapshot();
@@ -161,8 +187,9 @@ public sealed class SvStreamObservationManager
             return false;
 
         var key = SvObservedStreamKey.FromFrame(frame);
-        var diagnostics = ValidateFrameConsistency(asdus);
-        var signature = profile?.Entries.Select(ToSignature).ToArray()
+        var diagnostics = ValidateFrameConsistency(asdus).ToList();
+        var boundProfile = ValidateProfileBinding(frame, profile, diagnostics);
+        var signature = boundProfile?.Entries.Select(ToSignature).ToArray()
             ?? Array.Empty<SvDatasetElementSignature>();
         var payloadLengths = asdus.Select(item => item.SamplePayload.Length).Distinct().ToArray();
         var payloadLength = payloadLengths.Length == 1 ? payloadLengths[0] : first.SamplePayload.Length;
@@ -189,7 +216,7 @@ public sealed class SvStreamObservationManager
         var state = _streams.GetOrAdd(
             key,
             _ => new StreamState(_maximumObservations, _maximumAge));
-        state.Add(observation, inputKind, profile, diagnostics);
+        state.Add(observation, inputKind, boundProfile, comparisonMode, diagnostics);
         snapshot = state.Snapshot(key);
         return true;
     }
@@ -215,6 +242,29 @@ public sealed class SvStreamObservationManager
             .ToArray();
 
     public void Clear() => _streams.Clear();
+
+    private static SampledValuesPublisherProfile? ValidateProfileBinding(
+        SampledValuesFrame frame,
+        SampledValuesPublisherProfile? profile,
+        ICollection<string> diagnostics)
+    {
+        if (profile is null)
+            return null;
+
+        var appIdMatches = profile.AppId == frame.AppId;
+        var destinationMatches = string.Equals(
+            profile.Destination.ToString(),
+            frame.Destination.ToString(),
+            StringComparison.OrdinalIgnoreCase);
+        var vlanMatches = profile.Vlan?.VlanId == frame.Vlan?.VlanId;
+        if (appIdMatches && destinationMatches && vlanMatches)
+            return profile;
+
+        diagnostics.Add(
+            $"Rejected SCL candidate {profile.Stream.ControlBlockReference}: " +
+            "APPID, destination MAC, and VLAN must identify the same configured stream before comparison.");
+        return null;
+    }
 
     private static IReadOnlyList<string> ValidateFrameConsistency(IReadOnlyList<SampledValueAsdu> asdus)
     {
