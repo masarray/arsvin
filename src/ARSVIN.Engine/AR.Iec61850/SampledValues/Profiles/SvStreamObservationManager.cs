@@ -164,9 +164,8 @@ public sealed class SvStreamObservationManager
         var diagnostics = ValidateFrameConsistency(asdus);
         var signature = profile?.Entries.Select(ToSignature).ToArray()
             ?? Array.Empty<SvDatasetElementSignature>();
-        var payloadLength = asdus.Select(item => item.SamplePayload.Length).Distinct().SingleOrDefault();
-        if (payloadLength <= 0)
-            payloadLength = first.SamplePayload.Length;
+        var payloadLengths = asdus.Select(item => item.SamplePayload.Length).Distinct().ToArray();
+        var payloadLength = payloadLengths.Length == 1 ? payloadLengths[0] : first.SamplePayload.Length;
 
         var observation = new SvFrameObservation
         {

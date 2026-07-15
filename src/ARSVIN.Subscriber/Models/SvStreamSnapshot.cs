@@ -1,3 +1,5 @@
+using AR.Iec61850.SampledValues.Profiles;
+
 namespace ARSVIN.Subscriber.Models;
 
 public sealed class SvStreamSnapshot
@@ -38,5 +40,14 @@ public sealed class SvStreamSnapshot
     public IReadOnlyList<PhasorVector> Phasors { get; init; } = Array.Empty<PhasorVector>();
     public string CursorSummary { get; init; } = string.Empty;
     public string QualitySummary { get; init; } = string.Empty;
+    public IReadOnlyList<SvObservationInputKind> ObservationInputKinds { get; init; }
+        = Array.Empty<SvObservationInputKind>();
+    public int ObservationWindowFrames { get; init; }
+    public double? ObservedFramesPerSecond { get; init; }
+    public double? ObservedSamplesPerSecond { get; init; }
+    public int? ObservedCounterWrap { get; init; }
+    public IReadOnlyList<string> ObservationDiagnostics { get; init; } = Array.Empty<string>();
+    public IReadOnlyDictionary<string, SvFactSource> FactProvenance { get; init; }
+        = new Dictionary<string, SvFactSource>(StringComparer.Ordinal);
 }
 
