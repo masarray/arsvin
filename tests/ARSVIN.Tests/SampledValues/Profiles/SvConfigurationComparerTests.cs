@@ -46,6 +46,26 @@ public sealed class SvConfigurationComparerTests
         Assert.True(result.IsExactMatch);
     }
 
+    [Theory]
+    [InlineData("MU-01SV01", "MU01SV01", "SV_ID_MISMATCH")]
+    [InlineData("MU01MUnn/LLN0$Phs-Meas", "MU01MUnn/LLN0$PhsMeas", "SV_DATASET_MISMATCH")]
+    public void IdentifierPunctuationIsSemanticallySignificant(
+        string expectedIdentifier,
+        string observedIdentifier,
+        string expectedCode)
+    {
+        var expected = expectedCode == "SV_ID_MISMATCH"
+            ? CreateExpected() with { SvId = expectedIdentifier }
+            : CreateExpected() with { DataSetReference = expectedIdentifier };
+        var observed = expectedCode == "SV_ID_MISMATCH"
+            ? CreateObserved() with { SvId = observedIdentifier }
+            : CreateObserved() with { DataSetReference = observedIdentifier };
+
+        var result = new SvConfigurationComparer().Compare(expected, observed, SvComparisonMode.Strict);
+
+        Assert.Equal(expectedCode, Assert.Single(result.Findings).Code);
+    }
+
     [Fact]
     public void MissingDatasetSignatureIsReportedWithoutThrowing()
     {

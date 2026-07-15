@@ -64,11 +64,11 @@ public sealed class SvConfigurationComparer
         var findings = new List<SvConfigurationFinding>();
         CompareNullable("SV_ETHERTYPE", "EtherType", expected.EtherType, observed.EtherType, value => $"0x{value:X4}", mode, findings);
         CompareNullable("SV_APPID", "APPID", expected.AppId, observed.AppId, value => $"0x{value:X4}", mode, findings);
-        CompareText("SV_DEST_MAC", "Destination MAC", expected.DestinationMac, observed.DestinationMac, mode, findings);
+        CompareMacAddress("SV_DEST_MAC", "Destination MAC", expected.DestinationMac, observed.DestinationMac, mode, findings);
         CompareNullable("SV_VLAN_ID", "VLAN ID", expected.VlanId, observed.VlanId, value => value.ToString(), mode, findings);
         CompareNullable("SV_VLAN_PRIORITY", "VLAN priority", expected.VlanPriority, observed.VlanPriority, value => value.ToString(), mode, findings);
-        CompareText("SV_ID", "svID", expected.SvId, observed.SvId, mode, findings);
-        CompareText("SV_DATASET", "Dataset reference", expected.DataSetReference, observed.DataSetReference, mode, findings);
+        CompareIdentifier("SV_ID", "svID", expected.SvId, observed.SvId, mode, findings);
+        CompareIdentifier("SV_DATASET", "Dataset reference", expected.DataSetReference, observed.DataSetReference, mode, findings);
         CompareNullable("SV_CONFREV", "confRev", expected.ConfigurationRevision, observed.ConfigurationRevision, value => value.ToString(), mode, findings);
         CompareNullable("SV_ASDU_COUNT", "ASDU per frame", expected.AsduPerFrame, observed.AsduPerFrame, value => value.ToString(), mode, findings);
         CompareNullable("SV_PAYLOAD_LENGTH", "Payload bytes per ASDU", expected.PayloadBytesPerAsdu, observed.PayloadBytesPerAsdu, value => value.ToString(), mode, findings);
@@ -83,11 +83,34 @@ public sealed class SvConfigurationComparer
         };
     }
 
+    private static void CompareMacAddress(
+        string code,
+        string field,
+        string expected,
+        string observed,
+        SvComparisonMode mode,
+        List<SvConfigurationFinding> findings)
+    {
+        CompareText(code, field, expected, observed, NormalizeMacAddress, mode, findings);
+    }
+
+    private static void CompareIdentifier(
+        string code,
+        string field,
+        string expected,
+        string observed,
+        SvComparisonMode mode,
+        List<SvConfigurationFinding> findings)
+    {
+        CompareText(code, field, expected, observed, NormalizeIdentifier, mode, findings);
+    }
+
     private static void CompareText(
         string code,
         string field,
         string expected,
         string observed,
+        Func<string, string> normalize,
         SvComparisonMode mode,
         List<SvConfigurationFinding> findings)
     {
@@ -100,7 +123,7 @@ public sealed class SvConfigurationComparer
             return;
         }
 
-        if (!string.Equals(NormalizeText(expected), NormalizeText(observed), StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(normalize(expected), normalize(observed), StringComparison.Ordinal))
             findings.Add(Mismatch(code, field, expected, observed, mode));
     }
 
@@ -184,10 +207,14 @@ public sealed class SvConfigurationComparer
             ? SvConfigurationFindingSeverity.Error
             : SvConfigurationFindingSeverity.Warning;
 
-    private static string NormalizeText(string value)
-        => value.Replace("-", string.Empty, StringComparison.Ordinal)
-            .Replace(":", string.Empty, StringComparison.Ordinal)
-            .Trim();
+    private static string NormalizeMacAddress(string value)
+        => new((value ?? string.Empty)
+            .Where(Uri.IsHexDigit)
+            .Select(char.ToUpperInvariant)
+            .ToArray());
+
+    private static string NormalizeIdentifier(string value)
+        => (value ?? string.Empty).Trim();
 
     private static string SignatureText(IReadOnlyList<SvDatasetElementSignature> signature)
         => string.Join(", ", signature.Select(item => item.NormalizedBType));

@@ -33,6 +33,16 @@ public enum SvProfileEvidenceOutcome
     Unknown
 }
 
+public enum SvFactSource
+{
+    Unknown,
+    WireObserved,
+    CaptureCalculated,
+    SclDerived,
+    TrustedContext,
+    ProfileInferred
+}
+
 public sealed record SvProfileSourceEvidence(
     string SourceId,
     string Description,
@@ -55,6 +65,15 @@ public sealed record SvDatasetElementSignature
             .ToArray());
 }
 
+public sealed record SvCounterTransitionSummary
+{
+    public int SequentialCount { get; init; }
+    public int GapCount { get; init; }
+    public int DuplicateCount { get; init; }
+    public int OutOfOrderOrResetCount { get; init; }
+    public int ConfirmedWrapCount { get; init; }
+}
+
 public sealed record SvObservedStreamFacts
 {
     public ushort? EtherType { get; init; }
@@ -70,11 +89,14 @@ public sealed record SvObservedStreamFacts
     public double? ObservedFramesPerSecond { get; init; }
     public double? ObservedSamplesPerSecond { get; init; }
     public int? ObservedCounterWrap { get; init; }
+    public SvCounterTransitionSummary CounterTransitions { get; init; } = new();
     public ushort? DeclaredSampleRate { get; init; }
     public ushort? DeclaredSampleMode { get; init; }
     public double? NominalFrequencyHz { get; init; }
     public IReadOnlyList<SvDatasetElementSignature> DataSetSignature { get; init; }
         = Array.Empty<SvDatasetElementSignature>();
+    public IReadOnlyDictionary<string, SvFactSource> Provenance { get; init; }
+        = new Dictionary<string, SvFactSource>(StringComparer.Ordinal);
     public int ObservationCount { get; init; }
     public DateTimeOffset? FirstTimestamp { get; init; }
     public DateTimeOffset? LastTimestamp { get; init; }
@@ -160,8 +182,19 @@ public sealed record SvProfileMatchEvidence(
 
 public sealed record SvProfileDetectionResult
 {
+    private SvProfileConfidence _rawConfidence;
+
     public SvProfileDefinition Profile { get; init; } = new();
-    public SvProfileConfidence Confidence { get; init; }
+    public SvProfileConfidence RawConfidence
+    {
+        get => _rawConfidence;
+        init => _rawConfidence = value;
+    }
+    public SvProfileConfidence Confidence
+    {
+        get => SvProfileConfidencePolicy.ApplyEvidenceMaturityCeiling(_rawConfidence, Profile.EvidenceStatus);
+        init => _rawConfidence = value;
+    }
     public double ScorePercent { get; init; }
     public int MatchedWeight { get; init; }
     public int ConflictWeight { get; init; }
@@ -170,4 +203,38 @@ public sealed record SvProfileDetectionResult
         = Array.Empty<SvProfileMatchEvidence>();
 
     public bool HasConflicts => Evidence.Any(item => item.Outcome == SvProfileEvidenceOutcome.Conflict);
+}
+
+public static class SvProfileConfidencePolicy
+{
+    public static SvProfileConfidence ApplyEvidenceMaturityCeiling(
+        SvProfileConfidence confidence,
+        SvProfileEvidenceStatus evidenceStatus)
+    {
+        if (confidence is SvProfileConfidence.Unknown or SvProfileConfidence.Conflict)
+            return confidence;
+
+        var ceiling = evidenceStatus switch
+        {
+            SvProfileEvidenceStatus.ResearchCandidate => SvProfileConfidence.Possible,
+            SvProfileEvidenceStatus.ImplementedGeneric => SvProfileConfidence.Likely,
+            SvProfileEvidenceStatus.VerifiedStandard => SvProfileConfidence.Confirmed,
+            SvProfileEvidenceStatus.VerifiedCapture => SvProfileConfidence.Confirmed,
+            SvProfileEvidenceStatus.VerifiedLab => SvProfileConfidence.Confirmed,
+            _ => SvProfileConfidence.Possible
+        };
+
+        return Rank(confidence) <= Rank(ceiling) ? confidence : ceiling;
+    }
+
+    private static int Rank(SvProfileConfidence confidence)
+        => confidence switch
+        {
+            SvProfileConfidence.Unknown => 0,
+            SvProfileConfidence.Possible => 1,
+            SvProfileConfidence.Likely => 2,
+            SvProfileConfidence.Confirmed => 3,
+            SvProfileConfidence.Conflict => 4,
+            _ => 0
+        };
 }
