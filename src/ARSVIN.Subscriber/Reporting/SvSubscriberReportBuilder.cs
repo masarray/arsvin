@@ -87,6 +87,8 @@ internal static class SvSubscriberReportBuilder
         var observationDiagnostics = observation?.Diagnostics ?? stream.ObservationDiagnostics;
         var profileDetection = observation?.ProfileDetection ?? stream.ProfileDetection;
         var configurationComparison = observation?.ConfigurationComparison ?? stream.ConfigurationComparison;
+        var health = ResolveHealth(stream, observation, configurationComparison);
+        var healthDetail = ResolveHealthDetail(stream, observation, configurationComparison, health);
         var diagnostics = stream.Diagnostics.Concat(observationDiagnostics)
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.Ordinal)
@@ -95,8 +97,8 @@ internal static class SvSubscriberReportBuilder
         return new SvSubscriberStreamEvidence
         {
             Key = stream.Key,
-            Health = stream.Health,
-            HealthDetail = stream.HealthDetail,
+            Health = health,
+            HealthDetail = healthDetail,
             Identity = new SvSubscriberStreamIdentityEvidence
             {
                 AppId = stream.AppId,
@@ -140,7 +142,7 @@ internal static class SvSubscriberReportBuilder
                 WindowFrames = facts.ObservationCount > 0
                     ? facts.ObservationCount
                     : stream.ObservationWindowFrames,
-                WindowSamples = stream.ObservationWindowSamples,
+                WindowSamples = ResolveWindowSamples(facts, stream.ObservationWindowSamples),
                 WindowDurationSeconds = ResolveWindowDuration(facts, stream.ObservationWindowDurationSeconds),
                 FirstTimestamp = facts.FirstTimestamp,
                 LastTimestamp = facts.LastTimestamp,
@@ -193,6 +195,52 @@ internal static class SvSubscriberReportBuilder
             ObservationCount = stream.ObservationWindowFrames,
             Diagnostics = stream.ObservationDiagnostics
         };
+
+    private static int ResolveWindowSamples(SvObservedStreamFacts facts, int fallback)
+    {
+        if (facts.ObservationCount > 0)
+            return facts.ObservationCount * Math.Max(1, facts.AsduPerFrame ?? 1);
+        return Math.Max(0, fallback);
+    }
+
+    private static string ResolveHealth(
+        SvStreamSnapshot stream,
+        SvStreamObservationSnapshot? observation,
+        SvConfigurationComparisonResult? comparison)
+    {
+        var hasRuntimeError = stream.PayloadIssueCount > 0 || stream.OutOfOrderCount > 0;
+        var hasRuntimeWarning = stream.SequenceGapCount > 0 || stream.DuplicateCount > 0;
+        var isConfigured = observation?.IsBoundToScl ?? stream.IsBoundToScl;
+        if (hasRuntimeError || comparison?.HasBlockingErrors == true)
+            return "BAD";
+        if (hasRuntimeWarning || comparison?.WarningCount > 0 || !isConfigured)
+            return "WARN";
+        return "GOOD";
+    }
+
+    private static string ResolveHealthDetail(
+        SvStreamSnapshot stream,
+        SvStreamObservationSnapshot? observation,
+        SvConfigurationComparisonResult? comparison,
+        string health)
+    {
+        var blocking = comparison?.Findings
+            .FirstOrDefault(item => item.Severity == SvConfigurationFindingSeverity.Error);
+        if (blocking is not null)
+            return blocking.Message;
+        if (stream.PayloadIssueCount > 0 || stream.OutOfOrderCount > 0)
+            return stream.HealthDetail;
+
+        var warning = comparison?.Findings
+            .FirstOrDefault(item => item.Severity == SvConfigurationFindingSeverity.Warning);
+        if (warning is not null)
+            return warning.Message;
+        if (health == "GOOD")
+            return "SV stream is stable and matches the configured SCL expectation.";
+        if (observation?.IsBoundToScl != true)
+            return "SV stream is not bound to an SCL expectation.";
+        return stream.HealthDetail;
+    }
 
     private static double ResolveWindowDuration(SvObservedStreamFacts facts, double fallback)
     {

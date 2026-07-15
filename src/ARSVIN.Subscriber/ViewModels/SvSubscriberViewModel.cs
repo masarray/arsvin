@@ -374,7 +374,7 @@ public sealed class SvSubscriberViewModel : ObservableObject, IDisposable
         if (dataSetMatches.Length == 1)
             return dataSetMatches[0];
 
-        return addressCandidates.Length == 1 ? addressCandidates[0] : null;
+        return null;
     }
 
     private void RefreshUiSnapshots()
