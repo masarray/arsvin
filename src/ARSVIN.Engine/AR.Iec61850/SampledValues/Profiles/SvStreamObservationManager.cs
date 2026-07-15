@@ -55,6 +55,9 @@ public sealed record SvStreamObservationSnapshot
     public SvObservationInputKind LastInputKind { get; init; }
     public bool IsBoundToScl { get; init; }
     public string ControlBlockReference { get; init; } = string.Empty;
+    public SvExpectedStreamConfiguration? ExpectedConfiguration { get; init; }
+    public SvConfigurationComparisonResult? ConfigurationComparison { get; init; }
+    public string ConfigurationMatchSummary => ConfigurationComparison?.Summary ?? "Not configured";
     public IReadOnlyList<string> Diagnostics { get; init; } = Array.Empty<string>();
 }
 
@@ -150,7 +153,8 @@ public sealed class SvStreamObservationManager
         SvObservationInputKind inputKind,
         SampledValuesPublisherProfile? profile,
         out SvStreamObservationSnapshot snapshot,
-        double? nominalFrequencyHz = null)
+        double? nominalFrequencyHz = null,
+        SvComparisonMode comparisonMode = SvComparisonMode.Compatible)
     {
         ArgumentNullException.ThrowIfNull(frame);
         snapshot = new SvStreamObservationSnapshot();
@@ -161,8 +165,9 @@ public sealed class SvStreamObservationManager
             return false;
 
         var key = SvObservedStreamKey.FromFrame(frame);
-        var diagnostics = ValidateFrameConsistency(asdus);
-        var signature = profile?.Entries.Select(ToSignature).ToArray()
+        var diagnostics = ValidateFrameConsistency(asdus).ToList();
+        var boundProfile = ValidateProfileBinding(frame, profile, diagnostics);
+        var signature = boundProfile?.Entries.Select(ToSignature).ToArray()
             ?? Array.Empty<SvDatasetElementSignature>();
         var payloadLengths = asdus.Select(item => item.SamplePayload.Length).Distinct().ToArray();
         var payloadLength = payloadLengths.Length == 1 ? payloadLengths[0] : first.SamplePayload.Length;
@@ -189,8 +194,25 @@ public sealed class SvStreamObservationManager
         var state = _streams.GetOrAdd(
             key,
             _ => new StreamState(_maximumObservations, _maximumAge));
-        state.Add(observation, inputKind, profile, diagnostics);
-        snapshot = state.Snapshot(key);
+        state.Add(observation, inputKind, boundProfile, diagnostics);
+
+        var observedSnapshot = state.Snapshot(key);
+        if (boundProfile is null)
+        {
+            snapshot = observedSnapshot;
+            return true;
+        }
+
+        var expected = SvExpectedStreamConfigurationFactory.Create(boundProfile);
+        var comparison = new SvConfigurationComparer().Compare(
+            expected,
+            observedSnapshot.Facts,
+            comparisonMode);
+        snapshot = observedSnapshot with
+        {
+            ExpectedConfiguration = expected,
+            ConfigurationComparison = comparison
+        };
         return true;
     }
 
@@ -215,6 +237,29 @@ public sealed class SvStreamObservationManager
             .ToArray();
 
     public void Clear() => _streams.Clear();
+
+    private static SampledValuesPublisherProfile? ValidateProfileBinding(
+        SampledValuesFrame frame,
+        SampledValuesPublisherProfile? profile,
+        ICollection<string> diagnostics)
+    {
+        if (profile is null)
+            return null;
+
+        var appIdMatches = profile.AppId == frame.AppId;
+        var destinationMatches = string.Equals(
+            profile.Destination.ToString(),
+            frame.Destination.ToString(),
+            StringComparison.OrdinalIgnoreCase);
+        var vlanMatches = profile.Vlan?.VlanId == frame.Vlan?.VlanId;
+        if (appIdMatches && destinationMatches && vlanMatches)
+            return profile;
+
+        diagnostics.Add(
+            $"Rejected SCL candidate {profile.Stream.ControlBlockReference}: " +
+            "APPID, destination MAC, and VLAN must identify the same configured stream before comparison.");
+        return null;
+    }
 
     private static IReadOnlyList<string> ValidateFrameConsistency(IReadOnlyList<SampledValueAsdu> asdus)
     {
