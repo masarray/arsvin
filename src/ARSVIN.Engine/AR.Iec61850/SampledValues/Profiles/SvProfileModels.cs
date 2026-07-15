@@ -17,6 +17,12 @@ public enum SvProfileEvidenceStatus
     VerifiedLab
 }
 
+public enum SvProfileClassificationScope
+{
+    TrafficFamily,
+    Profile
+}
+
 public enum SvProfileConfidence
 {
     Unknown,
@@ -32,6 +38,74 @@ public enum SvProfileEvidenceOutcome
     Conflict,
     Unknown
 }
+
+public enum SvFactProvenance
+{
+    Unavailable,
+    WireObserved,
+    CaptureCalculated,
+    SclDerived,
+    TrustedContext,
+    ProfileInferred
+}
+
+public enum SvObservationWindowQuality
+{
+    Empty,
+    Insufficient,
+    Ready,
+    Degraded
+}
+
+public sealed record SvObservationWindowPolicy
+{
+    public int MaximumObservations { get; init; } = 4096;
+    public TimeSpan MaximumAge { get; init; } = TimeSpan.FromSeconds(5);
+    public int MinimumObservations { get; init; } = 3;
+    public TimeSpan MinimumDuration { get; init; } = TimeSpan.FromMilliseconds(250);
+    public int ReorderTolerance { get; init; } = 8;
+    public ushort WrapLowWatermark { get; init; } = 8;
+    public ushort MinimumWrapPredecessor { get; init; } = 255;
+
+    public void Validate()
+    {
+        if (MaximumObservations <= 0)
+            throw new InvalidOperationException("SV observation windows require a positive maximum observation count.");
+        if (MaximumAge <= TimeSpan.Zero)
+            throw new InvalidOperationException("SV observation windows require a positive maximum age.");
+        if (MinimumObservations <= 0 || MinimumObservations > MaximumObservations)
+            throw new InvalidOperationException("SV observation windows contain an invalid minimum observation count.");
+        if (MinimumDuration < TimeSpan.Zero || MinimumDuration > MaximumAge)
+            throw new InvalidOperationException("SV observation windows contain an invalid minimum duration.");
+        if (ReorderTolerance < 0)
+            throw new InvalidOperationException("SV observation windows contain an invalid reorder tolerance.");
+        if (MinimumWrapPredecessor <= WrapLowWatermark)
+            throw new InvalidOperationException("SV wrap detection requires the predecessor threshold to exceed the low-watermark threshold.");
+    }
+}
+
+public sealed record SvCounterSequenceSummary
+{
+    public int ContinuousTransitions { get; init; }
+    public int GapTransitions { get; init; }
+    public int EstimatedMissingSamples { get; init; }
+    public int DuplicateTransitions { get; init; }
+    public int WrapTransitions { get; init; }
+    public int OutOfOrderTransitions { get; init; }
+    public int ResetTransitions { get; init; }
+    public int? ConfirmedWrap { get; init; }
+
+    public bool HasAnomalies =>
+        GapTransitions > 0 ||
+        DuplicateTransitions > 0 ||
+        OutOfOrderTransitions > 0 ||
+        ResetTransitions > 0;
+}
+
+public sealed record SvFactProvenanceEntry(
+    string Field,
+    SvFactProvenance Provenance,
+    string Explanation);
 
 public sealed record SvProfileSourceEvidence(
     string SourceId,
@@ -78,7 +152,20 @@ public sealed record SvObservedStreamFacts
     public int ObservationCount { get; init; }
     public DateTimeOffset? FirstTimestamp { get; init; }
     public DateTimeOffset? LastTimestamp { get; init; }
+    public TimeSpan ObservationDuration { get; init; }
+    public SvObservationWindowQuality WindowQuality { get; init; }
+    public SvCounterSequenceSummary CounterSequence { get; init; } = new();
+    public IReadOnlyList<SvFactProvenanceEntry> Provenance { get; init; }
+        = Array.Empty<SvFactProvenanceEntry>();
     public IReadOnlyList<string> Diagnostics { get; init; } = Array.Empty<string>();
+
+    public bool IsWindowSufficient =>
+        WindowQuality is SvObservationWindowQuality.Ready or SvObservationWindowQuality.Degraded;
+
+    public SvFactProvenance GetProvenance(string field)
+        => Provenance.FirstOrDefault(item =>
+                item.Field.Equals(field, StringComparison.Ordinal))?.Provenance
+            ?? SvFactProvenance.Unavailable;
 }
 
 public sealed record SvProfileDefinition
@@ -86,6 +173,7 @@ public sealed record SvProfileDefinition
     public string Id { get; init; } = string.Empty;
     public string DisplayName { get; init; } = string.Empty;
     public string Family { get; init; } = string.Empty;
+    public SvProfileClassificationScope ClassificationScope { get; init; } = SvProfileClassificationScope.Profile;
     public SvSamplingBasis SamplingBasis { get; init; }
     public ushort? ExpectedEtherType { get; init; }
     public IReadOnlyList<int> AllowedAsduPerFrame { get; init; } = Array.Empty<int>();
@@ -162,6 +250,7 @@ public sealed record SvProfileDetectionResult
 {
     public SvProfileDefinition Profile { get; init; } = new();
     public SvProfileConfidence Confidence { get; init; }
+    public SvProfileConfidence UncappedConfidence { get; init; }
     public double ScorePercent { get; init; }
     public int MatchedWeight { get; init; }
     public int ConflictWeight { get; init; }
@@ -170,4 +259,5 @@ public sealed record SvProfileDetectionResult
         = Array.Empty<SvProfileMatchEvidence>();
 
     public bool HasConflicts => Evidence.Any(item => item.Outcome == SvProfileEvidenceOutcome.Conflict);
+    public bool ConfidenceLimitedByEvidence => Confidence != UncappedConfidence;
 }
