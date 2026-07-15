@@ -64,6 +64,9 @@ public sealed record SvStreamObservationSnapshot
 
 public sealed class SvStreamObservationManager
 {
+    public const int DefaultMaximumObservations = 12_288;
+    public static readonly TimeSpan DefaultMaximumAge = TimeSpan.FromSeconds(2);
+
     private sealed class StreamState
     {
         private readonly object _gate = new();
@@ -151,13 +154,13 @@ public sealed class SvStreamObservationManager
     private readonly TimeSpan _maximumAge;
 
     public SvStreamObservationManager(
-        int maximumObservations = SvObservationAccumulator.DefaultMaximumObservations,
+        int maximumObservations = DefaultMaximumObservations,
         TimeSpan? maximumAge = null)
     {
         if (maximumObservations < 2)
             throw new ArgumentOutOfRangeException(nameof(maximumObservations));
 
-        _maximumAge = maximumAge ?? SvObservationAccumulator.DefaultMaximumAge;
+        _maximumAge = maximumAge ?? DefaultMaximumAge;
         if (_maximumAge <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(maximumAge));
 
