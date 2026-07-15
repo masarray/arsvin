@@ -32,25 +32,68 @@ public sealed record SvFrameObservation
 
 public sealed class SvObservationAccumulator
 {
-    private readonly List<SvFrameObservation> _observations = [];
+    public const int DefaultMaximumObservations = 4096;
+    public static readonly TimeSpan DefaultMaximumAge = TimeSpan.FromSeconds(5);
 
-    public int Count => _observations.Count;
+    private readonly object _gate = new();
+    private readonly Queue<SvFrameObservation> _observations = new();
+    private readonly int _maximumObservations;
+    private readonly TimeSpan _maximumAge;
+
+    public SvObservationAccumulator(
+        int maximumObservations = DefaultMaximumObservations,
+        TimeSpan? maximumAge = null)
+    {
+        if (maximumObservations < 2)
+            throw new ArgumentOutOfRangeException(nameof(maximumObservations), "At least two observations are required for rate analysis.");
+
+        _maximumAge = maximumAge ?? DefaultMaximumAge;
+        if (_maximumAge <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(maximumAge), "Observation age must be greater than zero.");
+
+        _maximumObservations = maximumObservations;
+    }
+
+    public int Count
+    {
+        get
+        {
+            lock (_gate)
+                return _observations.Count;
+        }
+    }
+
+    public int MaximumObservations => _maximumObservations;
+    public TimeSpan MaximumAge => _maximumAge;
 
     public void Add(SvFrameObservation observation)
     {
         ArgumentNullException.ThrowIfNull(observation);
         observation.Validate();
-        _observations.Add(observation);
+
+        lock (_gate)
+        {
+            _observations.Enqueue(observation);
+            TrimWindow(observation.Timestamp);
+        }
     }
 
-    public void Clear() => _observations.Clear();
+    public void Clear()
+    {
+        lock (_gate)
+            _observations.Clear();
+    }
 
     public SvObservedStreamFacts BuildFacts()
     {
-        if (_observations.Count == 0)
+        SvFrameObservation[] snapshot;
+        lock (_gate)
+            snapshot = _observations.ToArray();
+
+        if (snapshot.Length == 0)
             return new SvObservedStreamFacts();
 
-        var ordered = _observations.OrderBy(item => item.Timestamp).ToArray();
+        var ordered = snapshot.OrderBy(item => item.Timestamp).ToArray();
         var diagnostics = new List<string>();
         var first = ordered[0];
         var last = ordered[^1];
@@ -69,7 +112,8 @@ public sealed class SvObservationAccumulator
             diagnostics.Add("At least two timestamped frames are required to estimate stream rate.");
         }
 
-        var counterWrap = DetectCounterWrap(ordered, diagnostics);
+        var counterAnalysis = AnalyzeCounters(ordered, diagnostics);
+        var provenance = BuildProvenance();
 
         return new SvObservedStreamFacts
         {
@@ -85,11 +129,13 @@ public sealed class SvObservationAccumulator
             PayloadBytesPerAsdu = StableValue(ordered.Select(item => item.PayloadBytesPerAsdu), "payload length", diagnostics),
             ObservedFramesPerSecond = framesPerSecond,
             ObservedSamplesPerSecond = samplesPerSecond,
-            ObservedCounterWrap = counterWrap,
+            ObservedCounterWrap = counterAnalysis.Wrap,
+            CounterTransitions = counterAnalysis.Summary,
             DeclaredSampleRate = StableNullableValue(ordered.Select(item => item.DeclaredSampleRate), "declared sample rate", diagnostics),
             DeclaredSampleMode = StableNullableValue(ordered.Select(item => item.DeclaredSampleMode), "declared sample mode", diagnostics),
             NominalFrequencyHz = StableNullableValue(ordered.Select(item => item.NominalFrequencyHz), "nominal frequency", diagnostics),
             DataSetSignature = StableSignature(ordered.Select(item => item.DataSetSignature), diagnostics),
+            Provenance = provenance,
             ObservationCount = ordered.Length,
             FirstTimestamp = first.Timestamp,
             LastTimestamp = last.Timestamp,
@@ -97,31 +143,112 @@ public sealed class SvObservationAccumulator
         };
     }
 
-    private static int? DetectCounterWrap(
+    private void TrimWindow(DateTimeOffset newestTimestamp)
+    {
+        while (_observations.Count > _maximumObservations)
+            _observations.Dequeue();
+
+        var oldestAllowed = newestTimestamp - _maximumAge;
+        while (_observations.Count > 0 && _observations.Peek().Timestamp < oldestAllowed)
+            _observations.Dequeue();
+    }
+
+    private static (int? Wrap, SvCounterTransitionSummary Summary) AnalyzeCounters(
         IReadOnlyList<SvFrameObservation> observations,
         List<string> diagnostics)
     {
         var sampleCounts = observations.SelectMany(item => item.SampleCounts).ToArray();
         if (sampleCounts.Length < 2)
-            return null;
+            return (null, new SvCounterTransitionSummary());
 
-        var wraps = new HashSet<int>();
+        var sequential = 0;
+        var gaps = 0;
+        var duplicates = 0;
+        var outOfOrderOrReset = 0;
+        var confirmedWraps = 0;
+        var wrapCandidates = new HashSet<int>();
+
         for (var index = 1; index < sampleCounts.Length; index++)
         {
             var previous = sampleCounts[index - 1];
             var current = sampleCounts[index];
-            if (current < previous)
-                wraps.Add(previous + 1);
+
+            if (current == previous)
+            {
+                duplicates++;
+                continue;
+            }
+
+            if (current == previous + 1)
+            {
+                sequential++;
+                continue;
+            }
+
+            if (current > previous + 1)
+            {
+                gaps++;
+                continue;
+            }
+
+            var hasSequentialRecovery = index + 1 < sampleCounts.Length && sampleCounts[index + 1] == current + 1;
+            if (current == 0 && hasSequentialRecovery && previous > 1)
+            {
+                confirmedWraps++;
+                wrapCandidates.Add(previous + 1);
+                continue;
+            }
+
+            outOfOrderOrReset++;
         }
 
-        if (wraps.Count == 1)
-            return wraps.Single();
+        int? wrap = null;
+        if (wrapCandidates.Count == 1)
+            wrap = wrapCandidates.Single();
+        else if (wrapCandidates.Count > 1)
+            diagnostics.Add($"Multiple sample-counter wrap candidates were observed: {string.Join(", ", wrapCandidates.Order())}.");
 
-        if (wraps.Count > 1)
-            diagnostics.Add($"Multiple sample-counter wrap candidates were observed: {string.Join(", ", wraps.Order())}.");
+        if (gaps > 0)
+            diagnostics.Add($"Observed {gaps} forward sample-counter gap transition(s).");
+        if (duplicates > 0)
+            diagnostics.Add($"Observed {duplicates} duplicate sample-counter transition(s).");
+        if (outOfOrderOrReset > 0)
+            diagnostics.Add($"Observed {outOfOrderOrReset} out-of-order or reset transition(s); these were not classified as wraps.");
 
-        return null;
+        return (
+            wrap,
+            new SvCounterTransitionSummary
+            {
+                SequentialCount = sequential,
+                GapCount = gaps,
+                DuplicateCount = duplicates,
+                OutOfOrderOrResetCount = outOfOrderOrReset,
+                ConfirmedWrapCount = confirmedWraps
+            });
     }
+
+    private static IReadOnlyDictionary<string, SvFactSource> BuildProvenance()
+        => new Dictionary<string, SvFactSource>(StringComparer.Ordinal)
+        {
+            [nameof(SvObservedStreamFacts.EtherType)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.AppId)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.DestinationMac)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.VlanId)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.VlanPriority)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.SvId)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.DataSetReference)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.ConfigurationRevision)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.AsduPerFrame)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.PayloadBytesPerAsdu)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.DeclaredSampleRate)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.DeclaredSampleMode)] = SvFactSource.WireObserved,
+            [nameof(SvObservedStreamFacts.ObservedFramesPerSecond)] = SvFactSource.CaptureCalculated,
+            [nameof(SvObservedStreamFacts.ObservedSamplesPerSecond)] = SvFactSource.CaptureCalculated,
+            [nameof(SvObservedStreamFacts.ObservedCounterWrap)] = SvFactSource.CaptureCalculated,
+            [nameof(SvObservedStreamFacts.CounterTransitions)] = SvFactSource.CaptureCalculated,
+            [nameof(SvObservedStreamFacts.NominalFrequencyHz)] = SvFactSource.TrustedContext,
+            [nameof(SvObservedStreamFacts.DataSetSignature)] = SvFactSource.SclDerived
+        };
 
     private static T? StableValue<T>(
         IEnumerable<T> values,
@@ -171,7 +298,8 @@ public sealed class SvObservationAccumulator
         IEnumerable<IReadOnlyList<SvDatasetElementSignature>> signatures,
         List<string> diagnostics)
     {
-        var normalized = signatures
+        var materialized = signatures.ToArray();
+        var normalized = materialized
             .Select(signature => signature.Select(ToKey).ToArray())
             .ToArray();
 
@@ -180,7 +308,7 @@ public sealed class SvObservationAccumulator
 
         var first = normalized[0];
         if (normalized.All(signature => signature.SequenceEqual(first, StringComparer.Ordinal)))
-            return signatures.First().ToArray();
+            return materialized[0].ToArray();
 
         diagnostics.Add("Observed dataset signature changed within the analysis window.");
         return Array.Empty<SvDatasetElementSignature>();
