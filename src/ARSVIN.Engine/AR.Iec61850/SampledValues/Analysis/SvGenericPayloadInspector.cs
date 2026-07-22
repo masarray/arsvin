@@ -69,7 +69,7 @@ public sealed record SvGenericPayloadInspection
 
 /// <summary>
 /// Generic seqOfData inspector used when no trusted dataset layout is available.
-/// It never labels words as Ia/Ib/Ic, voltage, current, quality, primary, secondary, A, or V.
+/// It never labels words as phase channels, voltage, current, quality, primary, secondary, A, or V.
 /// </summary>
 public static class SvGenericPayloadInspector
 {
