@@ -1,7 +1,9 @@
 using System.Collections.Specialized;
 using System.Text.Json;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
+using System.Windows.Media;
 using AR.Iec61850.SampledValues.Measurements;
 using AR.Iec61850.SampledValues.Reporting;
 using ARSVIN.Subscriber.Controls;
@@ -23,6 +25,7 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
         _viewModel.Streams.CollectionChanged += Streams_CollectionChanged;
         AttachLivePlotControls();
+        Loaded += (_, _) => AttachMeasurementContextToolbar();
     }
 
     private void AttachLivePlotControls()
@@ -40,6 +43,54 @@ public partial class MainWindow : Window
             PhasorPlot.VectorsProperty,
             new Binding("SelectedStream.Phasors"));
         PhasorHost.Child = phasor;
+    }
+
+    private void AttachMeasurementContextToolbar()
+    {
+        var toolbar = FindVisualChildren<WrapPanel>(this)
+            .FirstOrDefault(panel => panel.Children.OfType<Button>()
+                .Any(button => string.Equals(button.Content?.ToString(), "Import SCL", StringComparison.Ordinal)));
+        if (toolbar is null || toolbar.Children.OfType<Button>()
+                .Any(button => string.Equals(button.Tag?.ToString(), "measurement-context", StringComparison.Ordinal)))
+            return;
+
+        toolbar.Children.Add(CreateToolbarButton("CT/VT", "measurement-context", MeasurementContext_Click,
+            "Edit primary/secondary CT and VT context for the selected stream."));
+        toolbar.Children.Add(CreateToolbarButton("Ctx Import", "measurement-context-import", ImportMeasurementContext_Click,
+            "Import a versioned ARSVIN measurement-context JSON document."));
+        toolbar.Children.Add(CreateToolbarButton("Ctx Export", "measurement-context-export", ExportMeasurementContext_Click,
+            "Export configured stream measurement contexts as JSON evidence."));
+    }
+
+    private Button CreateToolbarButton(
+        string content,
+        string tag,
+        RoutedEventHandler click,
+        string toolTip)
+    {
+        var button = new Button
+        {
+            Content = content,
+            Tag = tag,
+            ToolTip = toolTip,
+            Margin = new Thickness(0, 0, 6, 0)
+        };
+        button.SetResourceReference(StyleProperty, "ToolbarButton");
+        button.Click += click;
+        return button;
+    }
+
+    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root)
+        where T : DependencyObject
+    {
+        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
+        {
+            var child = VisualTreeHelper.GetChild(root, index);
+            if (child is T typed)
+                yield return typed;
+            foreach (var descendant in FindVisualChildren<T>(child))
+                yield return descendant;
+        }
     }
 
     private void Streams_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
