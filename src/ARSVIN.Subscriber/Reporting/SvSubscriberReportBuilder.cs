@@ -1,4 +1,5 @@
 using System.Reflection;
+using AR.Iec61850.SampledValues.Measurements;
 using AR.Iec61850.SampledValues.Profiles;
 using AR.Iec61850.SampledValues.Reporting;
 using ARSVIN.Subscriber.Models;
@@ -87,9 +88,12 @@ internal static class SvSubscriberReportBuilder
         var observationDiagnostics = observation?.Diagnostics ?? stream.ObservationDiagnostics;
         var profileDetection = observation?.ProfileDetection ?? stream.ProfileDetection;
         var configurationComparison = observation?.ConfigurationComparison ?? stream.ConfigurationComparison;
-        var health = ResolveHealth(stream, observation, configurationComparison);
-        var healthDetail = ResolveHealthDetail(stream, observation, configurationComparison, health);
-        var diagnostics = stream.Diagnostics.Concat(observationDiagnostics)
+        var qualityStates = ResolveQualityStates(stream.Values);
+        var health = ResolveHealth(stream, configurationComparison, qualityStates);
+        var healthDetail = ResolveHealthDetail(stream, observation, configurationComparison, qualityStates, health);
+        var diagnostics = stream.Diagnostics
+            .Concat(observationDiagnostics)
+            .Concat(BuildQualityDiagnostics(stream.Values))
             .Where(item => !string.IsNullOrWhiteSpace(item))
             .Distinct(StringComparer.Ordinal)
             .ToArray();
@@ -129,7 +133,7 @@ internal static class SvSubscriberReportBuilder
                 SclMismatchCount = stream.SclMismatchCount,
                 IsWaveformWindowReady = stream.IsWaveformWindowReady,
                 LayoutBinding = stream.LayoutBinding,
-                QualitySummary = stream.QualitySummary,
+                QualitySummary = BuildQualitySummary(qualityStates, stream.QualitySummary),
                 CursorSummary = stream.CursorSummary,
                 LastSeen = stream.LastSeen
             },
@@ -205,41 +209,89 @@ internal static class SvSubscriberReportBuilder
 
     private static string ResolveHealth(
         SvStreamSnapshot stream,
-        SvStreamObservationSnapshot? observation,
-        SvConfigurationComparisonResult? comparison)
+        SvConfigurationComparisonResult? comparison,
+        IReadOnlyList<SvQualityState> qualityStates)
     {
-        var hasRuntimeError = stream.PayloadIssueCount > 0 || stream.OutOfOrderCount > 0;
-        var hasRuntimeWarning = stream.SequenceGapCount > 0 || stream.DuplicateCount > 0;
-        var isConfigured = observation?.IsBoundToScl ?? stream.IsBoundToScl;
-        if (hasRuntimeError || comparison?.HasBlockingErrors == true)
+        var hasQualityBad = qualityStates.Any(item => item.Severity is SvQualitySeverity.Bad or SvQualitySeverity.Unknown);
+        var hasQualityWarning = qualityStates.Any(item => item.Severity == SvQualitySeverity.Warning);
+
+        if (comparison?.HasBlockingErrors == true || hasQualityBad)
             return "BAD";
-        if (hasRuntimeWarning || comparison?.WarningCount > 0 || !isConfigured)
+        if (stream.Health == "BAD")
+            return "BAD";
+        if (comparison?.WarningCount > 0 || hasQualityWarning)
             return "WARN";
-        return "GOOD";
+        return stream.Health;
     }
 
     private static string ResolveHealthDetail(
         SvStreamSnapshot stream,
         SvStreamObservationSnapshot? observation,
         SvConfigurationComparisonResult? comparison,
+        IReadOnlyList<SvQualityState> qualityStates,
         string health)
     {
         var blocking = comparison?.Findings
             .FirstOrDefault(item => item.Severity == SvConfigurationFindingSeverity.Error);
         if (blocking is not null)
             return blocking.Message;
-        if (stream.PayloadIssueCount > 0 || stream.OutOfOrderCount > 0)
+
+        var badQuality = qualityStates.FirstOrDefault(item =>
+            item.Severity is SvQualitySeverity.Bad or SvQualitySeverity.Unknown);
+        if (badQuality is not null)
+            return $"Sample quality requires attention: {badQuality.Summary}.";
+
+        if (stream.Health == "BAD")
             return stream.HealthDetail;
 
         var warning = comparison?.Findings
             .FirstOrDefault(item => item.Severity == SvConfigurationFindingSeverity.Warning);
         if (warning is not null)
             return warning.Message;
+
+        var warningQuality = qualityStates.FirstOrDefault(item => item.Severity == SvQualitySeverity.Warning);
+        if (warningQuality is not null)
+            return $"Sample quality warning: {warningQuality.Summary}.";
+
         if (health == "GOOD")
-            return "SV stream is stable and matches the configured SCL expectation.";
+            return "SV stream is stable, quality is usable, and the configured expectation has no blocking mismatch.";
         if (observation?.IsBoundToScl != true)
             return "SV stream is not bound to an SCL expectation.";
         return stream.HealthDetail;
+    }
+
+    private static IReadOnlyList<SvQualityState> ResolveQualityStates(IEnumerable<DecodedValueRow> values)
+        => values.Select(value => value.QualityState)
+            .Where(value => value is not null)
+            .Select(value => value!)
+            .ToArray();
+
+    private static string BuildQualitySummary(
+        IReadOnlyList<SvQualityState> states,
+        string fallback)
+    {
+        if (states.Count == 0)
+            return fallback;
+
+        var good = states.Count(item => item.Severity == SvQualitySeverity.Good);
+        var information = states.Count(item => item.Severity == SvQualitySeverity.Information);
+        var warning = states.Count(item => item.Severity == SvQualitySeverity.Warning);
+        var bad = states.Count(item => item.Severity is SvQualitySeverity.Bad or SvQualitySeverity.Unknown);
+        return $"Quality channels {states.Count}: good {good}, info {information}, warning {warning}, bad/unknown {bad}";
+    }
+
+    private static IEnumerable<string> BuildQualityDiagnostics(IEnumerable<DecodedValueRow> values)
+    {
+        foreach (var value in values.Where(item => item.IsQuality))
+        {
+            if (value.QualityState is not { } quality)
+            {
+                yield return $"QUALITY · {value.Signal} · undecoded · raw {value.Raw}";
+                continue;
+            }
+
+            yield return $"QUALITY · {value.Signal} · {quality.Severity} · {quality.Summary} · placement {quality.Placement} · raw {value.Raw}";
+        }
     }
 
     private static double ResolveWindowDuration(SvObservedStreamFacts facts, double fallback)

@@ -1,3 +1,4 @@
+using AR.Iec61850.SampledValues.Measurements;
 using AR.Iec61850.SampledValues.Profiles;
 using ARSVIN.Subscriber.Models;
 
@@ -99,26 +100,33 @@ public sealed class SvStreamViewModel : ObservableObject
         Gap = $"avg {snapshot.AverageFrameGapMilliseconds:0.###} ms / max {snapshot.MaxFrameGapMilliseconds:0.###} ms";
         DataSet = string.IsNullOrWhiteSpace(snapshot.DataSet) ? "-" : snapshot.DataSet;
         CursorSummary = snapshot.CursorSummary;
-        QualitySummary = snapshot.QualitySummary;
         Scaling = snapshot.ScalingSummary;
         Timebase = BuildTimebaseText(snapshot);
 
+        var qualityStates = ResolveQualityStates(snapshot.Values);
+        QualitySummary = BuildQualitySummary(qualityStates, snapshot.QualitySummary);
+
         var comparison = observation?.ConfigurationComparison;
         var configurationIssues = comparison?.Findings.Count ?? 0;
+        var qualityIssues = qualityStates.Count(item =>
+            item.Severity is SvQualitySeverity.Warning or SvQualitySeverity.Bad or SvQualitySeverity.Unknown);
         var issueTotal = snapshot.SequenceGapCount + snapshot.DuplicateCount + snapshot.OutOfOrderCount +
-                         snapshot.PayloadIssueCount + configurationIssues;
+                         snapshot.PayloadIssueCount + configurationIssues + qualityIssues;
         Issues = issueTotal == 0
             ? "0"
-            : $"{issueTotal} (gap {snapshot.SequenceGapCount}, dup {snapshot.DuplicateCount}, order {snapshot.OutOfOrderCount}, payload {snapshot.PayloadIssueCount}, SCL {configurationIssues})";
+            : $"{issueTotal} (gap {snapshot.SequenceGapCount}, dup {snapshot.DuplicateCount}, order {snapshot.OutOfOrderCount}, payload {snapshot.PayloadIssueCount}, quality {qualityIssues}, SCL {configurationIssues})";
 
         var hasBlockingConfigurationError = comparison?.HasBlockingErrors == true;
         var hasConfigurationWarning = comparison?.WarningCount > 0;
-        Health = hasBlockingConfigurationError
+        var hasQualityBad = qualityStates.Any(item =>
+            item.Severity is SvQualitySeverity.Bad or SvQualitySeverity.Unknown);
+        var hasQualityWarning = qualityStates.Any(item => item.Severity == SvQualitySeverity.Warning);
+        Health = hasBlockingConfigurationError || hasQualityBad
             ? "BAD"
-            : hasConfigurationWarning && snapshot.Health == "GOOD"
+            : (hasConfigurationWarning || hasQualityWarning) && snapshot.Health == "GOOD"
                 ? "WARN"
                 : snapshot.Health;
-        HealthDetail = ResolveHealthDetail(snapshot, observation, Health);
+        HealthDetail = ResolveHealthDetail(snapshot, observation, qualityStates, Health);
 
         var isConfigured = observation?.IsBoundToScl == true;
         Bound = isConfigured
@@ -141,7 +149,7 @@ public sealed class SvStreamViewModel : ObservableObject
 
         _values.ReplaceAll(snapshot.Values.Take(64));
         UpdateStableVisuals(snapshot);
-        _evidenceDetails.ReplaceAll(BuildEvidenceDetails(snapshot, observation));
+        _evidenceDetails.ReplaceAll(BuildEvidenceDetails(snapshot, observation, qualityStates));
     }
 
     private void UpdateStableVisuals(SvStreamSnapshot snapshot)
@@ -219,6 +227,7 @@ public sealed class SvStreamViewModel : ObservableObject
     private static string ResolveHealthDetail(
         SvStreamSnapshot snapshot,
         SvStreamObservationSnapshot? observation,
+        IReadOnlyList<SvQualityState> qualityStates,
         string health)
     {
         var blocking = observation?.ConfigurationComparison?.Findings
@@ -226,24 +235,59 @@ public sealed class SvStreamViewModel : ObservableObject
         if (blocking is not null)
             return blocking.Message;
 
+        var badQuality = qualityStates.FirstOrDefault(item =>
+            item.Severity is SvQualitySeverity.Bad or SvQualitySeverity.Unknown);
+        if (badQuality is not null)
+            return $"Sample quality requires attention: {badQuality.Summary}.";
+
         var warning = observation?.ConfigurationComparison?.Findings
             .FirstOrDefault(item => item.Severity == SvConfigurationFindingSeverity.Warning);
         if (warning is not null && health != "BAD")
             return warning.Message;
 
+        var warningQuality = qualityStates.FirstOrDefault(item => item.Severity == SvQualitySeverity.Warning);
+        if (warningQuality is not null && health != "BAD")
+            return $"Sample quality warning: {warningQuality.Summary}.";
+
         return snapshot.HealthDetail;
+    }
+
+    private static IReadOnlyList<SvQualityState> ResolveQualityStates(IEnumerable<DecodedValueRow> values)
+        => values.Select(value => value.QualityState)
+            .Where(value => value is not null)
+            .Select(value => value!)
+            .ToArray();
+
+    private static string BuildQualitySummary(
+        IReadOnlyList<SvQualityState> states,
+        string fallback)
+    {
+        if (states.Count == 0)
+            return fallback;
+
+        var good = states.Count(item => item.Severity == SvQualitySeverity.Good);
+        var information = states.Count(item => item.Severity == SvQualitySeverity.Information);
+        var warning = states.Count(item => item.Severity == SvQualitySeverity.Warning);
+        var bad = states.Count(item => item.Severity is SvQualitySeverity.Bad or SvQualitySeverity.Unknown);
+        return $"Quality channels {states.Count}: good {good}, info {information}, warning {warning}, bad/unknown {bad}";
     }
 
     private static IReadOnlyList<string> BuildEvidenceDetails(
         SvStreamSnapshot snapshot,
-        SvStreamObservationSnapshot? observation)
+        SvStreamObservationSnapshot? observation,
+        IReadOnlyList<SvQualityState> qualityStates)
     {
         var lines = new List<string>
         {
             $"MEASUREMENT · scaling {snapshot.ScalingSummary} · {snapshot.ScalingReason}",
             $"TIMEBASE · {BuildTimebaseText(snapshot)} · {snapshot.TimebaseReason}",
-            $"HEALTH · current {snapshot.Health} · session totals gap {snapshot.SequenceGapCount}, duplicate {snapshot.DuplicateCount}, out-of-order {snapshot.OutOfOrderCount}, payload {snapshot.PayloadIssueCount}."
+            $"HEALTH · current {snapshot.Health} · session totals gap {snapshot.SequenceGapCount}, duplicate {snapshot.DuplicateCount}, out-of-order {snapshot.OutOfOrderCount}, payload {snapshot.PayloadIssueCount}.",
+            $"QUALITY · {BuildQualitySummary(qualityStates, snapshot.QualitySummary)}"
         };
+
+        lines.AddRange(snapshot.Values
+            .Where(value => value.IsQuality && value.QualityState is not null)
+            .Select(value => $"QUALITY · {value.Signal} · {value.QualityState!.Severity} · {value.QualityState.Summary} · placement {value.QualityState.Placement} · raw {value.Raw}"));
 
         if (observation is null)
         {
