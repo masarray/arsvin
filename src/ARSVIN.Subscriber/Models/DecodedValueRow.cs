@@ -59,7 +59,7 @@ public sealed class DecodedValueRow
                 return "Primary";
             if (PreferredDisplayDomain == SvMeasurementValueDomain.SecondaryEquivalent && DomainValue.SecondaryEquivalentValue.HasValue)
                 return "Secondary";
-            return $"{DomainValue.WireDomain} · fallback";
+            return $"{DomainValue.WireDomain} fallback";
         }
     }
 
@@ -70,7 +70,7 @@ public sealed class DecodedValueRow
             if (QualityState is { } quality)
                 return $"Quality · {quality.Severity} · {quality.Placement}";
             return HasEngineeringValue
-                ? $"{ScalingConfidence} · {ScalingSource}"
+                ? $"{ScalingConfidence} · {ScalingSource} · {MeasurementDomainText}"
                 : "Raw counts";
         }
     }
