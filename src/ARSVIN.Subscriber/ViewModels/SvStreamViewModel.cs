@@ -4,12 +4,13 @@ using ARSVIN.Subscriber.Models;
 
 namespace ARSVIN.Subscriber.ViewModels;
 
-public sealed class SvStreamViewModel : ObservableObject
+public sealed partial class SvStreamViewModel : ObservableObject
 {
     private readonly BulkObservableCollection<DecodedValueRow> _values = new();
     private readonly BulkObservableCollection<WaveformPoint> _waveformPoints = new();
     private readonly BulkObservableCollection<PhasorVector> _phasors = new();
     private readonly BulkObservableCollection<string> _evidenceDetails = new();
+    private SvStreamMeasurementContext? _activeMeasurementContext;
     private string _key = string.Empty;
     private string _health = "IDLE";
     private string _healthDetail = string.Empty;
@@ -48,6 +49,7 @@ public sealed class SvStreamViewModel : ObservableObject
     public IReadOnlyList<WaveformPoint> WaveformPoints => _waveformPoints;
     public IReadOnlyList<PhasorVector> Phasors => _phasors;
     public IReadOnlyList<string> EvidenceDetails => _evidenceDetails;
+    public SvStreamMeasurementContext? ActiveMeasurementContext => _activeMeasurementContext;
 
     public string Key { get => _key; set => SetProperty(ref _key, value); }
     public string Health { get => _health; set => SetProperty(ref _health, value); }
@@ -83,11 +85,24 @@ public sealed class SvStreamViewModel : ObservableObject
     public string Timebase { get => _timebase; set => SetProperty(ref _timebase, value); }
     public string MeasurementContext { get => _measurementContext; set => SetProperty(ref _measurementContext, value); }
 
+    public void SetMeasurementContext(SvStreamMeasurementContext? context)
+    {
+        _activeMeasurementContext = context;
+        MeasurementContext = context?.Summary ?? "No explicit CT/VT context · displaying wire engineering domain";
+    }
+
+    public void Apply(SvStreamSnapshot snapshot, SvStreamObservationSnapshot? observation)
+        => Apply(snapshot, observation, _activeMeasurementContext);
+
     public void Apply(
         SvStreamSnapshot snapshot,
         SvStreamObservationSnapshot? observation,
-        SvStreamMeasurementContext? measurementContext = null)
+        SvStreamMeasurementContext? measurementContext)
     {
+        if (measurementContext is not null)
+            _activeMeasurementContext = measurementContext;
+        var effectiveContext = measurementContext ?? _activeMeasurementContext;
+
         Key = snapshot.Key;
         AppId = $"0x{snapshot.AppId:X4}";
         SvId = string.IsNullOrWhiteSpace(snapshot.SvId) ? "-" : snapshot.SvId;
@@ -107,11 +122,11 @@ public sealed class SvStreamViewModel : ObservableObject
         CursorSummary = snapshot.CursorSummary;
         Scaling = snapshot.ScalingSummary;
         Timebase = BuildTimebaseText(snapshot);
-        MeasurementContext = measurementContext?.Summary ?? "No explicit CT/VT context · displaying wire engineering domain";
+        MeasurementContext = effectiveContext?.Summary ?? "No explicit CT/VT context · displaying wire engineering domain";
 
         var displayValues = snapshot.Values
             .Take(64)
-            .Select(value => ApplyMeasurementContext(value, measurementContext))
+            .Select(value => ApplyMeasurementContext(value, effectiveContext))
             .ToArray();
         var qualityStates = ResolveQualityStates(displayValues);
         QualitySummary = BuildQualitySummary(qualityStates, snapshot.QualitySummary);
@@ -158,8 +173,8 @@ public sealed class SvStreamViewModel : ObservableObject
         Window = $"{duration:0.0} s · {samples:N0} samples";
 
         _values.ReplaceAll(displayValues);
-        UpdateStableVisuals(snapshot, measurementContext);
-        _evidenceDetails.ReplaceAll(BuildEvidenceDetails(snapshot, observation, qualityStates, measurementContext));
+        UpdateStableVisuals(snapshot, effectiveContext);
+        _evidenceDetails.ReplaceAll(BuildEvidenceDetails(snapshot, observation, qualityStates, effectiveContext));
     }
 
     private void UpdateStableVisuals(
