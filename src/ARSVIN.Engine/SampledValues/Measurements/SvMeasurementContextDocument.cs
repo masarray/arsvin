@@ -106,7 +106,10 @@ public sealed record SvMeasurementContextDocument
         errors.AddRange(duplicateKeys.Select(key => $"Duplicate measurement context for stream key '{key}'."));
 
         foreach (var stream in Streams)
-            errors.AddRange(stream.Validate().Select(error => $"{stream.SvId.DefaultIfEmpty(stream.StreamKey)}: {error}"));
+        {
+            var label = string.IsNullOrWhiteSpace(stream.SvId) ? stream.StreamKey : stream.SvId;
+            errors.AddRange(stream.Validate().Select(error => $"{label}: {error}"));
+        }
         return errors;
     }
 }
@@ -154,7 +157,4 @@ public static class SvMeasurementContextSerializer
         if (errors.Count > 0)
             throw new InvalidDataException("Measurement-context validation failed: " + string.Join(" ", errors));
     }
-
-    private static string DefaultIfEmpty(this string value, string fallback)
-        => string.IsNullOrWhiteSpace(value) ? fallback : value;
 }
