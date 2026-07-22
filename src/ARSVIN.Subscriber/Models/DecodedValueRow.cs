@@ -21,10 +21,34 @@ public sealed class DecodedValueRow
     public string ScalingReason { get; init; } = string.Empty;
 
     public bool HasEngineeringValue => EngineeringValue.HasValue && ScalingSource != SvEngineeringScaleSource.RawOnly;
-    public string DisplayValue => HasEngineeringValue
-        ? $"{EngineeringValue:0.###} {EngineeringUnit}"
-        : Value;
-    public string ScalingText => HasEngineeringValue
-        ? $"{ScalingConfidence} · {ScalingSource}"
-        : "Raw counts";
+    public bool IsQuality => Kind.Contains("Quality", StringComparison.OrdinalIgnoreCase);
+    public SvQualityState? QualityState => IsQuality && SvQualityDecoder.TryDecodeHex(Raw, out var quality)
+        ? quality
+        : null;
+    public string QualitySeverity => QualityState?.Severity.ToString() ?? string.Empty;
+    public string QualityPlacement => QualityState?.Placement.ToString() ?? string.Empty;
+
+    public string DisplayValue
+    {
+        get
+        {
+            if (QualityState is { } quality)
+                return quality.Summary;
+            return HasEngineeringValue
+                ? $"{EngineeringValue:0.###} {EngineeringUnit}"
+                : Value;
+        }
+    }
+
+    public string ScalingText
+    {
+        get
+        {
+            if (QualityState is { } quality)
+                return $"Quality · {quality.Severity} · {quality.Placement}";
+            return HasEngineeringValue
+                ? $"{ScalingConfidence} · {ScalingSource}"
+                : "Raw counts";
+        }
+    }
 }
