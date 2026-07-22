@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "arsvin.sv-profile-manifest/v1",
+  "manifestId": "example-fixed-layouts",
+  "displayName": "Example fixed-layout research profiles",
+  "description": "Template only. Replace the evidence metadata and expectations with reviewed source-backed values before engineering use.",
+  "createdAt": "2026-07-22T10:00:00Z",
+  "profiles": [
+    {
+      "id": "example-fixed-4i4v-50hz",
+      "displayName": "Example fixed 4I + 4V at 50 Hz",
+      "family": "Example fixed-layout SV",
+      "samplingBasis": "samplesPerCycle",
+      "expectedEtherType": 35002,
+      "allowedAsduPerFrame": [1],
+      "expectedPayloadBytesPerAsdu": 64,
+      "expectedDataSetElementCount": 16,
+      "expectedDataSetSignature": [
+        { "bType": "INT32", "cdc": "SAV-Current", "isQuality": false, "isTimestamp": false },
+        { "bType": "Quality", "cdc": "SAV-Current", "isQuality": true, "isTimestamp": false },
+        { "bType": "INT32", "cdc": "SAV-Current", "isQuality": false, "isTimestamp": false },
+        { "bType": "Quality", "cdc": "SAV-Current", "isQuality": true, "isTimestamp": false },
+        { "bType": "INT32", "cdc": "SAV-Current", "isQuality": false, "isTimestamp": false },
+        { "bType": "Quality", "cdc": "SAV-Current", "isQuality": true, "isTimestamp": false },
+        { "bType": "INT32", "cdc": "SAV-Current", "isQuality": false, "isTimestamp": false },
+        { "bType": "Quality", "cdc": "SAV-Current", "isQuality": true, "isTimestamp": false },
+        { "bType": "INT32", "cdc": "SAV-Voltage", "isQuality": false, "isTimestamp": false },
+        { "bType": "Quality", "cdc": "SAV-Voltage", "isQuality": true, "isTimestamp": false },
+        { "bType": "INT32", "cdc": "SAV-Voltage", "isQuality": false, "isTimestamp": false },
+        { "bType": "Quality", "cdc": "SAV-Voltage", "isQuality": true, "isTimestamp": false },
+        { "bType": "INT32", "cdc": "SAV-Voltage", "isQuality": false, "isTimestamp": false },
+        { "bType": "Quality", "cdc": "SAV-Voltage", "isQuality": true, "isTimestamp": false },
+        { "bType": "INT32", "cdc": "SAV-Voltage", "isQuality": false, "isTimestamp": false },
+        { "bType": "Quality", "cdc": "SAV-Voltage", "isQuality": true, "isTimestamp": false }
+      ],
+      "expectedSamplesPerCycle": 80,
+      "expectedSamplesPerSecond": null,
+      "allowedNominalFrequenciesHz": [50],
+      "expectedCounterWrap": 4000,
+      "rateTolerancePercent": 1.0,
+      "evidenceStatus": "researchCandidate",
+      "sources": [
+        {
+          "sourceId": "replace-with-reviewed-source",
+          "description": "Template evidence entry. Replace with an official document, reviewed capture, or controlled laboratory record.",
+          "status": "researchCandidate"
+        }
+      ]
+    }
+  ]
+}
