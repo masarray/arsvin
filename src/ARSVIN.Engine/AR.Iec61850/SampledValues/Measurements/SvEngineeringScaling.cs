@@ -29,7 +29,13 @@ public sealed record SvEngineeringScale
 public enum SvEngineeringScaleSource
 {
     RawOnly,
+
+    /// <summary>
+    /// Retained for evidence-document compatibility. Generic receive-side analysis no longer activates
+    /// engineering scaling from packet shape or observed rate alone.
+    /// </summary>
     Legacy92LeStyleStructuralInference,
+
     SclBackedLegacy92LeStyle,
     ManualOverride
 }
@@ -60,8 +66,9 @@ public sealed record SvEngineeringScaleEvidence
 }
 
 /// <summary>
-/// Resolves conservative engineering scaling for installed-base 9-2LE-style protection streams.
-/// The resolver requires structural evidence plus sampling or SCL evidence. Otherwise it returns raw counts.
+/// Resolves conservative engineering scaling for an explicitly SCL-bound installed-base
+/// 4-current/4-voltage protection layout. Packet shape, rate, product name, APPID, MAC address,
+/// svID, and amplitude are never sufficient by themselves.
 /// </summary>
 public static class SvEngineeringScaleResolver
 {
@@ -75,27 +82,31 @@ public static class SvEngineeringScaleResolver
 
         var domain = ResolveDomain(evidence.Channel, evidence.Kind);
         if (domain == SvMeasurementDomain.Unknown)
-            return SvEngineeringScale.RawOnly("The channel could not be classified as current or voltage.");
+            return SvEngineeringScale.RawOnly("The SCL-derived channel semantics do not prove a current or voltage domain.");
+
+        if (!evidence.IsSclBound)
+        {
+            return SvEngineeringScale.RawOnly(
+                "No SCL dataset mapping is bound. Generic packet inspection preserves raw counts and does not infer engineering units.");
+        }
 
         var fixedLayout = evidence.IsFixedFourCurrentFourVoltageLayout &&
                           evidence.AnalogChannelCount == 8 &&
                           evidence.PayloadBytesPerAsdu == 64;
         if (!fixedLayout)
-            return SvEngineeringScale.RawOnly("The payload is not proven to be the fixed 4I+4U value-quality layout.");
+        {
+            return SvEngineeringScale.RawOnly(
+                "The SCL-mapped payload is not the fixed 4-current/4-voltage value-quality layout required by this scaling rule.");
+        }
 
-        var samplingEvidence = HasProtectionRateEvidence(evidence);
-        if (!evidence.IsSclBound && !samplingEvidence)
-            return SvEngineeringScale.RawOnly("The fixed layout is visible, but sampling or SCL evidence is insufficient for engineering scaling.");
+        if (!HasProtectionRateEvidence(evidence))
+        {
+            return SvEngineeringScale.RawOnly(
+                "The fixed SCL layout is visible, but declared or observed protection-rate evidence is insufficient for the installed-base scaling rule.");
+        }
 
-        var source = evidence.IsSclBound
-            ? SvEngineeringScaleSource.SclBackedLegacy92LeStyle
-            : SvEngineeringScaleSource.Legacy92LeStyleStructuralInference;
-        var confidence = evidence.IsSclBound
-            ? SvEngineeringScaleConfidence.SclBacked
-            : SvEngineeringScaleConfidence.Inferred;
-        var reason = evidence.IsSclBound
-            ? "SCL binding and fixed 4I+4U structural evidence support installed-base 9-2LE-style scaling."
-            : "Fixed 4I+4U structure and protection-rate evidence support provisional 9-2LE-style scaling.";
+        var reason =
+            "SCL dataset mapping, fixed 4-current/4-voltage structure, and protection-rate evidence support the installed-base 9-2LE-style scale.";
 
         return domain switch
         {
@@ -103,16 +114,16 @@ public static class SvEngineeringScaleResolver
             {
                 Multiplier = CurrentAmperesPerCount,
                 Unit = "A",
-                Source = source,
-                Confidence = confidence,
+                Source = SvEngineeringScaleSource.SclBackedLegacy92LeStyle,
+                Confidence = SvEngineeringScaleConfidence.SclBacked,
                 Reason = reason
             },
             SvMeasurementDomain.Voltage => new SvEngineeringScale
             {
                 Multiplier = VoltageVoltsPerCount,
                 Unit = "V",
-                Source = source,
-                Confidence = confidence,
+                Source = SvEngineeringScaleSource.SclBackedLegacy92LeStyle,
+                Confidence = SvEngineeringScaleConfidence.SclBacked,
                 Reason = reason
             },
             _ => SvEngineeringScale.RawOnly("Unsupported measurement domain.")
