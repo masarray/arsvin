@@ -38,7 +38,9 @@ public sealed class SvStreamViewModel : ObservableObject
     private string _sclMatch = "Not configured";
     private string _window = "0.0 s · 0 samples";
     private string _comparisonMode = "Compatible";
-    private string _waveformState = "Waiting for complete two-cycle window";
+    private string _waveformState = "Waiting for a resolved timebase";
+    private string _scaling = "Raw counts";
+    private string _timebase = "Unknown";
 
     public IReadOnlyList<DecodedValueRow> Values => _values;
     public IReadOnlyList<WaveformPoint> WaveformPoints => _waveformPoints;
@@ -75,6 +77,8 @@ public sealed class SvStreamViewModel : ObservableObject
     public string Window { get => _window; set => SetProperty(ref _window, value); }
     public string ComparisonMode { get => _comparisonMode; set => SetProperty(ref _comparisonMode, value); }
     public string WaveformState { get => _waveformState; set => SetProperty(ref _waveformState, value); }
+    public string Scaling { get => _scaling; set => SetProperty(ref _scaling, value); }
+    public string Timebase { get => _timebase; set => SetProperty(ref _timebase, value); }
 
     public void Apply(SvStreamSnapshot snapshot, SvStreamObservationSnapshot? observation)
     {
@@ -87,7 +91,7 @@ public sealed class SvStreamViewModel : ObservableObject
         Vlan = snapshot.VlanId.HasValue ? $"{snapshot.VlanId} / p{snapshot.VlanPriority ?? 0}" : "untagged";
         ConfRev = snapshot.ConfRev?.ToString() ?? "-";
         NofAsdu = snapshot.NofAsdu <= 0 ? "-" : snapshot.NofAsdu.ToString();
-        SampleRate = snapshot.SampleRate?.ToString() ?? "-";
+        SampleRate = BuildSampleRateText(snapshot);
         SmpCnt = snapshot.LastSmpCnt?.ToString() ?? "-";
         SmpSynch = snapshot.SmpSynch?.ToString() ?? "-";
         Packets = snapshot.FrameCount.ToString("N0");
@@ -96,26 +100,27 @@ public sealed class SvStreamViewModel : ObservableObject
         DataSet = string.IsNullOrWhiteSpace(snapshot.DataSet) ? "-" : snapshot.DataSet;
         CursorSummary = snapshot.CursorSummary;
         QualitySummary = snapshot.QualitySummary;
+        Scaling = snapshot.ScalingSummary;
+        Timebase = BuildTimebaseText(snapshot);
 
         var comparison = observation?.ConfigurationComparison;
         var configurationIssues = comparison?.Findings.Count ?? 0;
-        var issueTotal = snapshot.SequenceGapCount + snapshot.DuplicateCount + snapshot.OutOfOrderCount + snapshot.PayloadIssueCount + configurationIssues;
+        var issueTotal = snapshot.SequenceGapCount + snapshot.DuplicateCount + snapshot.OutOfOrderCount +
+                         snapshot.PayloadIssueCount + configurationIssues;
         Issues = issueTotal == 0
             ? "0"
             : $"{issueTotal} (gap {snapshot.SequenceGapCount}, dup {snapshot.DuplicateCount}, order {snapshot.OutOfOrderCount}, payload {snapshot.PayloadIssueCount}, SCL {configurationIssues})";
 
         var hasBlockingConfigurationError = comparison?.HasBlockingErrors == true;
         var hasConfigurationWarning = comparison?.WarningCount > 0;
-        var hasRuntimeError = snapshot.PayloadIssueCount > 0 || snapshot.OutOfOrderCount > 0;
-        var hasRuntimeWarning = snapshot.SequenceGapCount > 0 || snapshot.DuplicateCount > 0;
-        var isConfigured = observation?.IsBoundToScl == true;
-        Health = hasRuntimeError || hasBlockingConfigurationError
+        Health = hasBlockingConfigurationError
             ? "BAD"
-            : hasRuntimeWarning || hasConfigurationWarning || !isConfigured
+            : hasConfigurationWarning && snapshot.Health == "GOOD"
                 ? "WARN"
-                : "GOOD";
+                : snapshot.Health;
         HealthDetail = ResolveHealthDetail(snapshot, observation, Health);
 
+        var isConfigured = observation?.IsBoundToScl == true;
         Bound = isConfigured
             ? $"SCL: {observation!.ControlBlockReference}"
             : string.IsNullOrWhiteSpace(snapshot.LayoutBinding) ? "Unbound" : snapshot.LayoutBinding;
@@ -136,32 +141,54 @@ public sealed class SvStreamViewModel : ObservableObject
 
         _values.ReplaceAll(snapshot.Values.Take(64));
         UpdateStableVisuals(snapshot);
-        _evidenceDetails.ReplaceAll(BuildEvidenceDetails(observation));
+        _evidenceDetails.ReplaceAll(BuildEvidenceDetails(snapshot, observation));
     }
 
     private void UpdateStableVisuals(SvStreamSnapshot snapshot)
     {
-        var expectedPoints = ResolveTwoCyclePointCount(snapshot.SampleRate);
-        var fullWindow = snapshot.WaveformPoints.Count >= expectedPoints;
+        if (snapshot.SamplesPerCycle is not > 0)
+        {
+            _waveformPoints.ReplaceAll(snapshot.WaveformPoints);
+            _phasors.ReplaceAll(Array.Empty<PhasorVector>());
+            WaveformState = $"{snapshot.ScalingSummary} · timebase unresolved; phasor withheld";
+            return;
+        }
+
+        var expectedPoints = Math.Clamp(snapshot.SamplesPerCycle.Value * 2, 32, 512);
+        var fullWindow = snapshot.IsWaveformWindowReady && snapshot.WaveformPoints.Count >= expectedPoints;
         if (fullWindow)
         {
             _waveformPoints.ReplaceAll(snapshot.WaveformPoints.TakeLast(expectedPoints));
             _phasors.ReplaceAll(snapshot.Phasors);
-            WaveformState = $"2 cycles locked · {expectedPoints:N0} points";
+            WaveformState = $"2 cycles locked · {expectedPoints:N0} points · {snapshot.ScalingSummary}";
             return;
         }
 
-        if (_waveformPoints.Count == 0)
-            _phasors.ReplaceAll(Array.Empty<PhasorVector>());
-        WaveformState = $"Filling full window · {snapshot.WaveformPoints.Count:N0}/{expectedPoints:N0} points";
+        _waveformPoints.ReplaceAll(snapshot.WaveformPoints);
+        _phasors.ReplaceAll(Array.Empty<PhasorVector>());
+        WaveformState = $"Filling verified window · {snapshot.WaveformPoints.Count:N0}/{expectedPoints:N0} points";
     }
 
-    private static int ResolveTwoCyclePointCount(ushort? sampleRate)
+    private static string BuildSampleRateText(SvStreamSnapshot snapshot)
     {
-        var pointsPerCycle = sampleRate is > 1000
-            ? (int)Math.Round(sampleRate.Value / 50.0)
-            : sampleRate ?? 80;
-        return Math.Clamp(pointsPerCycle * 2, 32, 512);
+        var declared = snapshot.SampleRate?.ToString() ?? "-";
+        var mode = snapshot.SampleMode switch
+        {
+            0 => "smp/cycle",
+            1 => "smp/s",
+            2 => "s/smp",
+            _ => "mode unknown"
+        };
+        return $"{declared} {mode}";
+    }
+
+    private static string BuildTimebaseText(SvStreamSnapshot snapshot)
+    {
+        if (snapshot.NominalFrequencyHz.HasValue && snapshot.SamplesPerCycle.HasValue)
+            return $"{snapshot.NominalFrequencyHz:0.#} Hz · {snapshot.SamplesPerCycle} smp/cycle · {snapshot.TimebaseSource}";
+        if (snapshot.SamplesPerCycle.HasValue)
+            return $"{snapshot.SamplesPerCycle} smp/cycle · frequency unknown";
+        return "Unknown · no hidden 50/60 Hz assumption";
     }
 
     private static double ResolveObservationDuration(SvObservedStreamFacts? facts)
@@ -199,25 +226,31 @@ public sealed class SvStreamViewModel : ObservableObject
         if (blocking is not null)
             return blocking.Message;
 
-        if (snapshot.PayloadIssueCount > 0 || snapshot.OutOfOrderCount > 0)
-            return snapshot.HealthDetail;
-
         var warning = observation?.ConfigurationComparison?.Findings
             .FirstOrDefault(item => item.Severity == SvConfigurationFindingSeverity.Warning);
-        if (warning is not null)
+        if (warning is not null && health != "BAD")
             return warning.Message;
 
-        if (health == "GOOD")
-            return "SV stream is stable and matches the configured SCL expectation.";
         return snapshot.HealthDetail;
     }
 
-    private static IReadOnlyList<string> BuildEvidenceDetails(SvStreamObservationSnapshot? observation)
+    private static IReadOnlyList<string> BuildEvidenceDetails(
+        SvStreamSnapshot snapshot,
+        SvStreamObservationSnapshot? observation)
     {
-        if (observation is null)
-            return ["No observation evidence is available yet."];
+        var lines = new List<string>
+        {
+            $"MEASUREMENT · scaling {snapshot.ScalingSummary} · {snapshot.ScalingReason}",
+            $"TIMEBASE · {BuildTimebaseText(snapshot)} · {snapshot.TimebaseReason}",
+            $"HEALTH · current {snapshot.Health} · session totals gap {snapshot.SequenceGapCount}, duplicate {snapshot.DuplicateCount}, out-of-order {snapshot.OutOfOrderCount}, payload {snapshot.PayloadIssueCount}."
+        };
 
-        var lines = new List<string>();
+        if (observation is null)
+        {
+            lines.Add("No observation evidence is available yet.");
+            return lines;
+        }
+
         if (observation.ProfileDetection is { } detection)
         {
             lines.Add($"Profile: {detection.Profile.DisplayName} · confidence {detection.Confidence} · score {detection.ScorePercent:0.#}% · evidence {detection.MatchedWeight}/{detection.EvaluatedWeight}.");

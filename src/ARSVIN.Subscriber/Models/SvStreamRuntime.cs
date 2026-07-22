@@ -1,6 +1,8 @@
-using AR.Iec61850.Mms;
 using System.Buffers.Binary;
+using System.Globalization;
+using AR.Iec61850.Mms;
 using AR.Iec61850.SampledValues;
+using AR.Iec61850.SampledValues.Measurements;
 using AR.Iec61850.SampledValues.Profiles;
 using AR.Iec61850.Scl;
 
@@ -9,14 +11,18 @@ namespace ARSVIN.Subscriber.Models;
 internal sealed class SvStreamRuntime
 {
     private const int MaxWaveformPoints = 640;
+    private static readonly TimeSpan CurrentHealthWindow = TimeSpan.FromSeconds(2);
 
     private readonly object _gate = new();
     private readonly Queue<WaveformPoint> _waveform = new(MaxWaveformPoints + 8);
     private readonly List<string> _diagnostics = new();
+    private readonly SvSampleCounterTracker _counterTracker = new();
     private DateTimeOffset? _firstSeen;
     private DateTimeOffset? _lastSeen;
-    private ushort? _expectedNext;
-    private ushort? _lastSampleCount;
+    private DateTimeOffset? _lastSequenceWarningAt;
+    private DateTimeOffset? _lastOutOfOrderAt;
+    private DateTimeOffset? _lastPayloadIssueAt;
+    private DateTimeOffset? _lastSclMismatchAt;
     private long _frameCount;
     private long _asduCount;
     private double _gapTotalMs;
@@ -31,9 +37,14 @@ internal sealed class SvStreamRuntime
     private int _qualityGood;
     private int _qualityNonZero;
     private string _lastHealthDetail = string.Empty;
+    private string _lastSequenceDetail = string.Empty;
     private string _layoutBinding = string.Empty;
+    private string _scalingSummary = "Raw counts";
+    private string _scalingReason = "Engineering scaling has not been resolved.";
     private IReadOnlyList<DecodedValueRow> _decodedValues = Array.Empty<DecodedValueRow>();
     private SvStreamObservationSnapshot? _observationSnapshot;
+    private SvTimebaseResolution _timebase = new();
+    private uint? _lastConfigurationRevision;
 
     public SvStreamRuntime(string key)
     {
@@ -70,12 +81,12 @@ internal sealed class SvStreamRuntime
         var points = new List<WaveformPoint>();
         var qualityGood = 0;
         var qualityNonZero = 0;
+        var scalingSummary = "Raw counts";
+        var scalingReason = "Engineering scaling has not been resolved.";
+        var fixedLegacyLayout = false;
 
         if (asdus.Count == 0)
-        {
             diagnostics.Add("SV frame contains no ASDU.");
-            IncrementPayloadIssue();
-        }
 
         var layoutBinding = string.Empty;
         if (profile is not null)
@@ -84,11 +95,23 @@ internal sealed class SvStreamRuntime
             ValidateAgainstScl(frame, asdus, profile, diagnostics);
             foreach (var asdu in asdus)
             {
-                var rows = DecodePayload(asdu, profile.PayloadLayout, diagnostics).ToArray();
+                var rawRows = DecodePayload(asdu, profile.PayloadLayout, diagnostics).ToArray();
+                var rows = ApplyEngineeringScaling(
+                    rawRows,
+                    isSclBound: true,
+                    asdu,
+                    observationSnapshot,
+                    out var localFixedLayout,
+                    out var localSummary,
+                    out var localReason);
+                fixedLegacyLayout |= localFixedLayout;
+                scalingSummary = localSummary;
+                scalingReason = localReason;
+
                 if (latestRows.Count == 0)
                     latestRows.AddRange(rows);
 
-                points.Add(BuildWaveformPoint(asdu.SampleCount, rows));
+                points.Add(BuildWaveformPoint(asdu.SampleCount, rows, scalingSummary));
                 CountQuality(rows, ref qualityGood, ref qualityNonZero);
             }
         }
@@ -96,22 +119,42 @@ internal sealed class SvStreamRuntime
         {
             foreach (var asdu in asdus)
             {
-                if (TryDecodeAutoPayload(asdu, diagnostics, out var rows, out var binding))
-                {
-                    layoutBinding = binding;
-                    if (latestRows.Count == 0)
-                        latestRows.AddRange(rows);
+                if (!TryDecodeAutoPayload(asdu, diagnostics, out var rawRows, out var binding))
+                    continue;
 
-                    points.Add(BuildWaveformPoint(asdu.SampleCount, rows));
-                    CountQuality(rows, ref qualityGood, ref qualityNonZero);
-                }
+                layoutBinding = binding;
+                var rows = ApplyEngineeringScaling(
+                    rawRows,
+                    isSclBound: false,
+                    asdu,
+                    observationSnapshot,
+                    out var localFixedLayout,
+                    out var localSummary,
+                    out var localReason);
+                fixedLegacyLayout |= localFixedLayout;
+                scalingSummary = localSummary;
+                scalingReason = localReason;
+
+                if (latestRows.Count == 0)
+                    latestRows.AddRange(rows);
+
+                points.Add(BuildWaveformPoint(asdu.SampleCount, rows, scalingSummary));
+                CountQuality(rows, ref qualityGood, ref qualityNonZero);
             }
 
             if (latestRows.Count == 0)
-                diagnostics.Add("No SCL binding and payload layout is unknown. Import SCL or use a fixed 9-2LE/UCA-style stream.");
+                diagnostics.Add("No SCL binding and payload layout is unknown. Import SCL or inspect raw payload bytes.");
             else
-                diagnostics.Add($"{layoutBinding}. SCL not loaded; channel names are inferred from the fixed payload profile.");
+                diagnostics.Add($"{layoutBinding}. SCL not loaded; channel names and scaling confidence are shown explicitly.");
         }
+
+        var resolvedTimebase = SvTimebaseResolver.Resolve(new SvTimebaseEvidence
+        {
+            DeclaredSampleRate = first?.SampleRate,
+            DeclaredSampleMode = first?.SampleMode,
+            ObservedSamplesPerSecond = observationSnapshot.Facts.ObservedSamplesPerSecond,
+            IsFixedLegacyProtectionLayout = fixedLegacyLayout
+        });
 
         lock (_gate)
         {
@@ -141,6 +184,16 @@ internal sealed class SvStreamRuntime
             IsBoundToScl = profile is not null;
             ControlBlockReference = profile?.Stream.ControlBlockReference ?? string.Empty;
             LayoutBinding = layoutBinding;
+            _layoutBinding = layoutBinding;
+            _scalingSummary = scalingSummary;
+            _scalingReason = scalingReason;
+
+            if (resolvedTimebase.IsResolved || !_timebase.IsResolved)
+                _timebase = resolvedTimebase;
+
+            var configurationRevisionChanged = first is not null &&
+                                               _lastConfigurationRevision.HasValue &&
+                                               first.ConfigurationRevision != _lastConfigurationRevision.Value;
 
             if (first is not null)
             {
@@ -150,10 +203,17 @@ internal sealed class SvStreamRuntime
                 SampleRate = first.SampleRate;
                 SampleMode = first.SampleMode;
                 SmpSynch = first.SampleSynchronization;
+                _lastConfigurationRevision = first.ConfigurationRevision;
             }
 
-            foreach (var asdu in asdus)
-                RecordSample(asdu.SampleCount, ResolveCounterWrap(asdu, profile));
+            for (var index = 0; index < asdus.Count; index++)
+            {
+                var transition = _counterTracker.Observe(
+                    asdus[index].SampleCount,
+                    _timebase.SampleCounterWrap,
+                    restartHint: configurationRevisionChanged && index == 0);
+                RecordTransition(transition, timestamp);
+            }
 
             foreach (var point in points)
             {
@@ -165,11 +225,23 @@ internal sealed class SvStreamRuntime
             _qualityGood += qualityGood;
             _qualityNonZero += qualityNonZero;
 
-            if (diagnostics.Any(x => x.Contains("payload", StringComparison.OrdinalIgnoreCase) || x.Contains("decode", StringComparison.OrdinalIgnoreCase)))
+            var hasPayloadIssue = asdus.Count == 0 || diagnostics.Any(x =>
+                x.Contains("payload", StringComparison.OrdinalIgnoreCase) ||
+                x.Contains("decode", StringComparison.OrdinalIgnoreCase));
+            if (hasPayloadIssue)
+            {
                 _payloadIssues++;
+                _lastPayloadIssueAt = timestamp;
+            }
 
-            if (diagnostics.Any(x => x.Contains("mismatch", StringComparison.OrdinalIgnoreCase) || x.Contains("differs", StringComparison.OrdinalIgnoreCase)))
+            var hasSclMismatch = diagnostics.Any(x =>
+                x.Contains("mismatch", StringComparison.OrdinalIgnoreCase) ||
+                x.Contains("differs", StringComparison.OrdinalIgnoreCase));
+            if (hasSclMismatch)
+            {
                 _sclMismatches++;
+                _lastSclMismatchAt = timestamp;
+            }
 
             _diagnostics.Clear();
             _diagnostics.AddRange(diagnostics.Take(12));
@@ -187,19 +259,18 @@ internal sealed class SvStreamRuntime
                 ? Math.Max(0.001, (_lastSeen.Value - _firstSeen.Value).TotalSeconds)
                 : 0.001;
             var fps = _frameCount / duration;
-            var issues = _sequenceGaps + _duplicates + _outOfOrder + _payloadIssues + _sclMismatches;
-            var health = issues > 0
-                ? (_payloadIssues > 0 || _sclMismatches > 0 || _outOfOrder > 0 ? "BAD" : "WARN")
-                : IsBoundToScl ? "GOOD" : "WARN";
+            var referenceTime = _lastSeen ?? DateTimeOffset.Now;
+            var (health, healthDetail) = ResolveCurrentHealth(referenceTime);
             var allPoints = _waveform.ToArray();
-            var visiblePoints = BuildLockedTwoCycleWindow(allPoints, SampleRate);
-            var phasors = ComputePhasors(visiblePoints, SampleRate).ToArray();
+            var visiblePoints = BuildLockedTwoCycleWindow(allPoints, _timebase.SamplesPerCycle);
+            var phasors = ComputePhasors(visiblePoints, _timebase.SamplesPerCycle).ToArray();
+            var observationFacts = _observationSnapshot?.Facts;
 
             return new SvStreamSnapshot
             {
                 Key = Key,
                 Health = health,
-                HealthDetail = _lastHealthDetail,
+                HealthDetail = healthDetail,
                 AppId = AppId,
                 Source = Source,
                 Destination = Destination,
@@ -209,10 +280,17 @@ internal sealed class SvStreamRuntime
                 DataSet = DataSet,
                 ConfRev = ConfRev,
                 NofAsdu = NofAsdu,
-                LastSmpCnt = _lastSampleCount,
+                LastSmpCnt = _counterTracker.Last,
                 SampleRate = SampleRate,
                 SampleMode = SampleMode,
                 SmpSynch = SmpSynch,
+                NominalFrequencyHz = _timebase.NominalFrequencyHz,
+                SamplesPerCycle = _timebase.SamplesPerCycle,
+                ResolvedCounterWrap = _timebase.SampleCounterWrap,
+                TimebaseSource = _timebase.Source,
+                TimebaseReason = _timebase.Reason,
+                ScalingSummary = _scalingSummary,
+                ScalingReason = _scalingReason,
                 FrameCount = _frameCount,
                 AsduCount = _asduCount,
                 ActualFps = fps,
@@ -236,18 +314,155 @@ internal sealed class SvStreamRuntime
                     ? "Quality not decoded"
                     : $"Quality good {_qualityGood:N0}, non-zero {_qualityNonZero:N0}",
                 ObservationInputKinds = _observationSnapshot?.InputKinds ?? Array.Empty<SvObservationInputKind>(),
-                ObservationWindowFrames = _observationSnapshot?.Facts.ObservationCount ?? 0,
-                ObservedFramesPerSecond = _observationSnapshot?.Facts.ObservedFramesPerSecond,
-                ObservedSamplesPerSecond = _observationSnapshot?.Facts.ObservedSamplesPerSecond,
-                ObservedCounterWrap = _observationSnapshot?.Facts.ObservedCounterWrap,
+                ObservationWindowFrames = observationFacts?.ObservationCount ?? 0,
+                ObservationWindowSamples = observationFacts is null
+                    ? 0
+                    : observationFacts.ObservationCount * Math.Max(1, observationFacts.AsduPerFrame ?? 1),
+                ObservationWindowDurationSeconds = ResolveObservationDuration(observationFacts),
+                ObservedFramesPerSecond = observationFacts?.ObservedFramesPerSecond,
+                ObservedSamplesPerSecond = observationFacts?.ObservedSamplesPerSecond,
+                ObservedCounterWrap = observationFacts?.ObservedCounterWrap,
+                IsWaveformWindowReady = _timebase.SamplesPerCycle is > 0 &&
+                                        visiblePoints.Length >= _timebase.SamplesPerCycle.Value * 2,
+                ProfileDetection = _observationSnapshot?.ProfileDetection,
+                ConfigurationComparison = _observationSnapshot?.ConfigurationComparison,
                 ObservationDiagnostics = _observationSnapshot?.Diagnostics ?? Array.Empty<string>(),
-                FactProvenance = _observationSnapshot?.Facts.Provenance
+                FactProvenance = observationFacts?.Provenance
                     ?? new Dictionary<string, SvFactSource>(StringComparer.Ordinal)
             };
         }
     }
 
-    private static bool TryDecodeAutoPayload(SampledValueAsdu asdu, ICollection<string> diagnostics, out DecodedValueRow[] rows, out string layoutBinding)
+    private static double ResolveObservationDuration(SvObservedStreamFacts? facts)
+    {
+        if (facts?.FirstTimestamp is not { } first || facts.LastTimestamp is not { } last)
+            return 0;
+        return Math.Max(0, (last - first).TotalSeconds);
+    }
+
+    private (string Health, string Detail) ResolveCurrentHealth(DateTimeOffset referenceTime)
+    {
+        if (IsRecent(_lastPayloadIssueAt, referenceTime))
+            return ("BAD", _lastHealthDetail.Length == 0 ? "Recent SV payload or decode failure." : _lastHealthDetail);
+        if (IsRecent(_lastOutOfOrderAt, referenceTime))
+            return ("BAD", _lastSequenceDetail.Length == 0 ? "Recent out-of-order smpCnt transition." : _lastSequenceDetail);
+        if (IsRecent(_lastSclMismatchAt, referenceTime))
+            return ("WARN", _lastHealthDetail.Length == 0 ? "Observed traffic differs from the SCL expectation." : _lastHealthDetail);
+        if (IsRecent(_lastSequenceWarningAt, referenceTime))
+            return ("WARN", _lastSequenceDetail.Length == 0 ? "Recent smpCnt gap or duplicate." : _lastSequenceDetail);
+        if (!IsBoundToScl)
+            return ("WARN", "Stream is not SCL-bound; layout, channel names or scaling may be inferred.");
+        if (_scalingSummary.Equals("Raw counts", StringComparison.OrdinalIgnoreCase))
+            return ("WARN", "Payload is decoded, but engineering scaling is not proven; waveform remains in raw counts.");
+        return ("GOOD", "SV stream is stable, SCL-bound and displayed with evidence-backed engineering scaling.");
+    }
+
+    private static bool IsRecent(DateTimeOffset? eventTime, DateTimeOffset referenceTime)
+        => eventTime.HasValue && referenceTime >= eventTime.Value &&
+           referenceTime - eventTime.Value <= CurrentHealthWindow;
+
+    private void RecordTransition(SvSampleCounterTransition transition, DateTimeOffset timestamp)
+    {
+        switch (transition.Kind)
+        {
+            case SvSampleCounterTransitionKind.Gap:
+                _sequenceGaps++;
+                _lastSequenceWarningAt = timestamp;
+                _lastSequenceDetail = transition.Detail;
+                break;
+            case SvSampleCounterTransitionKind.Duplicate:
+                _duplicates++;
+                _lastSequenceWarningAt = timestamp;
+                _lastSequenceDetail = transition.Detail;
+                break;
+            case SvSampleCounterTransitionKind.OutOfOrder:
+                _outOfOrder++;
+                _lastOutOfOrderAt = timestamp;
+                _lastSequenceDetail = transition.Detail;
+                break;
+            case SvSampleCounterTransitionKind.Restart:
+                _lastSequenceDetail = transition.Detail;
+                break;
+        }
+    }
+
+    private static DecodedValueRow[] ApplyEngineeringScaling(
+        IReadOnlyList<DecodedValueRow> rawRows,
+        bool isSclBound,
+        SampledValueAsdu asdu,
+        SvStreamObservationSnapshot observation,
+        out bool fixedLegacyLayout,
+        out string scalingSummary,
+        out string scalingReason)
+    {
+        var analogRows = rawRows
+            .Where(row => row.NumericValue.HasValue && !string.IsNullOrWhiteSpace(ClassifyAnalogChannel(row.Signal, row.Kind)))
+            .ToArray();
+        fixedLegacyLayout = analogRows.Length == 8 && asdu.SamplePayload.Length == 64;
+        var scaled = new List<DecodedValueRow>(rawRows.Count);
+        var resolvedScales = new List<SvEngineeringScale>();
+
+        foreach (var row in rawRows)
+        {
+            if (!row.NumericValue.HasValue)
+            {
+                scaled.Add(row);
+                continue;
+            }
+
+            var channel = ClassifyAnalogChannel(row.Signal, row.Kind);
+            var scale = SvEngineeringScaleResolver.Resolve(new SvEngineeringScaleEvidence
+            {
+                Channel = channel,
+                Kind = row.Kind,
+                IsSclBound = isSclBound,
+                IsFixedFourCurrentFourVoltageLayout = fixedLegacyLayout,
+                AnalogChannelCount = analogRows.Length,
+                PayloadBytesPerAsdu = asdu.SamplePayload.Length,
+                DeclaredSampleRate = asdu.SampleRate,
+                DeclaredSampleMode = asdu.SampleMode,
+                ObservedSamplesPerSecond = observation.Facts.ObservedSamplesPerSecond
+            });
+            resolvedScales.Add(scale);
+
+            scaled.Add(new DecodedValueRow
+            {
+                Index = row.Index,
+                Signal = row.Signal,
+                Kind = row.Kind,
+                Value = row.Value,
+                Raw = row.Raw,
+                NumericValue = row.NumericValue,
+                EngineeringValue = scale.HasEngineeringUnit ? scale.Apply(row.NumericValue.Value) : null,
+                EngineeringUnit = scale.HasEngineeringUnit ? scale.Unit : string.Empty,
+                ScalingSource = scale.Source,
+                ScalingConfidence = scale.Confidence,
+                ScalingReason = scale.Reason
+            });
+        }
+
+        var engineeringScale = resolvedScales.FirstOrDefault(scale => scale.HasEngineeringUnit);
+        if (engineeringScale is null)
+        {
+            scalingSummary = "Raw counts";
+            scalingReason = resolvedScales.FirstOrDefault()?.Reason ?? "No numeric analog channels were available for scaling.";
+        }
+        else
+        {
+            scalingSummary = engineeringScale.Confidence == SvEngineeringScaleConfidence.SclBacked
+                ? "Engineering A/V · SCL-backed 9-2LE-style"
+                : "Engineering A/V · inferred 9-2LE-style";
+            scalingReason = engineeringScale.Reason;
+        }
+
+        return scaled.ToArray();
+    }
+
+    private static bool TryDecodeAutoPayload(
+        SampledValueAsdu asdu,
+        ICollection<string> diagnostics,
+        out DecodedValueRow[] rows,
+        out string layoutBinding)
     {
         rows = Array.Empty<DecodedValueRow>();
         layoutBinding = string.Empty;
@@ -300,7 +515,7 @@ internal sealed class SvStreamRuntime
 
         rows = result.ToArray();
         layoutBinding = pairCount == 8
-            ? "Auto 9-2LE/UCA fixed 4I+4V layout"
+            ? "Auto fixed 4I+4V value-quality layout"
             : $"Auto fixed value+quality layout ({pairCount} analog channels)";
         return true;
     }
@@ -336,25 +551,39 @@ internal sealed class SvStreamRuntime
         };
     }
 
-    private WaveformPoint BuildWaveformPoint(ushort? smpCnt, IEnumerable<DecodedValueRow> rows)
+    private WaveformPoint BuildWaveformPoint(ushort? smpCnt, IEnumerable<DecodedValueRow> rows, string scalingSummary)
     {
-        var point = new WaveformPoint { Index = _waveformIndex++, SampleCount = smpCnt };
-        foreach (var row in rows)
+        var rowArray = rows.ToArray();
+        var currentUnit = rowArray.FirstOrDefault(row =>
+            row.HasEngineeringValue && SvEngineeringScaleResolver.ResolveDomain(row.Signal, row.Kind) == SvMeasurementDomain.Current)?.EngineeringUnit ?? "count";
+        var voltageUnit = rowArray.FirstOrDefault(row =>
+            row.HasEngineeringValue && SvEngineeringScaleResolver.ResolveDomain(row.Signal, row.Kind) == SvMeasurementDomain.Voltage)?.EngineeringUnit ?? "count";
+        var point = new WaveformPoint
         {
-            if (!row.NumericValue.HasValue)
+            Index = _waveformIndex++,
+            SampleCount = smpCnt,
+            CurrentUnit = currentUnit,
+            VoltageUnit = voltageUnit,
+            ScalingSummary = scalingSummary
+        };
+
+        foreach (var row in rowArray)
+        {
+            var value = row.EngineeringValue ?? row.NumericValue;
+            if (!value.HasValue)
                 continue;
 
             var channel = ClassifyAnalogChannel(row.Signal, row.Kind);
             switch (channel)
             {
-                case "Ia": point.Ia = row.NumericValue.Value; break;
-                case "Ib": point.Ib = row.NumericValue.Value; break;
-                case "Ic": point.Ic = row.NumericValue.Value; break;
-                case "In": point.In = row.NumericValue.Value; break;
-                case "Va": point.Va = row.NumericValue.Value; break;
-                case "Vb": point.Vb = row.NumericValue.Value; break;
-                case "Vc": point.Vc = row.NumericValue.Value; break;
-                case "Vn": point.Vn = row.NumericValue.Value; break;
+                case "Ia": point.Ia = value.Value; break;
+                case "Ib": point.Ib = value.Value; break;
+                case "Ic": point.Ic = value.Value; break;
+                case "In": point.In = value.Value; break;
+                case "Va": point.Va = value.Value; break;
+                case "Vb": point.Vb = value.Value; break;
+                case "Vc": point.Vc = value.Value; break;
+                case "Vn": point.Vn = value.Value; break;
             }
         }
 
@@ -363,7 +592,8 @@ internal sealed class SvStreamRuntime
 
     private static string ClassifyAnalogChannel(string reference, string kind)
     {
-        if (kind.Contains("Quality", StringComparison.OrdinalIgnoreCase) || kind.Contains("Timestamp", StringComparison.OrdinalIgnoreCase))
+        if (kind.Contains("Quality", StringComparison.OrdinalIgnoreCase) ||
+            kind.Contains("Timestamp", StringComparison.OrdinalIgnoreCase))
             return string.Empty;
 
         var text = reference.Replace('$', '.').Replace('/', '.').ToLowerInvariant();
@@ -376,16 +606,26 @@ internal sealed class SvStreamRuntime
         if (text is "vc" or "vol.vc" or "voltage.vc") return "Vc";
         if (text is "vn" or "vol.vn" or "voltage.vn") return "Vn";
 
-        var isVoltage = text.Contains("tvtr", StringComparison.Ordinal) || text.Contains("vol", StringComparison.Ordinal) || text.Contains("voltage", StringComparison.Ordinal);
+        var isVoltage = text.Contains("tvtr", StringComparison.Ordinal) ||
+                        text.Contains("vol", StringComparison.Ordinal) ||
+                        text.Contains("voltage", StringComparison.Ordinal);
         var prefix = isVoltage ? "V" : "I";
 
-        if (text.Contains("tctr4", StringComparison.Ordinal) || text.Contains("tvtr4", StringComparison.Ordinal) || text.Contains("neut", StringComparison.Ordinal) || text.Contains("phsn", StringComparison.Ordinal) || text.Contains(".n", StringComparison.Ordinal))
+        if (text.Contains("tctr4", StringComparison.Ordinal) || text.Contains("tvtr4", StringComparison.Ordinal) ||
+            text.Contains("neut", StringComparison.Ordinal) || text.Contains("phsn", StringComparison.Ordinal) ||
+            text.Contains(".n", StringComparison.Ordinal))
             return prefix + "n";
-        if (text.Contains("tctr3", StringComparison.Ordinal) || text.Contains("tvtr3", StringComparison.Ordinal) || text.Contains("phsc", StringComparison.Ordinal) || text.Contains("ic", StringComparison.Ordinal) || text.Contains("vc", StringComparison.Ordinal))
+        if (text.Contains("tctr3", StringComparison.Ordinal) || text.Contains("tvtr3", StringComparison.Ordinal) ||
+            text.Contains("phsc", StringComparison.Ordinal) || text.Contains("ic", StringComparison.Ordinal) ||
+            text.Contains("vc", StringComparison.Ordinal))
             return prefix + "c";
-        if (text.Contains("tctr2", StringComparison.Ordinal) || text.Contains("tvtr2", StringComparison.Ordinal) || text.Contains("phsb", StringComparison.Ordinal) || text.Contains("ib", StringComparison.Ordinal) || text.Contains("vb", StringComparison.Ordinal))
+        if (text.Contains("tctr2", StringComparison.Ordinal) || text.Contains("tvtr2", StringComparison.Ordinal) ||
+            text.Contains("phsb", StringComparison.Ordinal) || text.Contains("ib", StringComparison.Ordinal) ||
+            text.Contains("vb", StringComparison.Ordinal))
             return prefix + "b";
-        if (text.Contains("tctr1", StringComparison.Ordinal) || text.Contains("tvtr1", StringComparison.Ordinal) || text.Contains("phsa", StringComparison.Ordinal) || text.Contains("ia", StringComparison.Ordinal) || text.Contains("va", StringComparison.Ordinal))
+        if (text.Contains("tctr1", StringComparison.Ordinal) || text.Contains("tvtr1", StringComparison.Ordinal) ||
+            text.Contains("phsa", StringComparison.Ordinal) || text.Contains("ia", StringComparison.Ordinal) ||
+            text.Contains("va", StringComparison.Ordinal))
             return prefix + "a";
 
         return string.Empty;
@@ -402,39 +642,48 @@ internal sealed class SvStreamRuntime
         }
     }
 
-    private static IEnumerable<PhasorVector> ComputePhasors(IReadOnlyList<WaveformPoint> points, ushort? sampleRate)
+    private static IEnumerable<PhasorVector> ComputePhasors(
+        IReadOnlyList<WaveformPoint> points,
+        int? samplesPerCycle)
     {
-        var cyclePoints = ResolvePointsPerCycle(sampleRate, points.Count);
-        var window = points.TakeLast(cyclePoints).ToArray();
-        if (window.Length < 8)
+        if (samplesPerCycle is not > 0 || points.Count < samplesPerCycle.Value)
             return Array.Empty<PhasorVector>();
 
+        var window = points.TakeLast(samplesPerCycle.Value).ToArray();
+        var currentUnit = window.FirstOrDefault()?.CurrentUnit ?? "count";
+        var voltageUnit = window.FirstOrDefault()?.VoltageUnit ?? "count";
         var phasors = new List<PhasorVector>();
         foreach (var item in new[]
         {
-            (Name: "Ia", Kind: "Current", Values: window.Select(x => x.Ia)),
-            (Name: "Ib", Kind: "Current", Values: window.Select(x => x.Ib)),
-            (Name: "Ic", Kind: "Current", Values: window.Select(x => x.Ic)),
-            (Name: "In", Kind: "Current", Values: window.Select(x => x.In)),
-            (Name: "Va", Kind: "Voltage", Values: window.Select(x => x.Va)),
-            (Name: "Vb", Kind: "Voltage", Values: window.Select(x => x.Vb)),
-            (Name: "Vc", Kind: "Voltage", Values: window.Select(x => x.Vc)),
-            (Name: "Vn", Kind: "Voltage", Values: window.Select(x => x.Vn))
+            (Name: "Ia", Kind: "Current", Unit: currentUnit, Values: window.Select(x => x.Ia)),
+            (Name: "Ib", Kind: "Current", Unit: currentUnit, Values: window.Select(x => x.Ib)),
+            (Name: "Ic", Kind: "Current", Unit: currentUnit, Values: window.Select(x => x.Ic)),
+            (Name: "In", Kind: "Current", Unit: currentUnit, Values: window.Select(x => x.In)),
+            (Name: "Va", Kind: "Voltage", Unit: voltageUnit, Values: window.Select(x => x.Va)),
+            (Name: "Vb", Kind: "Voltage", Unit: voltageUnit, Values: window.Select(x => x.Vb)),
+            (Name: "Vc", Kind: "Voltage", Unit: voltageUnit, Values: window.Select(x => x.Vc)),
+            (Name: "Vn", Kind: "Voltage", Unit: voltageUnit, Values: window.Select(x => x.Vn))
         })
         {
-            var values = item.Values.Where(x => x.HasValue).Select(x => x!.Value).ToArray();
-            if (values.Length < 8)
+            var values = item.Values.ToArray();
+            if (values.Any(value => !value.HasValue))
                 continue;
 
-            var rms = Math.Sqrt(values.Select(x => x * x).Average());
-            var peak = values.Select(Math.Abs).DefaultIfEmpty(0).Max();
+            var numeric = values.Select(value => value!.Value).ToArray();
+            if (numeric.Length != samplesPerCycle.Value)
+                continue;
+
+            var rms = Math.Sqrt(numeric.Select(value => value * value).Average());
+            var peak = numeric.Select(Math.Abs).DefaultIfEmpty(0).Max();
+            var mean = numeric.Average();
             var sin = 0.0;
             var cos = 0.0;
-            for (var i = 0; i < values.Length; i++)
+            for (var i = 0; i < numeric.Length; i++)
             {
-                var theta = 2.0 * Math.PI * i / values.Length;
-                sin += values[i] * Math.Sin(theta);
-                cos += values[i] * Math.Cos(theta);
+                var theta = 2.0 * Math.PI * i / numeric.Length;
+                var ac = numeric[i] - mean;
+                sin += ac * Math.Sin(theta);
+                cos += ac * Math.Cos(theta);
             }
 
             var angle = Math.Atan2(cos, sin) * 180.0 / Math.PI;
@@ -442,13 +691,15 @@ internal sealed class SvStreamRuntime
             {
                 Channel = item.Name,
                 Kind = item.Kind,
+                Unit = item.Unit,
                 Rms = rms,
                 Peak = peak,
                 AngleDegrees = NormalizeAngle(angle)
             });
         }
 
-        var va = phasors.FirstOrDefault(x => string.Equals(x.Channel, "Va", StringComparison.OrdinalIgnoreCase) && x.Rms > 0);
+        var va = phasors.FirstOrDefault(x =>
+            string.Equals(x.Channel, "Va", StringComparison.OrdinalIgnoreCase) && x.Rms > 0);
         if (va is null)
             return phasors;
 
@@ -456,25 +707,26 @@ internal sealed class SvStreamRuntime
         {
             Channel = item.Channel,
             Kind = item.Kind,
+            Unit = item.Unit,
             Rms = item.Rms,
             Peak = item.Peak,
-            AngleDegrees = NormalizeAngle(item.AngleDegrees - va.AngleDegrees)
+            AngleDegrees = NormalizeAngle(item.AngleDegrees - va.AngleDegrees),
+            IsValid = item.IsValid,
+            InvalidReason = item.InvalidReason
         }).ToArray();
     }
 
-
-    private static WaveformPoint[] BuildLockedTwoCycleWindow(IReadOnlyList<WaveformPoint> points, ushort? sampleRate)
+    private static WaveformPoint[] BuildLockedTwoCycleWindow(
+        IReadOnlyList<WaveformPoint> points,
+        int? samplesPerCycle)
     {
         if (points.Count == 0)
             return Array.Empty<WaveformPoint>();
+        if (samplesPerCycle is not > 0)
+            return points.TakeLast(Math.Min(512, points.Count)).ToArray();
 
-        var pointsPerCycle = ResolvePointsPerCycle(sampleRate, points.Count);
-        if (pointsPerCycle <= 0)
-            return points.ToArray();
-
-        var window = Math.Clamp(pointsPerCycle * 2, 32, 512);
+        var window = Math.Clamp(samplesPerCycle.Value * 2, 32, 512);
         var slots = new WaveformPoint?[window];
-
         foreach (var point in points)
         {
             var slot = point.SampleCount.HasValue
@@ -486,35 +738,30 @@ internal sealed class SvStreamRuntime
         var result = new List<WaveformPoint>(window);
         for (var slot = 0; slot < slots.Length; slot++)
         {
-            if (slots[slot] is { } point)
+            if (slots[slot] is not { } point)
+                continue;
+
+            result.Add(new WaveformPoint
             {
-                result.Add(new WaveformPoint
-                {
-                    Index = slot,
-                    SampleCount = point.SampleCount,
-                    Ia = point.Ia,
-                    Ib = point.Ib,
-                    Ic = point.Ic,
-                    In = point.In,
-                    Va = point.Va,
-                    Vb = point.Vb,
-                    Vc = point.Vc,
-                    Vn = point.Vn
-                });
-            }
+                Index = slot,
+                SampleCount = point.SampleCount,
+                CurrentUnit = point.CurrentUnit,
+                VoltageUnit = point.VoltageUnit,
+                ScalingSummary = point.ScalingSummary,
+                Ia = point.Ia,
+                Ib = point.Ib,
+                Ic = point.Ic,
+                In = point.In,
+                Va = point.Va,
+                Vb = point.Vb,
+                Vc = point.Vc,
+                Vn = point.Vn
+            });
         }
 
-        return result.Count >= Math.Min(16, window) ? result.ToArray() : points.TakeLast(Math.Min(window, points.Count)).ToArray();
-    }
-
-    private static int ResolvePointsPerCycle(ushort? sampleRate, int available)
-    {
-        if (available <= 0)
-            return 0;
-
-        var candidate = sampleRate is > 1000 ? (int)Math.Round(sampleRate.Value / 50.0) : sampleRate ?? 80;
-        candidate = Math.Clamp(candidate, 16, 256);
-        return Math.Min(candidate, available);
+        return result.Count >= window
+            ? result.ToArray()
+            : points.TakeLast(Math.Min(window, points.Count)).ToArray();
     }
 
     private static double NormalizeAngle(double angle)
@@ -531,78 +778,21 @@ internal sealed class SvStreamRuntime
 
         var a = points[Math.Max(0, points.Count - 2)];
         var b = points[^1];
-        var iaDelta = Delta(a.Ia, b.Ia);
-        var vaDelta = Delta(a.Va, b.Va);
+        var iaDelta = Delta(a.Ia, b.Ia, b.CurrentUnit);
+        var vaDelta = Delta(a.Va, b.Va, b.VoltageUnit);
         return $"Cursor compare: ΔIa={iaDelta}, ΔVa={vaDelta}, smpCnt {a.SampleCount?.ToString() ?? "-"} → {b.SampleCount?.ToString() ?? "-"}";
     }
 
-    private static string Delta(double? a, double? b)
-        => a.HasValue && b.HasValue ? (b.Value - a.Value).ToString("0.###") : "-";
+    private static string Delta(double? a, double? b, string unit)
+        => a.HasValue && b.HasValue
+            ? $"{b.Value - a.Value:0.###} {unit}".TrimEnd()
+            : "-";
 
-    private void RecordSample(ushort sampleCount, ushort? wrap)
-    {
-        if (!_lastSampleCount.HasValue)
-        {
-            _lastSampleCount = sampleCount;
-            _expectedNext = NextSample(sampleCount, wrap);
-            return;
-        }
-
-        var previous = _lastSampleCount.Value;
-        if (sampleCount == previous)
-        {
-            _duplicates++;
-            return;
-        }
-
-        var expected = _expectedNext ?? NextSample(previous, wrap);
-        if (sampleCount == expected)
-        {
-            _lastSampleCount = sampleCount;
-            _expectedNext = NextSample(sampleCount, wrap);
-            return;
-        }
-
-        if (IsForwardJump(expected, sampleCount, wrap))
-            _sequenceGaps++;
-        else
-            _outOfOrder++;
-
-        _lastSampleCount = sampleCount;
-        _expectedNext = NextSample(sampleCount, wrap);
-    }
-
-    private static ushort NextSample(ushort sampleCount, ushort? wrap)
-    {
-        if (wrap is > 0)
-            return (ushort)((sampleCount + 1) % wrap.Value);
-
-        return unchecked((ushort)(sampleCount + 1));
-    }
-
-    private static bool IsForwardJump(ushort expected, ushort actual, ushort? wrap)
-    {
-        if (actual > expected)
-            return true;
-
-        if (wrap is > 0 && expected > wrap.Value * 0.8 && actual < wrap.Value * 0.2)
-            return true;
-
-        return false;
-    }
-
-    private static ushort? ResolveCounterWrap(SampledValueAsdu asdu, SampledValuesPublisherProfile? profile)
-    {
-        if (profile is not null)
-            return profile.ResolveSampleCounterWrap(50);
-
-        if (asdu.SampleMode is 1 && asdu.SampleRate is > 0)
-            return asdu.SampleRate;
-
-        return null;
-    }
-
-    private void ValidateAgainstScl(SampledValuesFrame frame, IReadOnlyList<SampledValueAsdu> asdus, SampledValuesPublisherProfile profile, ICollection<string> diagnostics)
+    private static void ValidateAgainstScl(
+        SampledValuesFrame frame,
+        IReadOnlyList<SampledValueAsdu> asdus,
+        SampledValuesPublisherProfile profile,
+        ICollection<string> diagnostics)
     {
         if (!string.Equals(profile.Destination.ToString(), frame.Destination.ToString(), StringComparison.OrdinalIgnoreCase))
             diagnostics.Add($"SCL mismatch: destination MAC expected {profile.Destination}, got {frame.Destination}.");
@@ -624,7 +814,8 @@ internal sealed class SvStreamRuntime
             if (profile.Stream.ConfigurationRevision != asdu.ConfigurationRevision)
                 diagnostics.Add($"SCL mismatch: confRev expected {profile.Stream.ConfigurationRevision}, got {asdu.ConfigurationRevision}.");
 
-            if (profile.Stream.SampleRate != 0 && asdu.SampleRate.HasValue && profile.Stream.SampleRate != asdu.SampleRate.Value)
+            if (profile.Stream.SampleRate != 0 && asdu.SampleRate.HasValue &&
+                profile.Stream.SampleRate != asdu.SampleRate.Value)
                 diagnostics.Add($"SCL mismatch: sample rate expected {profile.Stream.SampleRate}, got {asdu.SampleRate.Value}.");
 
             if (asdu.SamplePayload.Length != profile.PayloadLayout.PayloadByteLength)
@@ -632,7 +823,10 @@ internal sealed class SvStreamRuntime
         }
     }
 
-    private static IEnumerable<DecodedValueRow> DecodePayload(SampledValueAsdu asdu, SampledValuesPayloadLayout layout, ICollection<string> diagnostics)
+    private static IEnumerable<DecodedValueRow> DecodePayload(
+        SampledValueAsdu asdu,
+        SampledValuesPayloadLayout layout,
+        ICollection<string> diagnostics)
     {
         var decode = SampledValuesPayloadDecoder.Decode(layout, asdu.SamplePayload);
         foreach (var issue in decode.Diagnostics)
@@ -655,15 +849,9 @@ internal sealed class SvStreamRuntime
     private static double? ExtractNumeric(MmsDataValue value)
         => value.Kind switch
         {
-            MmsDataKind.Integer => Convert.ToDouble(value.Value, System.Globalization.CultureInfo.InvariantCulture),
-            MmsDataKind.Unsigned => Convert.ToDouble(value.Value, System.Globalization.CultureInfo.InvariantCulture),
-            MmsDataKind.FloatingPoint => Convert.ToDouble(value.Value, System.Globalization.CultureInfo.InvariantCulture),
+            MmsDataKind.Integer => Convert.ToDouble(value.Value, CultureInfo.InvariantCulture),
+            MmsDataKind.Unsigned => Convert.ToDouble(value.Value, CultureInfo.InvariantCulture),
+            MmsDataKind.FloatingPoint => Convert.ToDouble(value.Value, CultureInfo.InvariantCulture),
             _ => null
         };
-
-    private void IncrementPayloadIssue()
-    {
-        lock (_gate)
-            _payloadIssues++;
-    }
 }

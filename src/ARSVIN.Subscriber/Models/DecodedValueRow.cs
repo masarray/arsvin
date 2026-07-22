@@ -1,3 +1,5 @@
+using AR.Iec61850.SampledValues.Measurements;
+
 namespace ARSVIN.Subscriber.Models;
 
 public sealed class DecodedValueRow
@@ -7,6 +9,22 @@ public sealed class DecodedValueRow
     public string Kind { get; init; } = string.Empty;
     public string Value { get; init; } = string.Empty;
     public string Raw { get; init; } = string.Empty;
-    public double? NumericValue { get; init; }
-}
 
+    /// <summary>Decoded protocol number before any engineering scaling.</summary>
+    public double? NumericValue { get; init; }
+
+    /// <summary>Primary engineering value when scaling evidence is sufficient.</summary>
+    public double? EngineeringValue { get; init; }
+    public string EngineeringUnit { get; init; } = string.Empty;
+    public SvEngineeringScaleSource ScalingSource { get; init; } = SvEngineeringScaleSource.RawOnly;
+    public SvEngineeringScaleConfidence ScalingConfidence { get; init; } = SvEngineeringScaleConfidence.Unknown;
+    public string ScalingReason { get; init; } = string.Empty;
+
+    public bool HasEngineeringValue => EngineeringValue.HasValue && ScalingSource != SvEngineeringScaleSource.RawOnly;
+    public string DisplayValue => HasEngineeringValue
+        ? $"{EngineeringValue:0.###} {EngineeringUnit}"
+        : Value;
+    public string ScalingText => HasEngineeringValue
+        ? $"{ScalingConfidence} · {ScalingSource}"
+        : "Raw counts";
+}

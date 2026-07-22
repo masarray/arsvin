@@ -1,3 +1,4 @@
+using AR.Iec61850.SampledValues.Measurements;
 using AR.Iec61850.SampledValues.Profiles;
 
 namespace ARSVIN.Subscriber.Models;
@@ -20,6 +21,13 @@ public sealed class SvStreamSnapshot
     public ushort? SampleRate { get; init; }
     public ushort? SampleMode { get; init; }
     public byte? SmpSynch { get; init; }
+    public double? NominalFrequencyHz { get; init; }
+    public int? SamplesPerCycle { get; init; }
+    public ushort? ResolvedCounterWrap { get; init; }
+    public SvTimebaseSource TimebaseSource { get; init; } = SvTimebaseSource.Unknown;
+    public string TimebaseReason { get; init; } = string.Empty;
+    public string ScalingSummary { get; init; } = "Raw counts";
+    public string ScalingReason { get; init; } = string.Empty;
     public long FrameCount { get; init; }
     public long AsduCount { get; init; }
     public double ActualFps { get; init; }
