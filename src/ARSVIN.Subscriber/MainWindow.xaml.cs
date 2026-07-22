@@ -25,7 +25,11 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
         _viewModel.Streams.CollectionChanged += Streams_CollectionChanged;
         AttachLivePlotControls();
-        Loaded += (_, _) => AttachMeasurementContextToolbar();
+        Loaded += (_, _) =>
+        {
+            AttachMeasurementContextToolbar();
+            AttachGenericExplorerUi();
+        };
     }
 
     private void AttachLivePlotControls()
@@ -34,15 +38,83 @@ public partial class MainWindow : Window
         BindingOperations.SetBinding(
             scope,
             OscilloscopePlot.PointsProperty,
-            new Binding("SelectedStream.WaveformPoints"));
+            new Binding("SelectedStream.GenericWaveformPoints"));
         ScopeHost.Child = scope;
 
         var phasor = new PhasorPlot();
         BindingOperations.SetBinding(
             phasor,
             PhasorPlot.VectorsProperty,
-            new Binding("SelectedStream.Phasors"));
+            new Binding("SelectedStream.GenericPhasors"));
         PhasorHost.Child = phasor;
+    }
+
+    private void AttachGenericExplorerUi()
+    {
+        foreach (var text in FindVisualChildren<TextBlock>(this))
+        {
+            if (string.Equals(text.Text, "PROFILE", StringComparison.Ordinal))
+                text.Text = "MAPPING";
+            else if (string.Equals(text.Text, "CONFIDENCE", StringComparison.Ordinal))
+                text.Text = "SEMANTICS";
+
+            var binding = BindingOperations.GetBinding(text, TextBlock.TextProperty);
+            var path = binding?.Path?.Path;
+            if (string.Equals(path, "SelectedStream.Profile", StringComparison.Ordinal))
+            {
+                BindingOperations.SetBinding(
+                    text,
+                    TextBlock.TextProperty,
+                    new Binding("SelectedStream.GenericMappingState"));
+            }
+            else if (string.Equals(path, "SelectedStream.Confidence", StringComparison.Ordinal))
+            {
+                BindingOperations.SetBinding(
+                    text,
+                    TextBlock.TextProperty,
+                    new Binding("SelectedStream.GenericSemanticState"));
+            }
+            else if (string.Equals(path, "SelectedStream.WaveformState", StringComparison.Ordinal))
+            {
+                BindingOperations.SetBinding(
+                    text,
+                    TextBlock.TextProperty,
+                    new Binding("SelectedStream.GenericWaveformState"));
+            }
+        }
+
+        foreach (var grid in FindVisualChildren<DataGrid>(this))
+        {
+            var binding = BindingOperations.GetBinding(grid, ItemsControl.ItemsSourceProperty);
+            var path = binding?.Path?.Path;
+            if (string.Equals(path, "SelectedStream.Phasors", StringComparison.Ordinal))
+            {
+                BindingOperations.SetBinding(
+                    grid,
+                    ItemsControl.ItemsSourceProperty,
+                    new Binding("SelectedStream.GenericPhasors"));
+            }
+            else if (string.Equals(path, "SelectedValues", StringComparison.Ordinal))
+            {
+                BindingOperations.SetBinding(
+                    grid,
+                    ItemsControl.ItemsSourceProperty,
+                    new Binding("SelectedStream.GenericValues"));
+                UpdateGenericDecodedColumns(grid);
+            }
+        }
+    }
+
+    private static void UpdateGenericDecodedColumns(DataGrid grid)
+    {
+        if (grid.Columns.Count < 6)
+            return;
+
+        grid.Columns[1].Header = "Word / SCL signal";
+        grid.Columns[2].Header = "Representation";
+        grid.Columns[3].Header = "Value";
+        grid.Columns[4].Header = "Semantics";
+        grid.Columns[5].Header = "Raw bytes";
     }
 
     private void AttachMeasurementContextToolbar()
