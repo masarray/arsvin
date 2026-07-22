@@ -1,4 +1,5 @@
 using AR.Iec61850.SampledValues.Measurements;
+using Xunit;
 
 namespace ARSVIN.Tests;
 
