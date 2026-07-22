@@ -90,8 +90,10 @@ public sealed class SampledValuesQualityAndRatioTests
             SvMeasurementValueDomain.PrimaryEngineering,
             ratio);
 
-        Assert.Equal(800, value.PrimaryValue);
-        Assert.Equal(0.8, value.SecondaryEquivalentValue, 9);
+        Assert.True(value.PrimaryValue.HasValue);
+        Assert.True(value.SecondaryEquivalentValue.HasValue);
+        Assert.Equal(800.0, value.PrimaryValue.Value, 9);
+        Assert.Equal(0.8, value.SecondaryEquivalentValue.Value, 9);
         Assert.Equal(SvRatioSource.DeviceConfiguration, value.RatioSource);
     }
 
@@ -104,7 +106,8 @@ public sealed class SampledValuesQualityAndRatioTests
             SvMeasurementValueDomain.PrimaryEngineering,
             ratio: null);
 
-        Assert.Equal(800, value.PrimaryValue);
+        Assert.True(value.PrimaryValue.HasValue);
+        Assert.Equal(800.0, value.PrimaryValue.Value, 9);
         Assert.Null(value.SecondaryEquivalentValue);
         Assert.Contains("no verified CT/VT ratio", value.Diagnostic);
     }
