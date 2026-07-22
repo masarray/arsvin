@@ -4,7 +4,7 @@
 
 ArSubsv is a generic IEC 61850 Sampled Values subscriber, inspector, measurement viewer, and evidence tool.
 
-The receive path must not contain device-family branches such as ABB, Siemens, SEL, GE, or any other manufacturer identity. Product identity may appear in imported evidence or reports, but it must never select a parser, dataset order, engineering scale, quality layout, or health result.
+The receive path must not contain manufacturer or device-family branches. Product identity may appear in imported evidence or reports, but it must never select a parser, dataset order, engineering scale, quality layout, or health result.
 
 The intended receive pipeline is:
 
@@ -111,13 +111,25 @@ Engineering A/V scaling now requires all of the following:
 
 Packet shape, rate, product name, MAC, APPID, `svID`, amplitude, and manufacturer identity cannot activate scaling on their own.
 
+### Generic Subscriber presentation
+
+When an SCL mapping is not bound, the Subscriber presentation layer now:
+
+- replaces synthetic channel labels with generic word labels and byte offsets,
+- shows signed and unsigned representations of each 32-bit word,
+- labels semantics as unresolved,
+- suppresses semantic waveform, RMS, and phasor displays,
+- renames the compact profile indicators to mapping and semantics.
+
+When SCL is bound, existing ordered SCL decoding and measurement views remain available.
+
 ## Next implementation tranches
 
-### P3B — integrate generic explorer into live Subscriber
+### P3B — replace the runtime auto-layout path
 
-Replace the unbound auto-layout path with `SvGenericPayloadInspector`.
+Replace the unbound runtime auto-layout decoder with `SvGenericPayloadInspector`, so synthetic channel references are not created internally at all.
 
-Without SCL, the Decoded table must show:
+Without SCL, the Decoded table contract is:
 
 | Field | Meaning |
 |---|---|
@@ -190,7 +202,7 @@ The global headline should be driven by current protocol and stream integrity. M
 
 ## Real-device evidence policy
 
-PCAP and SCL from an ABB SMU615, Siemens merging unit, SEL device, or any other product are regression fixtures for the generic engine. They are not permission to add product-specific decoding branches.
+PCAP and SCL from any conforming or installed-base device are regression fixtures for the generic engine. They are not permission to add manufacturer-specific decoding branches.
 
 A real-device fixture should prove:
 
