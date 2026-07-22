@@ -128,11 +128,11 @@ public static class SvEngineeringScaleResolver
             return SvMeasurementDomain.Current;
 
         var normalizedChannel = channel?.Trim() ?? string.Empty;
-        if (normalizedChannel.StartsWith('V', StringComparison.OrdinalIgnoreCase) ||
+        if (normalizedChannel.StartsWith("V", StringComparison.OrdinalIgnoreCase) ||
             normalizedChannel.Contains("TVTR", StringComparison.OrdinalIgnoreCase) ||
             normalizedChannel.Contains("VolSv", StringComparison.OrdinalIgnoreCase))
             return SvMeasurementDomain.Voltage;
-        if (normalizedChannel.StartsWith('I', StringComparison.OrdinalIgnoreCase) ||
+        if (normalizedChannel.StartsWith("I", StringComparison.OrdinalIgnoreCase) ||
             normalizedChannel.Contains("TCTR", StringComparison.OrdinalIgnoreCase) ||
             normalizedChannel.Contains("AmpSv", StringComparison.OrdinalIgnoreCase))
             return SvMeasurementDomain.Current;
