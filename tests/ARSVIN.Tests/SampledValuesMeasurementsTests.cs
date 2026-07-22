@@ -6,7 +6,7 @@ namespace ARSVIN.Tests;
 public sealed class SampledValuesMeasurementsTests
 {
     [Fact]
-    public void ScaleResolverConvertsFixedProtectionCurrentToAmperes()
+    public void ScaleResolverDoesNotInferCurrentUnitsWithoutSclMapping()
     {
         var scale = SvEngineeringScaleResolver.Resolve(new SvEngineeringScaleEvidence
         {
@@ -19,14 +19,15 @@ public sealed class SampledValuesMeasurementsTests
             DeclaredSampleRate = 4_000
         });
 
-        Assert.Equal(SvEngineeringScaleSource.Legacy92LeStyleStructuralInference, scale.Source);
-        Assert.Equal(SvEngineeringScaleConfidence.Inferred, scale.Confidence);
-        Assert.Equal("A", scale.Unit);
-        Assert.Equal(1.0, scale.Apply(1_000), 9);
+        Assert.Equal(SvEngineeringScaleSource.RawOnly, scale.Source);
+        Assert.Equal(SvEngineeringScaleConfidence.Unknown, scale.Confidence);
+        Assert.Equal("count", scale.Unit);
+        Assert.Equal(1_000, scale.Apply(1_000));
+        Assert.Contains("No SCL dataset mapping", scale.Reason, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
-    public void ScaleResolverConvertsFixedProtectionVoltageToVolts()
+    public void ScaleResolverConvertsSclMappedFixedProtectionVoltageToVolts()
     {
         var scale = SvEngineeringScaleResolver.Resolve(new SvEngineeringScaleEvidence
         {
@@ -35,7 +36,9 @@ public sealed class SampledValuesMeasurementsTests
             IsSclBound = true,
             IsFixedFourCurrentFourVoltageLayout = true,
             AnalogChannelCount = 8,
-            PayloadBytesPerAsdu = 64
+            PayloadBytesPerAsdu = 64,
+            DeclaredSampleMode = 1,
+            DeclaredSampleRate = 4_000
         });
 
         Assert.Equal(SvEngineeringScaleSource.SclBackedLegacy92LeStyle, scale.Source);
@@ -45,12 +48,30 @@ public sealed class SampledValuesMeasurementsTests
     }
 
     [Fact]
+    public void ScaleResolverWithholdsFixedLayoutScalingWhenRateEvidenceIsMissing()
+    {
+        var scale = SvEngineeringScaleResolver.Resolve(new SvEngineeringScaleEvidence
+        {
+            Channel = "TCTR1/AmpSv.instMag.i",
+            Kind = "Current",
+            IsSclBound = true,
+            IsFixedFourCurrentFourVoltageLayout = true,
+            AnalogChannelCount = 8,
+            PayloadBytesPerAsdu = 64
+        });
+
+        Assert.Equal(SvEngineeringScaleSource.RawOnly, scale.Source);
+        Assert.Contains("rate evidence", scale.Reason, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ScaleResolverKeepsUnknownLayoutAsRawCounts()
     {
         var scale = SvEngineeringScaleResolver.Resolve(new SvEngineeringScaleEvidence
         {
             Channel = "Ia",
             Kind = "Current",
+            IsSclBound = true,
             AnalogChannelCount = 12,
             PayloadBytesPerAsdu = 96,
             ObservedSamplesPerSecond = 4_000
