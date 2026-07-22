@@ -1,6 +1,8 @@
+using System.Collections.Specialized;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Data;
+using AR.Iec61850.SampledValues.Measurements;
 using AR.Iec61850.SampledValues.Reporting;
 using ARSVIN.Subscriber.Controls;
 using ARSVIN.Subscriber.ViewModels;
@@ -11,12 +13,15 @@ namespace ARSVIN.Subscriber;
 public partial class MainWindow : Window
 {
     private readonly SvSubscriberViewModel _viewModel;
+    private readonly Dictionary<string, SvStreamMeasurementContext> _measurementContexts =
+        new(StringComparer.Ordinal);
 
     public MainWindow()
     {
         InitializeComponent();
         _viewModel = new SvSubscriberViewModel();
         DataContext = _viewModel;
+        _viewModel.Streams.CollectionChanged += Streams_CollectionChanged;
         AttachLivePlotControls();
     }
 
@@ -35,6 +40,152 @@ public partial class MainWindow : Window
             PhasorPlot.VectorsProperty,
             new Binding("SelectedStream.Phasors"));
         PhasorHost.Child = phasor;
+    }
+
+    private void Streams_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems is null)
+            return;
+
+        foreach (var row in e.NewItems.OfType<SvStreamViewModel>())
+        {
+            if (_measurementContexts.TryGetValue(row.Key, out var context))
+                row.SetMeasurementContext(context);
+        }
+    }
+
+    private void MeasurementContext_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = _viewModel.SelectedStream;
+        if (selected is null)
+        {
+            MessageBox.Show(
+                this,
+                "Select an SV stream before editing CT/VT measurement context.",
+                "SV Measurement Context",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        _measurementContexts.TryGetValue(selected.Key, out var existing);
+        var dialog = new MeasurementContextWindow(selected.Key, selected.SvId, existing)
+        {
+            Owner = this
+        };
+        if (dialog.ShowDialog() != true)
+            return;
+
+        if (dialog.RemoveRequested)
+        {
+            _measurementContexts.Remove(selected.Key);
+            selected.SetMeasurementContext(null);
+            return;
+        }
+
+        if (dialog.ResultContext is not { } context)
+            return;
+
+        _measurementContexts[selected.Key] = context;
+        selected.SetMeasurementContext(context);
+    }
+
+    private async void ImportMeasurementContext_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFileDialog
+        {
+            Title = "Import ARSVIN measurement-context JSON",
+            Filter = "ARSVIN measurement context (*.json)|*.json|All files (*.*)|*.*",
+            Multiselect = false
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            var json = await File.ReadAllTextAsync(dialog.FileName).ConfigureAwait(true);
+            var document = SvMeasurementContextSerializer.FromJson(json);
+            foreach (var context in document.Streams)
+                _measurementContexts[context.StreamKey] = context;
+
+            foreach (var row in _viewModel.Streams)
+            {
+                if (_measurementContexts.TryGetValue(row.Key, out var context))
+                    row.SetMeasurementContext(context);
+            }
+
+            MessageBox.Show(
+                this,
+                $"Imported {document.Streams.Count} measurement context(s). Existing matching stream keys were updated.",
+                "SV Measurement Context",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            MessageBox.Show(
+                this,
+                $"Measurement-context import failed: {ex.Message}",
+                "SV Measurement Context",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
+    }
+
+    private async void ExportMeasurementContext_Click(object sender, RoutedEventArgs e)
+    {
+        if (_measurementContexts.Count == 0)
+        {
+            MessageBox.Show(
+                this,
+                "No measurement context has been configured yet.",
+                "SV Measurement Context",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export ARSVIN measurement-context JSON",
+            Filter = "ARSVIN measurement context (*.json)|*.json|All files (*.*)|*.*",
+            DefaultExt = ".json",
+            AddExtension = true,
+            FileName = $"arsvin-measurement-context-{DateTime.Now:yyyyMMdd-HHmmss}.json"
+        };
+        if (dialog.ShowDialog(this) != true)
+            return;
+
+        try
+        {
+            var document = new SvMeasurementContextDocument
+            {
+                ExportedAt = DateTimeOffset.UtcNow,
+                Streams = _measurementContexts.Values
+                    .OrderBy(item => item.SvId, StringComparer.Ordinal)
+                    .ThenBy(item => item.StreamKey, StringComparer.Ordinal)
+                    .ToArray()
+            };
+            await File.WriteAllTextAsync(
+                dialog.FileName,
+                SvMeasurementContextSerializer.ToJson(document)).ConfigureAwait(true);
+
+            MessageBox.Show(
+                this,
+                $"Exported {_measurementContexts.Count} measurement context(s) to {Path.GetFileName(dialog.FileName)}.",
+                "SV Measurement Context",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+        {
+            MessageBox.Show(
+                this,
+                $"Measurement-context export failed: {ex.Message}",
+                "SV Measurement Context",
+                MessageBoxButton.OK,
+                MessageBoxImage.Error);
+        }
     }
 
     private async void CompareEvidence_Click(object sender, RoutedEventArgs e)
@@ -113,6 +264,7 @@ public partial class MainWindow : Window
 
     protected override void OnClosed(EventArgs e)
     {
+        _viewModel.Streams.CollectionChanged -= Streams_CollectionChanged;
         _viewModel.Dispose();
         base.OnClosed(e);
     }
