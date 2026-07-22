@@ -42,6 +42,7 @@ public sealed class SvStreamViewModel : ObservableObject
     private string _waveformState = "Waiting for a resolved timebase";
     private string _scaling = "Raw counts";
     private string _timebase = "Unknown";
+    private string _measurementContext = "No explicit CT/VT context";
 
     public IReadOnlyList<DecodedValueRow> Values => _values;
     public IReadOnlyList<WaveformPoint> WaveformPoints => _waveformPoints;
@@ -80,8 +81,12 @@ public sealed class SvStreamViewModel : ObservableObject
     public string WaveformState { get => _waveformState; set => SetProperty(ref _waveformState, value); }
     public string Scaling { get => _scaling; set => SetProperty(ref _scaling, value); }
     public string Timebase { get => _timebase; set => SetProperty(ref _timebase, value); }
+    public string MeasurementContext { get => _measurementContext; set => SetProperty(ref _measurementContext, value); }
 
-    public void Apply(SvStreamSnapshot snapshot, SvStreamObservationSnapshot? observation)
+    public void Apply(
+        SvStreamSnapshot snapshot,
+        SvStreamObservationSnapshot? observation,
+        SvStreamMeasurementContext? measurementContext = null)
     {
         Key = snapshot.Key;
         AppId = $"0x{snapshot.AppId:X4}";
@@ -102,8 +107,13 @@ public sealed class SvStreamViewModel : ObservableObject
         CursorSummary = snapshot.CursorSummary;
         Scaling = snapshot.ScalingSummary;
         Timebase = BuildTimebaseText(snapshot);
+        MeasurementContext = measurementContext?.Summary ?? "No explicit CT/VT context · displaying wire engineering domain";
 
-        var qualityStates = ResolveQualityStates(snapshot.Values);
+        var displayValues = snapshot.Values
+            .Take(64)
+            .Select(value => ApplyMeasurementContext(value, measurementContext))
+            .ToArray();
+        var qualityStates = ResolveQualityStates(displayValues);
         QualitySummary = BuildQualitySummary(qualityStates, snapshot.QualitySummary);
 
         var comparison = observation?.ConfigurationComparison;
@@ -147,35 +157,154 @@ public sealed class SvStreamViewModel : ObservableObject
         var samples = ResolveObservationSamples(observation?.Facts);
         Window = $"{duration:0.0} s · {samples:N0} samples";
 
-        _values.ReplaceAll(snapshot.Values.Take(64));
-        UpdateStableVisuals(snapshot);
-        _evidenceDetails.ReplaceAll(BuildEvidenceDetails(snapshot, observation, qualityStates));
+        _values.ReplaceAll(displayValues);
+        UpdateStableVisuals(snapshot, measurementContext);
+        _evidenceDetails.ReplaceAll(BuildEvidenceDetails(snapshot, observation, qualityStates, measurementContext));
     }
 
-    private void UpdateStableVisuals(SvStreamSnapshot snapshot)
+    private void UpdateStableVisuals(
+        SvStreamSnapshot snapshot,
+        SvStreamMeasurementContext? measurementContext)
     {
+        var convertedWaveform = ConvertWaveform(snapshot.WaveformPoints, measurementContext);
+        var convertedPhasors = ConvertPhasors(snapshot.Phasors, measurementContext);
+        var domainSuffix = measurementContext is null
+            ? string.Empty
+            : $" · display {measurementContext.DisplayDomain}";
+
         if (snapshot.SamplesPerCycle is not > 0)
         {
-            _waveformPoints.ReplaceAll(snapshot.WaveformPoints);
+            _waveformPoints.ReplaceAll(convertedWaveform);
             _phasors.ReplaceAll(Array.Empty<PhasorVector>());
-            WaveformState = $"{snapshot.ScalingSummary} · timebase unresolved; phasor withheld";
+            WaveformState = $"{snapshot.ScalingSummary}{domainSuffix} · timebase unresolved; phasor withheld";
             return;
         }
 
         var expectedPoints = Math.Clamp(snapshot.SamplesPerCycle.Value * 2, 32, 512);
-        var fullWindow = snapshot.IsWaveformWindowReady && snapshot.WaveformPoints.Count >= expectedPoints;
+        var fullWindow = snapshot.IsWaveformWindowReady && convertedWaveform.Count >= expectedPoints;
         if (fullWindow)
         {
-            _waveformPoints.ReplaceAll(snapshot.WaveformPoints.TakeLast(expectedPoints));
-            _phasors.ReplaceAll(snapshot.Phasors);
-            WaveformState = $"2 cycles locked · {expectedPoints:N0} points · {snapshot.ScalingSummary}";
+            _waveformPoints.ReplaceAll(convertedWaveform.TakeLast(expectedPoints));
+            _phasors.ReplaceAll(convertedPhasors);
+            WaveformState = $"2 cycles locked · {expectedPoints:N0} points · {snapshot.ScalingSummary}{domainSuffix}";
             return;
         }
 
-        _waveformPoints.ReplaceAll(snapshot.WaveformPoints);
+        _waveformPoints.ReplaceAll(convertedWaveform);
         _phasors.ReplaceAll(Array.Empty<PhasorVector>());
-        WaveformState = $"Filling verified window · {snapshot.WaveformPoints.Count:N0}/{expectedPoints:N0} points";
+        WaveformState = $"Filling verified window · {convertedWaveform.Count:N0}/{expectedPoints:N0} points{domainSuffix}";
     }
+
+    private static DecodedValueRow ApplyMeasurementContext(
+        DecodedValueRow source,
+        SvStreamMeasurementContext? context)
+    {
+        if (context is null || source.IsQuality || !source.HasEngineeringValue || !source.EngineeringValue.HasValue)
+            return source;
+
+        var ratio = context.ResolveRatio($"{source.Kind} {source.Signal}");
+        var domainValue = SvMeasurementDomainResolver.Resolve(
+            source.EngineeringValue.Value,
+            source.EngineeringUnit,
+            context.WireDomain,
+            ratio);
+
+        return new DecodedValueRow
+        {
+            Index = source.Index,
+            Signal = source.Signal,
+            Kind = source.Kind,
+            Value = source.Value,
+            Raw = source.Raw,
+            NumericValue = source.NumericValue,
+            EngineeringValue = source.EngineeringValue,
+            EngineeringUnit = source.EngineeringUnit,
+            ScalingSource = source.ScalingSource,
+            ScalingConfidence = source.ScalingConfidence,
+            ScalingReason = source.ScalingReason,
+            DomainValue = domainValue,
+            PreferredDisplayDomain = context.DisplayDomain
+        };
+    }
+
+    private static IReadOnlyList<WaveformPoint> ConvertWaveform(
+        IReadOnlyList<WaveformPoint> source,
+        SvStreamMeasurementContext? context)
+    {
+        if (context is null)
+            return source;
+
+        var currentMultiplier = ResolveDisplayMultiplier(context, context.CurrentRatio);
+        var voltageMultiplier = ResolveDisplayMultiplier(context, context.VoltageRatio);
+        if (currentMultiplier == 1.0 && voltageMultiplier == 1.0)
+            return source;
+
+        return source.Select(point => new WaveformPoint
+        {
+            Index = point.Index,
+            SampleCount = point.SampleCount,
+            CurrentUnit = point.CurrentUnit,
+            VoltageUnit = point.VoltageUnit,
+            ScalingSummary = $"{point.ScalingSummary} · {context.DisplayDomain}",
+            Ia = Scale(point.Ia, currentMultiplier, point.CurrentUnit),
+            Ib = Scale(point.Ib, currentMultiplier, point.CurrentUnit),
+            Ic = Scale(point.Ic, currentMultiplier, point.CurrentUnit),
+            In = Scale(point.In, currentMultiplier, point.CurrentUnit),
+            Va = Scale(point.Va, voltageMultiplier, point.VoltageUnit),
+            Vb = Scale(point.Vb, voltageMultiplier, point.VoltageUnit),
+            Vc = Scale(point.Vc, voltageMultiplier, point.VoltageUnit),
+            Vn = Scale(point.Vn, voltageMultiplier, point.VoltageUnit)
+        }).ToArray();
+    }
+
+    private static IReadOnlyList<PhasorVector> ConvertPhasors(
+        IReadOnlyList<PhasorVector> source,
+        SvStreamMeasurementContext? context)
+    {
+        if (context is null)
+            return source;
+
+        return source.Select(vector =>
+        {
+            var ratio = context.ResolveRatio($"{vector.Kind} {vector.Channel}");
+            var multiplier = ResolveDisplayMultiplier(context, ratio);
+            if (multiplier == 1.0 || string.Equals(vector.Unit, "count", StringComparison.OrdinalIgnoreCase))
+                return vector;
+
+            return new PhasorVector
+            {
+                Channel = vector.Channel,
+                Kind = vector.Kind,
+                Unit = vector.Unit,
+                Rms = vector.Rms * multiplier,
+                Peak = vector.Peak * multiplier,
+                AngleDegrees = vector.AngleDegrees,
+                IsValid = vector.IsValid,
+                InvalidReason = vector.InvalidReason
+            };
+        }).ToArray();
+    }
+
+    private static double ResolveDisplayMultiplier(
+        SvStreamMeasurementContext context,
+        SvMeasurementRatio? ratio)
+    {
+        if (context.WireDomain == context.DisplayDomain || ratio?.IsValid != true)
+            return 1.0;
+        return context.WireDomain switch
+        {
+            SvMeasurementValueDomain.PrimaryEngineering when context.DisplayDomain == SvMeasurementValueDomain.SecondaryEquivalent
+                => ratio.SecondaryNominal / ratio.PrimaryNominal,
+            SvMeasurementValueDomain.SecondaryEquivalent when context.DisplayDomain == SvMeasurementValueDomain.PrimaryEngineering
+                => ratio.PrimaryNominal / ratio.SecondaryNominal,
+            _ => 1.0
+        };
+    }
+
+    private static double? Scale(double? value, double multiplier, string unit)
+        => value.HasValue && !string.Equals(unit, "count", StringComparison.OrdinalIgnoreCase)
+            ? value.Value * multiplier
+            : value;
 
     private static string BuildSampleRateText(SvStreamSnapshot snapshot)
     {
@@ -275,15 +404,22 @@ public sealed class SvStreamViewModel : ObservableObject
     private static IReadOnlyList<string> BuildEvidenceDetails(
         SvStreamSnapshot snapshot,
         SvStreamObservationSnapshot? observation,
-        IReadOnlyList<SvQualityState> qualityStates)
+        IReadOnlyList<SvQualityState> qualityStates,
+        SvStreamMeasurementContext? measurementContext)
     {
         var lines = new List<string>
         {
             $"MEASUREMENT · scaling {snapshot.ScalingSummary} · {snapshot.ScalingReason}",
+            measurementContext is null
+                ? "MEASUREMENT CONTEXT · none · wire engineering values are shown without CT/VT conversion"
+                : $"MEASUREMENT CONTEXT · {measurementContext.Summary} · updated {measurementContext.UpdatedAt:O}",
             $"TIMEBASE · {BuildTimebaseText(snapshot)} · {snapshot.TimebaseReason}",
             $"HEALTH · current {snapshot.Health} · session totals gap {snapshot.SequenceGapCount}, duplicate {snapshot.DuplicateCount}, out-of-order {snapshot.OutOfOrderCount}, payload {snapshot.PayloadIssueCount}.",
             $"QUALITY · {BuildQualitySummary(qualityStates, snapshot.QualitySummary)}"
         };
+
+        if (!string.IsNullOrWhiteSpace(measurementContext?.Notes))
+            lines.Add($"MEASUREMENT CONTEXT NOTE · {measurementContext.Notes}");
 
         lines.AddRange(snapshot.Values
             .Where(value => value.IsQuality && value.QualityState is not null)
