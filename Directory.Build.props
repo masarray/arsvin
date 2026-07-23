@@ -17,5 +17,13 @@
     <Authors>Ari Sulistiono</Authors>
     <Company>Ari Sulistiono</Company>
     <Copyright>Copyright © 2026 Ari Sulistiono</Copyright>
+
+    <!--
+      ARSVIN and ArSubsv are derived applications. Reusable IEC 61850 logic is owned by
+      the sibling ARIEC61850 repository rather than an embedded copy in this repository.
+    -->
+    <ARIEC61850_ROOT Condition="'$(ARIEC61850_ROOT)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\ARIEC61850'))</ARIEC61850_ROOT>
+    <ARIEC61850_CORE_PROJECT>$(ARIEC61850_ROOT)\src\AR.Iec61850\AR.Iec61850.csproj</ARIEC61850_CORE_PROJECT>
+    <ARIEC61850_NPCAP_PROJECT>$(ARIEC61850_ROOT)\src\AR.Iec61850.Transports.Npcap\AR.Iec61850.Transports.Npcap.csproj</ARIEC61850_NPCAP_PROJECT>
   </PropertyGroup>
 </Project>
