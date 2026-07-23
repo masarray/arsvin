@@ -98,7 +98,12 @@ jobs:
         run: .\scripts\validate-public-site.ps1 -SiteRoot artifacts/public-site
 
       - name: Restore dependency graph
-        run: dotnet restore ARSVIN.sln
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/build-logs -Force | Out-Null
+          dotnet restore ARSVIN.sln 2>&1 |
+            Tee-Object -FilePath artifacts/build-logs/restore.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Upload NuGet lock and paired engine revision evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
@@ -114,7 +119,6 @@ jobs:
       - name: Build Publisher with warnings as errors
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path artifacts/build-logs -Force | Out-Null
           dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore -warnaserror 2>&1 |
             Tee-Object -FilePath artifacts/build-logs/publisher-build.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -122,12 +126,11 @@ jobs:
       - name: Build Subscriber with warnings as errors
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path artifacts/build-logs -Force | Out-Null
           dotnet build src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj -c Release --no-restore -warnaserror 2>&1 |
             Tee-Object -FilePath artifacts/build-logs/subscriber-build.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Upload paired build diagnostics
+      - name: Upload paired restore and build diagnostics
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
