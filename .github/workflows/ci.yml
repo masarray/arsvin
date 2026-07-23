@@ -15,7 +15,7 @@ env:
 
 jobs:
   public-content:
-    name: Validate licensing, provenance, and public wording
+    name: Validate licensing, provenance, wording, and engine ownership
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -29,17 +29,24 @@ jobs:
         continue-on-error: true
         run: python3 scripts/validate-public-neutrality.py
 
-      - name: Upload terminology validation evidence
+      - name: Validate ARIEC61850 engine ownership boundary
+        id: ownership
+        continue-on-error: true
+        run: python3 scripts/validate-engine-ownership.py
+
+      - name: Upload public and ownership validation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: arsvin-public-neutrality-report
-          path: artifacts/public-neutrality-report.txt
+          name: arsvin-public-and-engine-ownership-reports
+          path: |
+            artifacts/public-neutrality-report.txt
+            artifacts/engine-ownership-report.txt
           if-no-files-found: error
           retention-days: 14
 
-      - name: Enforce terminology validation result
-        if: steps.neutrality.outcome == 'failure'
+      - name: Enforce public and ownership validation results
+        if: steps.neutrality.outcome == 'failure' || steps.ownership.outcome == 'failure'
         run: exit 1
 
   build-test:
@@ -80,6 +87,9 @@ jobs:
       - name: Verify current licensing and public wording
         run: python scripts/verify-current-license.py
 
+      - name: Validate engine ownership boundary
+        run: python scripts/validate-engine-ownership.py
+
       - name: Build public site and HTML documentation
         run: python scripts/build-public-site.py --output artifacts/public-site
 
@@ -90,7 +100,7 @@ jobs:
       - name: Restore dependency graph
         run: dotnet restore ARSVIN.sln
 
-      - name: Upload committed NuGet lock and engine revision evidence
+      - name: Upload NuGet lock and paired engine revision evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: arsvin-dependency-evidence
