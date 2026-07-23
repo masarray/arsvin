@@ -33,13 +33,13 @@ if ($NoRestore) {
     $arguments += '--no-restore'
 }
 
-# Instrument the complete production engine. CI protects both the truthful
-# whole-engine baseline and the higher protocol-core regression baseline.
+# ARSVIN tests now execute against the sibling ARIEC61850 source of truth.
+# Instrument the reusable core assembly rather than the retired embedded ARSVIN.Engine copy.
 $arguments += @(
     '/p:RestoreLockedMode=true',
     '/p:TreatWarningsAsErrors=true',
     '/p:CollectCoverage=true',
-    '/p:Include=[ARSVIN.Engine]*',
+    '/p:Include=[AR.Iec61850]*',
     '/p:ExcludeAssembliesWithoutSources=None',
     '/p:CoverletOutputFormat=cobertura',
     "/p:CoverletOutput=$coveragePrefix",
@@ -130,9 +130,9 @@ if ($coreLinesValid -le 0) {
 
 $coreLineCoverage = [Math]::Round(($coreLinesCovered / $coreLinesValid) * 100, 2)
 
-Write-Host "Whole engine lines: $overallLinesValid"
-Write-Host "Whole engine line coverage: $overallLineCoverage%"
-Write-Host "Whole engine minimum required: $MinimumWholeEngineLineCoverage%"
+Write-Host "ARIEC61850 core lines: $overallLinesValid"
+Write-Host "ARIEC61850 core line coverage: $overallLineCoverage%"
+Write-Host "Whole-core minimum required: $MinimumWholeEngineLineCoverage%"
 Write-Host "Protocol core files: $($coreFiles.Count)"
 Write-Host "Protocol core lines: $coreLinesValid"
 Write-Host "Protocol core covered lines: $coreLinesCovered"
@@ -142,13 +142,13 @@ Write-Host "Coverage report: $coverageFile"
 
 if ($env:GITHUB_STEP_SUMMARY) {
     @"
-## Test coverage
+## Test coverage against sibling ARIEC61850
 
 | Metric | Result |
 |---|---:|
-| Whole `ARSVIN.Engine` instrumented lines | **$overallLinesValid** |
-| Whole engine line coverage | **$overallLineCoverage%** |
-| Whole-engine regression floor | **$MinimumWholeEngineLineCoverage%** |
+| Whole `AR.Iec61850` instrumented lines | **$overallLinesValid** |
+| Whole core line coverage | **$overallLineCoverage%** |
+| Whole-core regression floor | **$MinimumWholeEngineLineCoverage%** |
 | Tested protocol-core files | **$($coreFiles.Count)** |
 | Protocol-core instrumented lines | **$coreLinesValid** |
 | Protocol-core covered lines | **$coreLinesCovered** |
@@ -160,7 +160,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
 
 $coverageFailures = [System.Collections.Generic.List[string]]::new()
 if ($overallLineCoverage -lt $MinimumWholeEngineLineCoverage) {
-    $coverageFailures.Add("Whole-engine line coverage $overallLineCoverage% is below the required $MinimumWholeEngineLineCoverage%.")
+    $coverageFailures.Add("Whole-core line coverage $overallLineCoverage% is below the required $MinimumWholeEngineLineCoverage%.")
 }
 if ($coreLineCoverage -lt $MinimumLineCoverage) {
     $coverageFailures.Add("Protocol-core line coverage $coreLineCoverage% is below the required $MinimumLineCoverage%.")
