@@ -2,12 +2,14 @@
 """Validate that ARSVIN applications consume ARIEC61850 instead of an embedded engine.
 
 The legacy src/ARSVIN.Engine directory may remain temporarily during migration, but it must
-not be referenced by active projects or the solution. Reusable AR.Iec61850 namespaces must
-not be reintroduced in application source folders.
+not be referenced by active projects or the solution. Reusable protocol namespaces must not
+be reintroduced in application source folders. Application-specific namespaces such as
+AR.Iec61850.SvPublisher remain presentation ownership and are allowed.
 """
 
 from __future__ import annotations
 
+import re
 import sys
 from pathlib import Path
 
@@ -20,6 +22,19 @@ ACTIVE_PROJECTS = (
 )
 SOLUTION = ROOT / "ARSVIN.sln"
 LEGACY_ENGINE = ROOT / "src" / "ARSVIN.Engine"
+ENGINE_NAMESPACE_PREFIXES = (
+    "AR.Iec61850.Asn1",
+    "AR.Iec61850.Capture",
+    "AR.Iec61850.Diagnostics",
+    "AR.Iec61850.Ethernet",
+    "AR.Iec61850.Goose",
+    "AR.Iec61850.Mms",
+    "AR.Iec61850.Reporting",
+    "AR.Iec61850.SampledValues",
+    "AR.Iec61850.Scl",
+    "AR.Iec61850.Transports",
+)
+NAMESPACE_PATTERN = re.compile(r"^\s*namespace\s+([A-Za-z_][A-Za-z0-9_.]*)", re.MULTILINE)
 
 
 def read(path: Path) -> str:
@@ -49,10 +64,12 @@ def main() -> int:
     for application_root in application_roots:
         for source in application_root.rglob("*.cs"):
             text = source.read_text(encoding="utf-8-sig", errors="replace")
-            if "namespace AR.Iec61850" in text:
-                errors.append(
-                    f"{source.relative_to(ROOT)}: reusable AR.Iec61850 namespace belongs in the sibling engine repository"
-                )
+            for match in NAMESPACE_PATTERN.finditer(text):
+                namespace = match.group(1)
+                if namespace.startswith(ENGINE_NAMESPACE_PREFIXES):
+                    errors.append(
+                        f"{source.relative_to(ROOT)}: reusable namespace {namespace} belongs in the sibling engine repository"
+                    )
 
     legacy_count = 0
     if LEGACY_ENGINE.is_dir():
