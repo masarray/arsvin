@@ -17,6 +17,7 @@ The paired engine branch now owns the reusable contracts required by both applic
 - explicit CT/VT and measurement-domain context;
 - Sampled Values publisher evidence report contracts;
 - local transmitter timing-health evidence;
+- multi-ASDU Publisher profile/session behavior with bounded counter wrap;
 - unified live/PCAP observation windows and stable logical stream keys;
 - vendor-neutral profile evidence, confidence, and SCL-versus-wire comparison;
 - Subscriber JSON/Markdown evidence and regression-comparison contracts.
@@ -67,7 +68,7 @@ dotnet build .\src\ARSVIN.Subscriber\ARSVIN.Subscriber.csproj `
 
 1. Build and test `ARIEC61850` first.
 2. Build ARSVIN Publisher and ArSubsv against that exact checkout.
-3. Run Publisher dry-run and PCAP generation.
+3. Run Publisher dry-run and PCAP generation, including `nofASDU=1` and one multi-ASDU case.
 4. Open the generated PCAP in ArSubsv without SCL; verify generic raw words and unresolved semantics.
 5. Import the matching SCL; verify ordered dataset mapping, evidence-backed scaling, waveform, RMS, and phasor behavior.
 6. Export two Subscriber evidence reports and verify the shared comparator identifies source failover, health regression, and continuity changes.
