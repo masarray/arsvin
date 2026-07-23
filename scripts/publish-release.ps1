@@ -18,6 +18,13 @@ $solution = Join-Path $root 'ARSVIN.sln'
 $publisherProject = Join-Path $root 'src\ARSVIN\ARSVIN.csproj'
 $subscriberProject = Join-Path $root 'src\ARSVIN.Subscriber\ARSVIN.Subscriber.csproj'
 $testProject = Join-Path $root 'tests\ARSVIN.Tests\ARSVIN.Tests.csproj'
+$engineRoot = if ($env:ARIEC61850_ROOT) {
+    [System.IO.Path]::GetFullPath($env:ARIEC61850_ROOT)
+}
+else {
+    [System.IO.Path]::GetFullPath((Join-Path $root '..\ARIEC61850'))
+}
+$engineProject = Join-Path $engineRoot 'src\AR.Iec61850\AR.Iec61850.csproj'
 
 $normalizedVersion = ($Version.Trim() -replace '^[vV]', '')
 if ($normalizedVersion -notmatch '^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$') {
@@ -34,6 +41,19 @@ function Invoke-DotNet {
     if ($LASTEXITCODE -ne 0) {
         throw "dotnet $($Arguments -join ' ') failed with exit code $LASTEXITCODE."
     }
+}
+
+function Invoke-GitText {
+    param(
+        [Parameter(Mandatory)][string] $Repository,
+        [Parameter(Mandatory)][string[]] $Arguments
+    )
+
+    $output = & git -C $Repository @Arguments 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "git -C $Repository $($Arguments -join ' ') failed.`n$($output -join [Environment]::NewLine)"
+    }
+    return ($output -join '').Trim()
 }
 
 function Reset-Directory {
@@ -86,7 +106,8 @@ function Copy-ReleaseDocumentation {
         'known-limitations.md',
         'safety-boundaries.md',
         'subscriber-verification-app.md',
-        'arsubsv-sv-scout-companion.md'
+        'arsubsv-sv-scout-companion.md',
+        'engine-integration.md'
     )
 
     foreach ($document in $documents) {
@@ -112,20 +133,32 @@ function Copy-ReleaseDocumentation {
     }
 }
 
+if (-not (Test-Path $engineProject -PathType Leaf)) {
+    throw "ARIEC61850 sibling project was not found at $engineProject. Run build.ps1 first or clone the paired engine repository beside ARSVIN."
+}
+
+$sourceCommit = Invoke-GitText -Repository $root -Arguments @('rev-parse', 'HEAD')
+$engineCommit = Invoke-GitText -Repository $engineRoot -Arguments @('rev-parse', 'HEAD')
+$engineRef = if ($env:ARIEC61850_REF) { $env:ARIEC61850_REF } else { 'local-checkout' }
+
+Write-Host "==> ARSVIN source commit: $sourceCommit"
+Write-Host "==> ARIEC61850 ref: $engineRef"
+Write-Host "==> ARIEC61850 commit: $engineCommit"
+
 Reset-Directory $releaseRoot
 Reset-Directory $tempRoot
 Reset-Directory $portableRoot
 Reset-Directory $installerInput
 
 if (-not $SkipTests) {
-    Write-Host '==> Restoring locked solution graph and testing'
-    Invoke-DotNet -Arguments @('restore', $solution, '--locked-mode')
+    Write-Host '==> Restoring paired application/engine graph and testing'
+    Invoke-DotNet -Arguments @('restore', $solution)
     Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '--no-restore', '/p:TreatWarningsAsErrors=true')
 }
 
-Write-Host "==> Restoring locked publish graph for $Runtime"
-Invoke-DotNet -Arguments @('restore', $publisherProject, '-r', $Runtime, '--locked-mode')
-Invoke-DotNet -Arguments @('restore', $subscriberProject, '-r', $Runtime, '--locked-mode')
+Write-Host "==> Restoring paired publish graph for $Runtime"
+Invoke-DotNet -Arguments @('restore', $publisherProject, '-r', $Runtime)
+Invoke-DotNet -Arguments @('restore', $subscriberProject, '-r', $Runtime)
 
 $commonPublishArguments = @(
     '-c', 'Release',
@@ -175,11 +208,15 @@ Version: $normalizedVersion
 Runtime: $Runtime
 Publisher: ARSVIN.exe
 Subscriber: ArSubsv.exe
+ARSVIN source commit: $sourceCommit
+ARIEC61850 ref: $engineRef
+ARIEC61850 source commit: $engineCommit
 Community license: GPL-3.0-or-later
 Commercial rights: separate negotiated agreement only
 "@
 Set-Content -Path (Join-Path $portableRoot 'VERSION.txt') -Value $versionFile -Encoding utf8
 Set-Content -Path (Join-Path $installerInput 'VERSION.txt') -Value $versionFile -Encoding utf8
+Set-Content -Path (Join-Path $releaseRoot 'ENGINE-REVISION.txt') -Value $versionFile -Encoding utf8
 
 $portableZip = Join-Path $releaseRoot 'ARSVIN-win-x64-portable.zip'
 Compress-Archive -Path (Join-Path $portableRoot '*') -DestinationPath $portableZip -CompressionLevel Optimal -Force
