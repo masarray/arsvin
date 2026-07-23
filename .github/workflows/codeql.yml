@@ -19,11 +19,16 @@ jobs:
   analyze:
     name: Analyze C# solution
     runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: arsvin
     env:
       ARIEC61850_ROOT: ${{ github.workspace }}\ARIEC61850
     steps:
-      - name: Checkout ARSVIN
+      - name: Checkout ARSVIN into paired workspace
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          path: arsvin
 
       - name: Checkout sibling ARIEC61850
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -38,9 +43,9 @@ jobs:
           dotnet-version: 8.0.4xx
           cache: true
           cache-dependency-path: |
-            Directory.Packages.props
-            src/**/packages.lock.json
-            tests/**/packages.lock.json
+            arsvin/Directory.Packages.props
+            arsvin/src/**/packages.lock.json
+            arsvin/tests/**/packages.lock.json
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
@@ -48,10 +53,10 @@ jobs:
           languages: csharp
           build-mode: manual
 
-      - name: Restore solution dependency graph
+      - name: Restore paired solution dependency graph
         run: dotnet restore ARSVIN.sln
 
-      - name: Build solution with warnings as errors
+      - name: Build paired solution with warnings as errors
         run: dotnet build ARSVIN.sln -c Release --no-restore -warnaserror
 
       - name: Perform CodeQL Analysis
