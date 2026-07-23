@@ -12,13 +12,25 @@ permissions:
   security-events: write
   contents: read
 
+env:
+  ARIEC61850_REF: agent/sv-core-unification
+
 jobs:
   analyze:
     name: Analyze C# solution
     runs-on: windows-2025
+    env:
+      ARIEC61850_ROOT: ${{ github.workspace }}\ARIEC61850
     steps:
-      - name: Checkout
+      - name: Checkout ARSVIN
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Checkout sibling ARIEC61850
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: masarray/ARIEC61850
+          ref: ${{ env.ARIEC61850_REF }}
+          path: ARIEC61850
 
       - name: Setup .NET
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
@@ -36,8 +48,8 @@ jobs:
           languages: csharp
           build-mode: manual
 
-      - name: Restore locked solution dependency graph
-        run: dotnet restore ARSVIN.sln --locked-mode
+      - name: Restore solution dependency graph
+        run: dotnet restore ARSVIN.sln
 
       - name: Build solution with warnings as errors
         run: dotnet build ARSVIN.sln -c Release --no-restore -warnaserror
