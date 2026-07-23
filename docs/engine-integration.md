@@ -6,6 +6,20 @@ ARSVIN Publisher and ArSubsv Subscriber are derived applications. Reusable IEC 6
 
 The application repository owns WPF presentation, commands, workflow orchestration, application settings, branding, and packaging. The inactive `src/ARSVIN.Engine` directory is temporary migration material and is not an active project reference.
 
+## Migrated reusable contracts
+
+The paired engine branch now owns the reusable contracts required by both applications:
+
+- generic ASDU and raw `seqOfData` inspection;
+- evidence-gated engineering scaling;
+- timebase and `smpCnt` continuity analysis;
+- semantic quality decoding and publisher quality encoding;
+- explicit CT/VT and measurement-domain context;
+- Sampled Values publisher evidence report contracts;
+- local transmitter timing-health evidence.
+
+These contracts are implemented and tested in ARIEC61850. Application code consumes them; it must not maintain a second behavioral copy.
+
 ## Paired local layout
 
 ```text
