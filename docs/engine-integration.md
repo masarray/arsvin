@@ -16,7 +16,10 @@ The paired engine branch now owns the reusable contracts required by both applic
 - semantic quality decoding and publisher quality encoding;
 - explicit CT/VT and measurement-domain context;
 - Sampled Values publisher evidence report contracts;
-- local transmitter timing-health evidence.
+- local transmitter timing-health evidence;
+- unified live/PCAP observation windows and stable logical stream keys;
+- vendor-neutral profile evidence, confidence, and SCL-versus-wire comparison;
+- Subscriber JSON/Markdown evidence and regression-comparison contracts.
 
 These contracts are implemented and tested in ARIEC61850. Application code consumes them; it must not maintain a second behavioral copy.
 
@@ -67,8 +70,9 @@ dotnet build .\src\ARSVIN.Subscriber\ARSVIN.Subscriber.csproj `
 3. Run Publisher dry-run and PCAP generation.
 4. Open the generated PCAP in ArSubsv without SCL; verify generic raw words and unresolved semantics.
 5. Import the matching SCL; verify ordered dataset mapping, evidence-backed scaling, waveform, RMS, and phasor behavior.
-6. Run authorized isolated live capture/transmit tests only after offline tests pass.
-7. Record both Git commit SHAs in every test note.
+6. Export two Subscriber evidence reports and verify the shared comparator identifies source failover, health regression, and continuity changes.
+7. Run authorized isolated live capture/transmit tests only after offline tests pass.
+8. Record both Git commit SHAs in every test note.
 
 Commands:
 
