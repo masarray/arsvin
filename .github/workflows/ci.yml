@@ -10,6 +10,9 @@ on:
 permissions:
   contents: read
 
+env:
+  ARIEC61850_REF: agent/sv-core-unification
+
 jobs:
   public-content:
     name: Validate licensing, provenance, and public wording
@@ -43,9 +46,26 @@ jobs:
     name: Build, test, and validate site
     needs: public-content
     runs-on: windows-2025
+    env:
+      ARIEC61850_ROOT: ${{ github.workspace }}\ARIEC61850
     steps:
-      - name: Checkout
+      - name: Checkout ARSVIN
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Checkout sibling ARIEC61850
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: masarray/ARIEC61850
+          ref: ${{ env.ARIEC61850_REF }}
+          path: ARIEC61850
+
+      - name: Record paired engine revision
+        shell: pwsh
+        run: |
+          $engineSha = git -C "$env:ARIEC61850_ROOT" rev-parse HEAD
+          "ARIEC61850_REF=$env:ARIEC61850_REF" | Out-File artifacts-engine-revision.txt -Encoding utf8
+          "ARIEC61850_SHA=$engineSha" | Add-Content artifacts-engine-revision.txt
+          Get-Content artifacts-engine-revision.txt
 
       - name: Setup .NET
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
@@ -67,16 +87,17 @@ jobs:
         shell: pwsh
         run: .\scripts\validate-public-site.ps1 -SiteRoot artifacts/public-site
 
-      - name: Restore locked NuGet dependency graph
-        run: dotnet restore ARSVIN.sln --locked-mode
+      - name: Restore dependency graph
+        run: dotnet restore ARSVIN.sln
 
-      - name: Upload committed NuGet lock evidence
+      - name: Upload committed NuGet lock and engine revision evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: arsvin-nuget-lockfiles
+          name: arsvin-dependency-evidence
           path: |
             src/**/packages.lock.json
             tests/**/packages.lock.json
+            artifacts-engine-revision.txt
           if-no-files-found: error
           retention-days: 7
 
@@ -86,7 +107,7 @@ jobs:
       - name: Build Subscriber with warnings as errors
         run: dotnet build src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj -c Release --no-restore -warnaserror
 
-      - name: Test with whole-engine and protocol-core coverage gates
+      - name: Test against sibling ARIEC61850 with coverage gates
         shell: pwsh
         run: .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 14.25 -MinimumLineCoverage 72.5 -NoRestore
 
