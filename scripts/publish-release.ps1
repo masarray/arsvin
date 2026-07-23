@@ -216,7 +216,6 @@ Commercial rights: separate negotiated agreement only
 "@
 Set-Content -Path (Join-Path $portableRoot 'VERSION.txt') -Value $versionFile -Encoding utf8
 Set-Content -Path (Join-Path $installerInput 'VERSION.txt') -Value $versionFile -Encoding utf8
-Set-Content -Path (Join-Path $releaseRoot 'ENGINE-REVISION.txt') -Value $versionFile -Encoding utf8
 
 $portableZip = Join-Path $releaseRoot 'ARSVIN-win-x64-portable.zip'
 Compress-Archive -Path (Join-Path $portableRoot '*') -DestinationPath $portableZip -CompressionLevel Optimal -Force
