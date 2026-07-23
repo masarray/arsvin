@@ -60,7 +60,12 @@ if ($env:GITHUB_ENV) {
     "ARIEC61850_REF=$EngineRef" | Add-Content $env:GITHUB_ENV
 }
 
-$engineSha = Invoke-Expression "git -C `"$engineRoot`" rev-parse HEAD"
+$engineShaOutput = & git -C $engineRoot rev-parse HEAD 2>&1
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not resolve the paired ARIEC61850 commit.`n$($engineShaOutput -join [Environment]::NewLine)"
+}
+$engineSha = ($engineShaOutput -join '').Trim()
+
 Write-Host "==> ARIEC61850 root: $engineRoot"
 Write-Host "==> ARIEC61850 ref: $EngineRef"
 Write-Host "==> ARIEC61850 commit: $engineSha"
@@ -75,6 +80,12 @@ Write-Host '==> Validating neutral public terminology'
 & python (Join-Path $root 'scripts\validate-public-neutrality.py')
 if ($LASTEXITCODE -ne 0) {
     throw 'Public terminology neutrality validation failed.'
+}
+
+Write-Host '==> Validating ARIEC61850 engine ownership boundary'
+& python (Join-Path $root 'scripts\validate-engine-ownership.py')
+if ($LASTEXITCODE -ne 0) {
+    throw 'Engine ownership validation failed.'
 }
 
 Write-Host '==> Restoring application and sibling-engine dependency graph'
