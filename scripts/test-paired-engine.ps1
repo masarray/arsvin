@@ -52,7 +52,11 @@ if ($LASTEXITCODE -ne 0) {
 
 if (-not $SkipCoverage) {
     Write-Host '==> Running ARSVIN integration coverage gates against pinned engine'
-    & (Join-Path $root 'scripts\test-with-coverage.ps1') -MinimumWholeEngineLineCoverage 14.25 -MinimumLineCoverage 72.5 -NoRestore
+    & (Join-Path $root 'scripts\test-with-coverage.ps1') `
+        -MinimumWholeEngineCoveredLines 3000 `
+        -MinimumProtocolCoreCoveredLines 2300 `
+        -MinimumLineCoverage 72.5 `
+        -NoRestore
     if ($LASTEXITCODE -ne 0) {
         throw "Paired coverage validation failed with exit code $LASTEXITCODE."
     }

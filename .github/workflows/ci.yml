@@ -156,9 +156,14 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Test against pinned ARIEC61850 with coverage gates
+      - name: Test against pinned ARIEC61850 with integration coverage gates
         shell: pwsh
-        run: .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 14.25 -MinimumLineCoverage 72.5 -NoRestore
+        run: |
+          .\scripts\test-with-coverage.ps1 `
+            -MinimumWholeEngineCoveredLines 3000 `
+            -MinimumProtocolCoreCoveredLines 2300 `
+            -MinimumLineCoverage 72.5 `
+            -NoRestore
 
       - name: Upload test and coverage evidence
         if: always()
