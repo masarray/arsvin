@@ -10,9 +10,6 @@ on:
 permissions:
   contents: read
 
-env:
-  ARIEC61850_REF: agent/sv-core-unification
-
 jobs:
   public-content:
     name: Validate licensing, provenance, wording, and engine ownership
@@ -50,7 +47,7 @@ jobs:
         run: exit 1
 
   build-test:
-    name: Build, test, and validate site
+    name: Build, test, and validate pinned engine integration
     needs: public-content
     runs-on: windows-2025
     defaults:
@@ -64,19 +61,33 @@ jobs:
         with:
           path: arsvin
 
-      - name: Checkout sibling ARIEC61850
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
-        with:
-          repository: masarray/ARIEC61850
-          ref: ${{ env.ARIEC61850_REF }}
-          path: ARIEC61850
-
-      - name: Record paired engine revision
+      - name: Resolve pinned ARIEC61850 revision
+        id: engine_pin
         shell: pwsh
         run: |
-          $engineSha = git -C "$env:ARIEC61850_ROOT" rev-parse HEAD
-          "ARIEC61850_REF=$env:ARIEC61850_REF" | Out-File artifacts-engine-revision.txt -Encoding utf8
-          "ARIEC61850_SHA=$engineSha" | Add-Content artifacts-engine-revision.txt
+          $pin = .\scripts\resolve-engine-pin.ps1 -AsObject
+          "repository=$($pin.Repository)" | Add-Content $env:GITHUB_OUTPUT
+          "ref=$($pin.Ref)" | Add-Content $env:GITHUB_OUTPUT
+          "commit=$($pin.Commit)" | Add-Content $env:GITHUB_OUTPUT
+
+      - name: Checkout pinned sibling ARIEC61850
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: ${{ steps.engine_pin.outputs.repository }}
+          ref: ${{ steps.engine_pin.outputs.commit }}
+          path: ARIEC61850
+
+      - name: Record and verify paired engine revision
+        shell: pwsh
+        run: |
+          $engineSha = (git -C "$env:ARIEC61850_ROOT" rev-parse HEAD).Trim().ToLowerInvariant()
+          $expected = '${{ steps.engine_pin.outputs.commit }}'.ToLowerInvariant()
+          if ($engineSha -ne $expected) {
+            throw "Pinned engine mismatch. Expected $expected, found $engineSha."
+          }
+          "ARIEC61850_REF=${{ steps.engine_pin.outputs.ref }}" | Out-File artifacts-engine-revision.txt -Encoding utf8
+          "ARIEC61850_EXPECTED_SHA=$expected" | Add-Content artifacts-engine-revision.txt
+          "ARIEC61850_ACTUAL_SHA=$engineSha" | Add-Content artifacts-engine-revision.txt
           Get-Content artifacts-engine-revision.txt
 
       - name: Setup .NET
@@ -115,6 +126,7 @@ jobs:
         with:
           name: arsvin-dependency-evidence
           path: |
+            arsvin/engines/ARIEC61850.lock.json
             arsvin/src/**/packages.lock.json
             arsvin/tests/**/packages.lock.json
             arsvin/artifacts-engine-revision.txt
@@ -144,7 +156,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
-      - name: Test against sibling ARIEC61850 with coverage gates
+      - name: Test against pinned ARIEC61850 with coverage gates
         shell: pwsh
         run: .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 14.25 -MinimumLineCoverage 72.5 -NoRestore
 

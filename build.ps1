@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [string] $EngineRef = $(if ($env:ARIEC61850_REF) { $env:ARIEC61850_REF } else { 'agent/sv-core-unification' })
+    [string] $EngineCommit = $(if ($env:ARIEC61850_COMMIT) { $env:ARIEC61850_COMMIT } else { '' }),
+    [string] $EngineRef = $(if ($env:ARIEC61850_REF) { $env:ARIEC61850_REF } else { '' }),
+    [switch] $AllowEngineDrift
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,6 +13,14 @@ $solution = Join-Path $root 'ARSVIN.sln'
 $appProject = Join-Path $root 'src\ARSVIN\ARSVIN.csproj'
 $subscriberProject = Join-Path $root 'src\ARSVIN.Subscriber\ARSVIN.Subscriber.csproj'
 $testProject = Join-Path $root 'tests\ARSVIN.Tests\ARSVIN.Tests.csproj'
+$pin = & (Join-Path $root 'scripts\resolve-engine-pin.ps1') -RepositoryRoot $root -AsObject
+$resolvedEngineCommit = if ([string]::IsNullOrWhiteSpace($EngineCommit)) { $pin.Commit } else { $EngineCommit.Trim().ToLowerInvariant() }
+$resolvedEngineRef = if ([string]::IsNullOrWhiteSpace($EngineRef)) { $pin.Ref } else { $EngineRef.Trim() }
+
+if ($resolvedEngineCommit -notmatch '^[0-9a-f]{40}$') {
+    throw "ARIEC61850 commit '$resolvedEngineCommit' is not a full 40-character SHA."
+}
+
 $engineRoot = if ($env:ARIEC61850_ROOT) {
     [System.IO.Path]::GetFullPath($env:ARIEC61850_ROOT)
 }
@@ -38,37 +48,60 @@ function Invoke-DotNet {
 
 if (-not (Test-Path $engineProject -PathType Leaf)) {
     if ($env:CI -ne 'true') {
-        throw "ARIEC61850 sibling repository was not found at $engineRoot. Clone https://github.com/masarray/ARIEC61850 beside this repository or set ARIEC61850_ROOT."
+        throw "ARIEC61850 sibling repository was not found at $engineRoot. Clone https://github.com/$($pin.Repository) beside this repository, checkout $resolvedEngineCommit, or set ARIEC61850_ROOT."
     }
 
-    Write-Host "==> CI bootstrap: cloning ARIEC61850 ref $EngineRef into $engineRoot"
+    Write-Host "==> CI bootstrap: fetching pinned ARIEC61850 commit $resolvedEngineCommit into $engineRoot"
     $engineParent = Split-Path -Parent $engineRoot
     New-Item -ItemType Directory -Path $engineParent -Force | Out-Null
     if (Test-Path $engineRoot) {
         Remove-Item $engineRoot -Recurse -Force
     }
-    Invoke-Checked -FilePath 'git' -Arguments @(
-        'clone', '--depth', '1', '--branch', $EngineRef,
-        'https://github.com/masarray/ARIEC61850.git', $engineRoot
-    )
-}
-
-$env:ARIEC61850_ROOT = $engineRoot
-$env:ARIEC61850_REF = $EngineRef
-if ($env:GITHUB_ENV) {
-    "ARIEC61850_ROOT=$engineRoot" | Add-Content $env:GITHUB_ENV
-    "ARIEC61850_REF=$EngineRef" | Add-Content $env:GITHUB_ENV
+    New-Item -ItemType Directory -Path $engineRoot -Force | Out-Null
+    Invoke-Checked -FilePath 'git' -Arguments @('-C', $engineRoot, 'init')
+    Invoke-Checked -FilePath 'git' -Arguments @('-C', $engineRoot, 'remote', 'add', 'origin', $pin.RepositoryUrl)
+    Invoke-Checked -FilePath 'git' -Arguments @('-C', $engineRoot, 'fetch', '--depth', '1', 'origin', $resolvedEngineCommit)
+    Invoke-Checked -FilePath 'git' -Arguments @('-C', $engineRoot, 'checkout', '--detach', 'FETCH_HEAD')
 }
 
 $engineShaOutput = & git -C $engineRoot rev-parse HEAD 2>&1
 if ($LASTEXITCODE -ne 0) {
     throw "Could not resolve the paired ARIEC61850 commit.`n$($engineShaOutput -join [Environment]::NewLine)"
 }
-$engineSha = ($engineShaOutput -join '').Trim()
+$engineSha = ($engineShaOutput -join '').Trim().ToLowerInvariant()
+
+if (-not $AllowEngineDrift -and $engineSha -ne $resolvedEngineCommit) {
+    throw "ARIEC61850 checkout mismatch. Expected $resolvedEngineCommit but found $engineSha. Run: git -C `"$engineRoot`" fetch origin $resolvedEngineCommit; git -C `"$engineRoot`" checkout --detach $resolvedEngineCommit"
+}
+
+$env:ARIEC61850_ROOT = $engineRoot
+$env:ARIEC61850_REF = $resolvedEngineRef
+$env:ARIEC61850_COMMIT = $engineSha
+if ($env:GITHUB_ENV) {
+    "ARIEC61850_ROOT=$engineRoot" | Add-Content $env:GITHUB_ENV
+    "ARIEC61850_REF=$resolvedEngineRef" | Add-Content $env:GITHUB_ENV
+    "ARIEC61850_COMMIT=$engineSha" | Add-Content $env:GITHUB_ENV
+}
+
+$artifactRoot = Join-Path $root 'artifacts'
+New-Item -ItemType Directory -Path $artifactRoot -Force | Out-Null
+$revisionEvidence = [ordered]@{
+    schemaVersion = 1
+    repository = $pin.Repository
+    configuredRef = $resolvedEngineRef
+    expectedCommit = $resolvedEngineCommit
+    actualCommit = $engineSha
+    exactMatch = ($engineSha -eq $resolvedEngineCommit)
+    engineRoot = $engineRoot
+    applicationCommit = (& git -C $root rev-parse HEAD 2>$null | Select-Object -First 1)
+    generatedAt = [DateTimeOffset]::UtcNow.ToString('O')
+}
+$revisionEvidence | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $artifactRoot 'engine-revision.json') -Encoding utf8
 
 Write-Host "==> ARIEC61850 root: $engineRoot"
-Write-Host "==> ARIEC61850 ref: $EngineRef"
-Write-Host "==> ARIEC61850 commit: $engineSha"
+Write-Host "==> ARIEC61850 ref: $resolvedEngineRef"
+Write-Host "==> ARIEC61850 expected commit: $resolvedEngineCommit"
+Write-Host "==> ARIEC61850 actual commit: $engineSha"
 
 Write-Host '==> Verifying current license, provenance, and public wording'
 & python (Join-Path $root 'scripts\verify-current-license.py')
@@ -88,7 +121,7 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Engine ownership validation failed.'
 }
 
-Write-Host '==> Restoring application and sibling-engine dependency graph'
+Write-Host '==> Restoring application and pinned sibling-engine dependency graph'
 Invoke-DotNet -Arguments @('restore', $solution)
 
 Write-Host '==> Building ARSVIN Publisher'
@@ -97,7 +130,7 @@ Invoke-DotNet -Arguments @('build', $appProject, '-c', 'Release', '--no-restore'
 Write-Host '==> Building ArSubsv Subscriber'
 Invoke-DotNet -Arguments @('build', $subscriberProject, '-c', 'Release', '--no-restore', '-warnaserror')
 
-Write-Host '==> Running integration regression tests against ARIEC61850'
+Write-Host '==> Running integration regression tests against pinned ARIEC61850'
 Invoke-DotNet -Arguments @('test', $testProject, '-c', 'Release', '--no-restore', '/p:TreatWarningsAsErrors=true')
 
-Write-Host '==> Build completed successfully'
+Write-Host '==> Paired build completed successfully'

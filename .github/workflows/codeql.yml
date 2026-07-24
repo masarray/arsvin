@@ -12,12 +12,9 @@ permissions:
   security-events: write
   contents: read
 
-env:
-  ARIEC61850_REF: agent/sv-core-unification
-
 jobs:
   analyze:
-    name: Analyze C# solution
+    name: Analyze pinned paired C# solution
     runs-on: windows-2025
     defaults:
       run:
@@ -30,12 +27,29 @@ jobs:
         with:
           path: arsvin
 
-      - name: Checkout sibling ARIEC61850
+      - name: Resolve pinned ARIEC61850 revision
+        id: engine_pin
+        shell: pwsh
+        run: |
+          $pin = .\scripts\resolve-engine-pin.ps1 -AsObject
+          "repository=$($pin.Repository)" | Add-Content $env:GITHUB_OUTPUT
+          "commit=$($pin.Commit)" | Add-Content $env:GITHUB_OUTPUT
+
+      - name: Checkout pinned sibling ARIEC61850
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
         with:
-          repository: masarray/ARIEC61850
-          ref: ${{ env.ARIEC61850_REF }}
+          repository: ${{ steps.engine_pin.outputs.repository }}
+          ref: ${{ steps.engine_pin.outputs.commit }}
           path: ARIEC61850
+
+      - name: Verify pinned engine commit
+        shell: pwsh
+        run: |
+          $actual = (git -C "$env:ARIEC61850_ROOT" rev-parse HEAD).Trim().ToLowerInvariant()
+          $expected = '${{ steps.engine_pin.outputs.commit }}'.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Pinned engine mismatch. Expected $expected, found $actual."
+          }
 
       - name: Setup .NET
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
@@ -53,10 +67,10 @@ jobs:
           languages: csharp
           build-mode: manual
 
-      - name: Restore paired solution dependency graph
+      - name: Restore pinned paired solution dependency graph
         run: dotnet restore ARSVIN.sln
 
-      - name: Build paired solution with warnings as errors
+      - name: Build pinned paired solution with warnings as errors
         run: dotnet build ARSVIN.sln -c Release --no-restore -warnaserror
 
       - name: Perform CodeQL Analysis
