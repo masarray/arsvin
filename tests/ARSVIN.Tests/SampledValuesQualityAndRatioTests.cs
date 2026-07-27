@@ -19,8 +19,8 @@ public sealed class SampledValuesQualityAndRatioTests
     [Fact]
     public void QualityDecoderRecognizesInvalidFailureAsBad()
     {
-        // Validity bits 10b = Invalid, plus Failure bit 6.
-        var state = SvQualityDecoder.DecodeWord(0x0042);
+        // IEC 61850 validity bits 01b = Invalid, plus Failure bit 6.
+        var state = SvQualityDecoder.DecodeWord(0x0041);
 
         Assert.Equal(SvQualityValidity.Invalid, state.Validity);
         Assert.True(state.Failure);

@@ -3,8 +3,11 @@ param(
     [ValidateRange(0, 100)]
     [double] $MinimumLineCoverage = 72.5,
 
-    [ValidateRange(0, 100)]
-    [double] $MinimumWholeEngineLineCoverage = 14.25,
+    [ValidateRange(1, [int]::MaxValue)]
+    [int] $MinimumWholeEngineCoveredLines = 3000,
+
+    [ValidateRange(1, [int]::MaxValue)]
+    [int] $MinimumProtocolCoreCoveredLines = 2300,
 
     [switch] $NoRestore
 )
@@ -33,13 +36,15 @@ if ($NoRestore) {
     $arguments += '--no-restore'
 }
 
-# Instrument the complete production engine. CI protects both the truthful
-# whole-engine baseline and the higher protocol-core regression baseline.
+# ARSVIN tests execute against the pinned sibling ARIEC61850 source of truth.
+# The engine repository owns its full-suite percentage gate. This integration gate checks:
+#   1. the application-consumed protocol core remains strongly covered; and
+#   2. the absolute amount of exercised production code does not regress when the engine grows.
 $arguments += @(
     '/p:RestoreLockedMode=true',
     '/p:TreatWarningsAsErrors=true',
     '/p:CollectCoverage=true',
-    '/p:Include=[ARSVIN.Engine]*',
+    '/p:Include=[AR.Iec61850]*',
     '/p:ExcludeAssembliesWithoutSources=None',
     '/p:CoverletOutputFormat=cobertura',
     "/p:CoverletOutput=$coveragePrefix",
@@ -64,6 +69,7 @@ if (-not (Test-Path $coverageFile -PathType Leaf)) {
 [xml] $coverage = Get-Content $coverageFile -Raw
 $overallLineRateText = [string] $coverage.coverage.'line-rate'
 $overallLinesValidText = [string] $coverage.coverage.'lines-valid'
+$overallLinesCoveredText = [string] $coverage.coverage.'lines-covered'
 if ([string]::IsNullOrWhiteSpace($overallLineRateText)) {
     throw 'Cobertura report does not contain a root line-rate value.'
 }
@@ -71,6 +77,11 @@ if ([string]::IsNullOrWhiteSpace($overallLineRateText)) {
 $overallLinesValid = 0
 if (-not [int]::TryParse($overallLinesValidText, [ref] $overallLinesValid) -or $overallLinesValid -le 0) {
     throw 'Coverage report contains no instrumented production source lines.'
+}
+
+$overallLinesCovered = 0
+if (-not [int]::TryParse($overallLinesCoveredText, [ref] $overallLinesCovered) -or $overallLinesCovered -le 0) {
+    throw 'Coverage report contains no covered production source lines.'
 }
 
 $overallLineRate = [double]::Parse(
@@ -130,37 +141,46 @@ if ($coreLinesValid -le 0) {
 
 $coreLineCoverage = [Math]::Round(($coreLinesCovered / $coreLinesValid) * 100, 2)
 
-Write-Host "Whole engine lines: $overallLinesValid"
-Write-Host "Whole engine line coverage: $overallLineCoverage%"
-Write-Host "Whole engine minimum required: $MinimumWholeEngineLineCoverage%"
+Write-Host "ARIEC61850 instrumented lines: $overallLinesValid"
+Write-Host "ARIEC61850 covered lines exercised by ARSVIN: $overallLinesCovered"
+Write-Host "Minimum covered production lines: $MinimumWholeEngineCoveredLines"
+Write-Host "Informational whole-engine line coverage: $overallLineCoverage%"
 Write-Host "Protocol core files: $($coreFiles.Count)"
 Write-Host "Protocol core lines: $coreLinesValid"
 Write-Host "Protocol core covered lines: $coreLinesCovered"
+Write-Host "Minimum protocol-core covered lines: $MinimumProtocolCoreCoveredLines"
 Write-Host "Protocol core line coverage: $coreLineCoverage%"
-Write-Host "Protocol core minimum required: $MinimumLineCoverage%"
+Write-Host "Protocol core minimum percentage: $MinimumLineCoverage%"
 Write-Host "Coverage report: $coverageFile"
 
 if ($env:GITHUB_STEP_SUMMARY) {
     @"
-## Test coverage
+## ARSVIN integration coverage against pinned ARIEC61850
+
+The ARIEC61850 repository owns the full-engine percentage gate. This paired gate measures the reusable code actually exercised by ARSVIN Publisher and ArSubsv.
 
 | Metric | Result |
 |---|---:|
-| Whole `ARSVIN.Engine` instrumented lines | **$overallLinesValid** |
-| Whole engine line coverage | **$overallLineCoverage%** |
-| Whole-engine regression floor | **$MinimumWholeEngineLineCoverage%** |
+| Whole `AR.Iec61850` instrumented lines | **$overallLinesValid** |
+| Production lines exercised by ARSVIN | **$overallLinesCovered** |
+| Minimum exercised production lines | **$MinimumWholeEngineCoveredLines** |
+| Informational whole-engine line coverage | **$overallLineCoverage%** |
 | Tested protocol-core files | **$($coreFiles.Count)** |
 | Protocol-core instrumented lines | **$coreLinesValid** |
 | Protocol-core covered lines | **$coreLinesCovered** |
+| Minimum protocol-core covered lines | **$MinimumProtocolCoreCoveredLines** |
 | Protocol-core line coverage | **$coreLineCoverage%** |
-| Protocol-core regression floor | **$MinimumLineCoverage%** |
+| Protocol-core percentage floor | **$MinimumLineCoverage%** |
 | Report | `artifacts/test-results/coverage.cobertura.xml` |
 "@ | Add-Content $env:GITHUB_STEP_SUMMARY
 }
 
 $coverageFailures = [System.Collections.Generic.List[string]]::new()
-if ($overallLineCoverage -lt $MinimumWholeEngineLineCoverage) {
-    $coverageFailures.Add("Whole-engine line coverage $overallLineCoverage% is below the required $MinimumWholeEngineLineCoverage%.")
+if ($overallLinesCovered -lt $MinimumWholeEngineCoveredLines) {
+    $coverageFailures.Add("ARSVIN exercised $overallLinesCovered production lines, below the required $MinimumWholeEngineCoveredLines.")
+}
+if ($coreLinesCovered -lt $MinimumProtocolCoreCoveredLines) {
+    $coverageFailures.Add("ARSVIN exercised $coreLinesCovered protocol-core lines, below the required $MinimumProtocolCoreCoveredLines.")
 }
 if ($coreLineCoverage -lt $MinimumLineCoverage) {
     $coverageFailures.Add("Protocol-core line coverage $coreLineCoverage% is below the required $MinimumLineCoverage%.")

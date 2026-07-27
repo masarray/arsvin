@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   public-content:
-    name: Validate licensing, provenance, and public wording
+    name: Validate licensing, provenance, wording, and engine ownership
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -26,26 +26,69 @@ jobs:
         continue-on-error: true
         run: python3 scripts/validate-public-neutrality.py
 
-      - name: Upload terminology validation evidence
+      - name: Validate ARIEC61850 engine ownership boundary
+        id: ownership
+        continue-on-error: true
+        run: python3 scripts/validate-engine-ownership.py
+
+      - name: Upload public and ownership validation evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: arsvin-public-neutrality-report
-          path: artifacts/public-neutrality-report.txt
+          name: arsvin-public-and-engine-ownership-reports
+          path: |
+            artifacts/public-neutrality-report.txt
+            artifacts/engine-ownership-report.txt
           if-no-files-found: error
           retention-days: 14
 
-      - name: Enforce terminology validation result
-        if: steps.neutrality.outcome == 'failure'
+      - name: Enforce public and ownership validation results
+        if: steps.neutrality.outcome == 'failure' || steps.ownership.outcome == 'failure'
         run: exit 1
 
   build-test:
-    name: Build, test, and validate site
+    name: Build, test, and validate pinned engine integration
     needs: public-content
     runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: arsvin
+    env:
+      ARIEC61850_ROOT: ${{ github.workspace }}\ARIEC61850
     steps:
-      - name: Checkout
+      - name: Checkout ARSVIN into paired workspace
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          path: arsvin
+
+      - name: Resolve pinned ARIEC61850 revision
+        id: engine_pin
+        shell: pwsh
+        run: |
+          $pin = .\scripts\resolve-engine-pin.ps1 -AsObject
+          "repository=$($pin.Repository)" | Add-Content $env:GITHUB_OUTPUT
+          "ref=$($pin.Ref)" | Add-Content $env:GITHUB_OUTPUT
+          "commit=$($pin.Commit)" | Add-Content $env:GITHUB_OUTPUT
+
+      - name: Checkout pinned sibling ARIEC61850
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: ${{ steps.engine_pin.outputs.repository }}
+          ref: ${{ steps.engine_pin.outputs.commit }}
+          path: ARIEC61850
+
+      - name: Record and verify paired engine revision
+        shell: pwsh
+        run: |
+          $engineSha = (git -C "$env:ARIEC61850_ROOT" rev-parse HEAD).Trim().ToLowerInvariant()
+          $expected = '${{ steps.engine_pin.outputs.commit }}'.ToLowerInvariant()
+          if ($engineSha -ne $expected) {
+            throw "Pinned engine mismatch. Expected $expected, found $engineSha."
+          }
+          "ARIEC61850_REF=${{ steps.engine_pin.outputs.ref }}" | Out-File artifacts-engine-revision.txt -Encoding utf8
+          "ARIEC61850_EXPECTED_SHA=$expected" | Add-Content artifacts-engine-revision.txt
+          "ARIEC61850_ACTUAL_SHA=$engineSha" | Add-Content artifacts-engine-revision.txt
+          Get-Content artifacts-engine-revision.txt
 
       - name: Setup .NET
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
@@ -53,12 +96,15 @@ jobs:
           dotnet-version: 8.0.4xx
           cache: true
           cache-dependency-path: |
-            Directory.Packages.props
-            src/**/packages.lock.json
-            tests/**/packages.lock.json
+            arsvin/Directory.Packages.props
+            arsvin/src/**/packages.lock.json
+            arsvin/tests/**/packages.lock.json
 
       - name: Verify current licensing and public wording
         run: python scripts/verify-current-license.py
+
+      - name: Validate engine ownership boundary
+        run: python scripts/validate-engine-ownership.py
 
       - name: Build public site and HTML documentation
         run: python scripts/build-public-site.py --output artifacts/public-site
@@ -67,35 +113,64 @@ jobs:
         shell: pwsh
         run: .\scripts\validate-public-site.ps1 -SiteRoot artifacts/public-site
 
-      - name: Restore locked NuGet dependency graph
-        run: dotnet restore ARSVIN.sln --locked-mode
+      - name: Restore dependency graph
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts/build-logs -Force | Out-Null
+          dotnet restore ARSVIN.sln 2>&1 |
+            Tee-Object -FilePath artifacts/build-logs/restore.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Upload committed NuGet lock evidence
+      - name: Upload NuGet lock and paired engine revision evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
-          name: arsvin-nuget-lockfiles
+          name: arsvin-dependency-evidence
           path: |
-            src/**/packages.lock.json
-            tests/**/packages.lock.json
+            arsvin/engines/ARIEC61850.lock.json
+            arsvin/src/**/packages.lock.json
+            arsvin/tests/**/packages.lock.json
+            arsvin/artifacts-engine-revision.txt
           if-no-files-found: error
           retention-days: 7
 
       - name: Build Publisher with warnings as errors
-        run: dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore -warnaserror
+        shell: pwsh
+        run: |
+          dotnet build src/ARSVIN/ARSVIN.csproj -c Release --no-restore -warnaserror 2>&1 |
+            Tee-Object -FilePath artifacts/build-logs/publisher-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Build Subscriber with warnings as errors
-        run: dotnet build src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj -c Release --no-restore -warnaserror
-
-      - name: Test with whole-engine and protocol-core coverage gates
         shell: pwsh
-        run: .\scripts\test-with-coverage.ps1 -MinimumWholeEngineLineCoverage 14.25 -MinimumLineCoverage 72.5 -NoRestore
+        run: |
+          dotnet build src/ARSVIN.Subscriber/ARSVIN.Subscriber.csproj -c Release --no-restore -warnaserror 2>&1 |
+            Tee-Object -FilePath artifacts/build-logs/subscriber-build.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Upload paired restore and build diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: arsvin-paired-build-logs
+          path: arsvin/artifacts/build-logs
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Test against pinned ARIEC61850 with integration coverage gates
+        shell: pwsh
+        run: |
+          .\scripts\test-with-coverage.ps1 `
+            -MinimumWholeEngineCoveredLines 3000 `
+            -MinimumProtocolCoreCoveredLines 2300 `
+            -MinimumLineCoverage 72.5 `
+            -NoRestore
 
       - name: Upload test and coverage evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: arsvin-test-evidence
-          path: artifacts/test-results
+          path: arsvin/artifacts/test-results
           if-no-files-found: warn
           retention-days: 14
 

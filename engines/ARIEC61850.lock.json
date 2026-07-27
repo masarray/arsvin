@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "repository": "masarray/ARIEC61850",
+  "ref": "main",
+  "commit": "0f8453182957900bc6d91287fb8177c8d9762188",
+  "pairedPullRequest": 45,
+  "updatedAt": "2026-07-27T07:30:00Z",
+  "purpose": "Pinned merged engine revision for paired local, CI, CodeQL, packaging, and release validation."
+}

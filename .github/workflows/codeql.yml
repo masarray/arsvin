@@ -14,11 +14,42 @@ permissions:
 
 jobs:
   analyze:
-    name: Analyze C# solution
+    name: Analyze pinned paired C# solution
     runs-on: windows-2025
+    defaults:
+      run:
+        working-directory: arsvin
+    env:
+      ARIEC61850_ROOT: ${{ github.workspace }}\ARIEC61850
     steps:
-      - name: Checkout
+      - name: Checkout ARSVIN into paired workspace
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          path: arsvin
+
+      - name: Resolve pinned ARIEC61850 revision
+        id: engine_pin
+        shell: pwsh
+        run: |
+          $pin = .\scripts\resolve-engine-pin.ps1 -AsObject
+          "repository=$($pin.Repository)" | Add-Content $env:GITHUB_OUTPUT
+          "commit=$($pin.Commit)" | Add-Content $env:GITHUB_OUTPUT
+
+      - name: Checkout pinned sibling ARIEC61850
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        with:
+          repository: ${{ steps.engine_pin.outputs.repository }}
+          ref: ${{ steps.engine_pin.outputs.commit }}
+          path: ARIEC61850
+
+      - name: Verify pinned engine commit
+        shell: pwsh
+        run: |
+          $actual = (git -C "$env:ARIEC61850_ROOT" rev-parse HEAD).Trim().ToLowerInvariant()
+          $expected = '${{ steps.engine_pin.outputs.commit }}'.ToLowerInvariant()
+          if ($actual -ne $expected) {
+            throw "Pinned engine mismatch. Expected $expected, found $actual."
+          }
 
       - name: Setup .NET
         uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
@@ -26,9 +57,9 @@ jobs:
           dotnet-version: 8.0.4xx
           cache: true
           cache-dependency-path: |
-            Directory.Packages.props
-            src/**/packages.lock.json
-            tests/**/packages.lock.json
+            arsvin/Directory.Packages.props
+            arsvin/src/**/packages.lock.json
+            arsvin/tests/**/packages.lock.json
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
@@ -36,10 +67,10 @@ jobs:
           languages: csharp
           build-mode: manual
 
-      - name: Restore locked solution dependency graph
-        run: dotnet restore ARSVIN.sln --locked-mode
+      - name: Restore pinned paired solution dependency graph
+        run: dotnet restore ARSVIN.sln
 
-      - name: Build solution with warnings as errors
+      - name: Build pinned paired solution with warnings as errors
         run: dotnet build ARSVIN.sln -c Release --no-restore -warnaserror
 
       - name: Perform CodeQL Analysis

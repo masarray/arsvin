@@ -1,0 +1,10 @@
+<Project>
+  <Target Name="ValidateARIEC61850Sibling"
+          BeforeTargets="PrepareForBuild"
+          Condition="'$(MSBuildProjectName)' == 'ARSVIN' or '$(MSBuildProjectName)' == 'ARSVIN.Subscriber' or '$(MSBuildProjectName)' == 'ARSVIN.Tests'">
+    <Error Condition="!Exists('$(ARIEC61850_CORE_PROJECT)')"
+           Text="ARIEC61850 sibling repository was not found. Expected core project: $(ARIEC61850_CORE_PROJECT). Clone https://github.com/masarray/ARIEC61850 beside this repository or pass -p:ARIEC61850_ROOT=&quot;X:\path\ARIEC61850&quot;." />
+    <Error Condition="!Exists('$(ARIEC61850_NPCAP_PROJECT)')"
+           Text="ARIEC61850 Npcap transport project was not found. Expected: $(ARIEC61850_NPCAP_PROJECT)." />
+  </Target>
+</Project>

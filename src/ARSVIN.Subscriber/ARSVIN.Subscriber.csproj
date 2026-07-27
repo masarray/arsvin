@@ -17,7 +17,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ARSVIN.Engine\ARSVIN.Engine.csproj" />
+    <ProjectReference Include="$(ARIEC61850_CORE_PROJECT)" />
+    <ProjectReference Include="$(ARIEC61850_NPCAP_PROJECT)" />
   </ItemGroup>
 
   <ItemGroup>

@@ -27,8 +27,6 @@ function New-DeterministicUuidUrn {
 
     $uuidBytes = [byte[]]::new(16)
     [Array]::Copy($hash, $uuidBytes, $uuidBytes.Length)
-
-    # RFC 4122 variant with a deterministic version-5-style identifier.
     $uuidBytes[6] = [byte](($uuidBytes[6] -band 0x0F) -bor 0x50)
     $uuidBytes[8] = [byte](($uuidBytes[8] -band 0x3F) -bor 0x80)
 
@@ -44,7 +42,31 @@ function New-DeterministicUuidUrn {
     return "urn:uuid:$uuid"
 }
 
+function Invoke-GitText {
+    param(
+        [Parameter(Mandatory)][string] $Repository,
+        [Parameter(Mandatory)][string[]] $Arguments
+    )
+
+    $output = & git -C $Repository @Arguments 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "git -C $Repository $($Arguments -join ' ') failed.`n$($output -join [Environment]::NewLine)"
+    }
+    return ($output -join '').Trim()
+}
+
 $root = Split-Path -Parent $PSScriptRoot
+$engineRoot = if ($env:ARIEC61850_ROOT) {
+    [System.IO.Path]::GetFullPath($env:ARIEC61850_ROOT)
+}
+else {
+    [System.IO.Path]::GetFullPath((Join-Path $root '..\ARIEC61850'))
+}
+$engineProject = Join-Path $engineRoot 'src\AR.Iec61850\AR.Iec61850.csproj'
+if (-not (Test-Path $engineProject -PathType Leaf)) {
+    throw "ARIEC61850 sibling project was not found at $engineProject."
+}
+
 $applicationProjects = @(
     [ordered]@{
         Name = 'ARSVIN Publisher'
@@ -66,23 +88,15 @@ elseif (-not [System.IO.Path]::IsPathRooted($OutputPath)) {
 $outputDirectory = Split-Path -Parent $OutputPath
 New-Item -ItemType Directory -Path $outputDirectory -Force | Out-Null
 
-$sourceCommitOutput = & git -C $root rev-parse HEAD 2>&1
-if ($LASTEXITCODE -ne 0) {
-    throw "Could not resolve the source commit.`n$($sourceCommitOutput -join [Environment]::NewLine)"
-}
-$sourceCommit = ($sourceCommitOutput -join '').Trim()
-
-$sourceTimestampOutput = & git -C $root show -s --format=%cI HEAD 2>&1
-if ($LASTEXITCODE -ne 0) {
-    throw "Could not resolve the source commit timestamp.`n$($sourceTimestampOutput -join [Environment]::NewLine)"
-}
+$sourceCommit = Invoke-GitText -Repository $root -Arguments @('rev-parse', 'HEAD')
+$engineCommit = Invoke-GitText -Repository $engineRoot -Arguments @('rev-parse', 'HEAD')
+$engineRef = if ($env:ARIEC61850_REF) { $env:ARIEC61850_REF } else { 'local-checkout' }
 $sourceTimestamp = [DateTimeOffset]::Parse(
-    ($sourceTimestampOutput -join '').Trim(),
+    (Invoke-GitText -Repository $root -Arguments @('show', '-s', '--format=%cI', 'HEAD')),
     [System.Globalization.CultureInfo]::InvariantCulture
 ).ToUniversalTime().ToString('o')
 
-$serialNumber = New-DeterministicUuidUrn -Value "https://github.com/masarray/arsvin|$Version|$sourceCommit"
-
+$serialNumber = New-DeterministicUuidUrn -Value "https://github.com/masarray/arsvin|$Version|$sourceCommit|$engineCommit"
 $packages = @{}
 
 foreach ($applicationProject in $applicationProjects) {
@@ -172,7 +186,7 @@ if ($testOnlyPackages.Count -gt 0) {
     throw "Release SBOM unexpectedly contains test-only packages: $names"
 }
 
-$components = foreach ($package in $sortedPackages) {
+$nugetComponents = foreach ($package in $sortedPackages) {
     $escapedId = [Uri]::EscapeDataString([string] $package.Id)
     $escapedVersion = [Uri]::EscapeDataString([string] $package.Version)
     $purl = "pkg:nuget/$escapedId@$escapedVersion"
@@ -197,6 +211,27 @@ $components = foreach ($package in $sortedPackages) {
     }
 }
 
+$enginePurl = "pkg:generic/ARIEC61850@$engineCommit"
+$engineComponent = [ordered]@{
+    type = 'library'
+    'bom-ref' = $enginePurl
+    name = 'ARIEC61850'
+    version = $engineCommit
+    purl = $enginePurl
+    licenses = @(
+        [ordered]@{
+            license = [ordered]@{ id = 'GPL-3.0-or-later' }
+        }
+    )
+    properties = @(
+        [ordered]@{ name = 'arsvin:source-repository'; value = 'https://github.com/masarray/ARIEC61850' },
+        [ordered]@{ name = 'arsvin:source-ref'; value = $engineRef },
+        [ordered]@{ name = 'arsvin:source-commit'; value = $engineCommit },
+        [ordered]@{ name = 'arsvin:dependency-scope'; value = 'direct-source-project' }
+    )
+}
+
+$allComponents = @($engineComponent) + @($nugetComponents)
 $sbom = [ordered]@{
     bomFormat = 'CycloneDX'
     specVersion = '1.5'
@@ -210,7 +245,7 @@ $sbom = [ordered]@{
                     type = 'application'
                     author = 'ARSVIN project'
                     name = 'generate-sbom.ps1'
-                    version = '1.2.0'
+                    version = '2.0.0'
                 }
             )
         }
@@ -221,24 +256,18 @@ $sbom = [ordered]@{
             version = $Version
             licenses = @(
                 [ordered]@{
-                    license = [ordered]@{
-                        id = 'Apache-2.0'
-                    }
+                    license = [ordered]@{ id = 'GPL-3.0-or-later' }
                 }
             )
             properties = @(
-                [ordered]@{
-                    name = 'arsvin:source-commit'
-                    value = $sourceCommit
-                },
-                [ordered]@{
-                    name = 'arsvin:included-applications'
-                    value = ($applicationProjects.Name -join ', ')
-                }
+                [ordered]@{ name = 'arsvin:source-commit'; value = $sourceCommit },
+                [ordered]@{ name = 'arsvin:engine-ref'; value = $engineRef },
+                [ordered]@{ name = 'arsvin:engine-commit'; value = $engineCommit },
+                [ordered]@{ name = 'arsvin:included-applications'; value = ($applicationProjects.Name -join ', ') }
             )
         }
     }
-    components = @($components)
+    components = $allComponents
 }
 
 $json = $sbom | ConvertTo-Json -Depth 20
@@ -250,7 +279,8 @@ $json = $sbom | ConvertTo-Json -Depth 20
 
 $written = Get-Item $OutputPath
 Write-Host "==> CycloneDX SBOM written: $($written.FullName)"
-Write-Host "    Source commit: $sourceCommit"
+Write-Host "    ARSVIN source commit: $sourceCommit"
+Write-Host "    ARIEC61850 source commit: $engineCommit"
 Write-Host "    Serial number: $serialNumber"
-Write-Host "    Components: $($components.Count)"
+Write-Host "    Components: $($allComponents.Count)"
 Write-Host "    Size: $($written.Length) bytes"
