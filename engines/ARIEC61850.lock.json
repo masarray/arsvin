@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "repository": "masarray/ARIEC61850",
-  "ref": "agent/sv-core-unification",
-  "commit": "fcc05de1f4b11560195e2589aa032e1d4c4b95f7",
+  "ref": "main",
+  "commit": "0f8453182957900bc6d91287fb8177c8d9762188",
   "pairedPullRequest": 45,
-  "updatedAt": "2026-07-24T01:00:00Z",
-  "purpose": "Pinned sibling engine revision for paired local, CI, CodeQL, packaging, and release validation."
+  "updatedAt": "2026-07-27T07:30:00Z",
+  "purpose": "Pinned merged engine revision for paired local, CI, CodeQL, packaging, and release validation."
 }
