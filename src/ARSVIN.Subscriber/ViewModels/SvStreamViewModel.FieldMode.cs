@@ -19,7 +19,7 @@ public sealed partial class SvStreamViewModel
     private string _fieldSummary = "Waiting for field evidence";
     private string _signalState = "UNRESOLVED";
 
-    public SvStreamViewModel()
+    private void InitializeFieldMode()
     {
         PropertyChanged += (_, args) =>
         {
@@ -29,6 +29,7 @@ public sealed partial class SvStreamViewModel
         };
         ((INotifyCollectionChanged)_values).CollectionChanged += (_, _) => RefreshFieldMode();
         ((INotifyCollectionChanged)_waveformPoints).CollectionChanged += (_, _) => RefreshFieldMode();
+        RefreshFieldMode();
     }
 
     public string CaptureFieldState { get => _captureFieldState; private set => SetProperty(ref _captureFieldState, value); }
