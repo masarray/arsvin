@@ -3,6 +3,7 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
+using AR.Iec61850.SampledValues.Field;
 
 namespace ARSVIN.Subscriber;
 
@@ -14,6 +15,7 @@ public partial class MainWindow
     {
         base.OnContentRendered(e);
         AttachFieldHealthStrip();
+        AttachKnownInjectionToolbarButton();
     }
 
     private void AttachFieldHealthStrip()
@@ -52,6 +54,62 @@ public partial class MainWindow
         root.Children.Add(strip);
         root.Children.Add(existingScope);
         ScopeHost.Child = root;
+    }
+
+    private void AttachKnownInjectionToolbarButton()
+    {
+        var toolbar = FindVisualChildren<WrapPanel>(this)
+            .FirstOrDefault(panel => panel.Children.OfType<Button>()
+                .Any(button => string.Equals(button.Content?.ToString(), "Import SCL", StringComparison.Ordinal)));
+        if (toolbar is null || toolbar.Children.OfType<Button>()
+                .Any(button => string.Equals(button.Tag?.ToString(), "field-known-injection", StringComparison.Ordinal)))
+            return;
+
+        toolbar.Children.Add(CreateToolbarButton(
+            "Validate",
+            "field-known-injection",
+            KnownInjection_Click,
+            "Compare the selected measured phasor with a known injected RMS, angle, and frequency."));
+    }
+
+    private void KnownInjection_Click(object sender, RoutedEventArgs e)
+    {
+        var selected = _viewModel.SelectedStream;
+        if (selected is null)
+        {
+            MessageBox.Show(this, "Select an SV stream before validating a known injection.", "Known Injection", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var phasors = selected.GenericPhasors
+            .Where(item => item.IsValid && !string.Equals(item.Unit, "count", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        if (phasors.Length == 0)
+        {
+            MessageBox.Show(
+                this,
+                "No engineering phasor is available yet. Import the matching SCL/CID, resolve timebase and scaling, then repeat the validation.",
+                "Known Injection",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new KnownInjectionWindow(phasors) { Owner = this };
+        if (dialog.ShowDialog() != true || dialog.Expectation is null || dialog.Measurement is null || dialog.Comparison is null)
+            return;
+
+        selected.RecordKnownInjectionEvidence(dialog.Expectation, dialog.Measurement, dialog.Comparison);
+        var comparison = dialog.Comparison;
+        var error = comparison.AmplitudeErrorPercent.HasValue
+            ? $"{comparison.AmplitudeErrorPercent.Value:+0.###;-0.###;0}%"
+            : $"{comparison.AbsoluteAmplitudeError:+0.######;-0.######;0}";
+        MessageBox.Show(
+            this,
+            $"Result: {comparison.State.ToString().ToUpperInvariant()}\nAmplitude error: {error}\n\nThe result is stored in the selected stream evidence and included in the support bundle.",
+            "Known Injection",
+            MessageBoxButton.OK,
+            comparison.State == SvKnownInjectionResultState.Fail ? MessageBoxImage.Warning : MessageBoxImage.Information);
     }
 
     private Border CreateAxisCard(string label, string statePath, string? toolTipPath = null)
