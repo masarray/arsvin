@@ -22,6 +22,7 @@ public sealed partial class SvStreamViewModel
         _phasors.CollectionChanged += SourceCollectionChanged;
         PropertyChanged += StreamPropertyChanged;
         RefreshGenericPresentation();
+        InitializeFieldMode();
     }
 
     public IReadOnlyList<DecodedValueRow> GenericValues => _genericValues;
