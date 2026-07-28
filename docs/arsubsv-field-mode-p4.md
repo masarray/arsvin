@@ -2,6 +2,8 @@
 
 Field Mode is the practical receiver workflow for live IEC 61850 Sampled Values and offline PCAP/PCAPNG analysis.
 
+The P4 application branch is rebuilt directly on merged `main` and pins the field-core engine by its exact commit SHA. The draft PR therefore contains only Field Mode changes and remains safe to test locally without merging.
+
 ## Five evidence axes
 
 ArSubsv separates:
