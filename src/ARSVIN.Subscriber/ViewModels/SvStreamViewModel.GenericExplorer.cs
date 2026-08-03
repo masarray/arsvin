@@ -18,7 +18,7 @@ public sealed partial class SvStreamViewModel
     private string _genericSemanticState = "Unresolved · no assumptions";
     private string _genericWaveformState = "Waiting for stream data";
     private string _continuityText = "smpCnt continuity unresolved";
-    private string _cadenceText = "Cadence unresolved";
+    private string _cadenceText = "Capture timing unresolved";
     private string _captureWindowText = "Capture window unavailable";
     private string _analysisWindowText = "Analysis window unavailable";
     private string _analysisTrustState = "UNKNOWN";
@@ -75,7 +75,7 @@ public sealed partial class SvStreamViewModel
                 ? "Waiting for seqOfData"
                 : "Raw words available · import SCL before waveform and phasor analysis";
             ContinuityText = "smpCnt available · semantic window not built";
-            CadenceText = "Expected cadence unresolved";
+            CadenceText = "Expected sample-domain cadence unresolved";
             AnalysisWindowText = "No semantic analysis window";
             AnalysisTrustState = "UNKNOWN";
             AnalysisTrustDetail = "SCL/CID mapping is required before semantic waveform and phasor analysis.";
@@ -99,7 +99,7 @@ public sealed partial class SvStreamViewModel
                 "UNKNOWN",
                 "Timebase is unresolved; waveform and phasor are withheld.",
                 "smpCnt continuity cannot be qualified without samples-per-cycle.",
-                "Expected cadence unresolved",
+                "Expected sample-domain cadence unresolved",
                 "No trusted analysis window");
             RefreshFieldMode();
             return;
@@ -115,11 +115,13 @@ public sealed partial class SvStreamViewModel
         double? cadenceErrorPercent = observedSamplesPerSecond.HasValue && expectedSamplesPerSecond > 0
             ? Math.Abs(observedSamplesPerSecond.Value - expectedSamplesPerSecond) / expectedSamplesPerSecond * 100.0
             : null;
-        var cadenceCompatible = !cadenceErrorPercent.HasValue || cadenceErrorPercent.Value <= CadenceTolerancePercent;
+        var captureTimingWarning = cadenceErrorPercent.HasValue && cadenceErrorPercent.Value > CadenceTolerancePercent;
 
         CadenceText = observedSamplesPerSecond.HasValue
-            ? $"Observed {observedSamplesPerSecond.Value:0.0} / expected {expectedSamplesPerSecond:0.0} smp/s"
-            : $"Expected {expectedSamplesPerSecond:0.0} smp/s · observed unavailable";
+            ? captureTimingWarning
+                ? $"Host delivery {observedSamplesPerSecond.Value:0.0} / sample-domain {expectedSamplesPerSecond:0.0} smp/s · timing WARN"
+                : $"Host delivery {observedSamplesPerSecond.Value:0.0} / sample-domain {expectedSamplesPerSecond:0.0} smp/s"
+            : $"Sample-domain {expectedSamplesPerSecond:0.0} smp/s · host delivery unavailable";
 
         var ordered = BuildOrderedWindow(
             _waveformPoints,
@@ -157,26 +159,20 @@ public sealed partial class SvStreamViewModel
             return;
         }
 
-        if (!cadenceCompatible)
-        {
-            SetWithheld(
-                "DEGRADED",
-                $"Capture cadence differs from the resolved timebase by {cadenceErrorPercent!.Value:0.0}%. Analysis is withheld to avoid misleading waveform and phasor results.",
-                ContinuityText,
-                CadenceText,
-                AnalysisWindowText);
-            RefreshFieldMode();
-            return;
-        }
-
         var phasors = ComputePhasors(ordered, timebase.Value.SamplesPerCycle);
         IsAnalysisTrusted = true;
-        AnalysisTrustState = "TRUSTED";
-        AnalysisTrustDetail = "Two contiguous cycles and capture cadence agree with the resolved timebase.";
-        GenericWaveformState = $"2 contiguous cycles · {expectedPoints:N0} points · {Scaling}";
+        AnalysisTrustState = captureTimingWarning ? "TIMING WARN" : "TRUSTED";
+        AnalysisTrustDetail = captureTimingWarning
+            ? $"Two contiguous sample-domain cycles are available, so waveform and DFT are shown. Host capture delivery differs from the resolved sample rate by {cadenceErrorPercent!.Value:0.0}%; do not use host arrival timing for latency, jitter, or real-time frequency evidence."
+            : "Two contiguous sample-domain cycles are available and host capture delivery agrees with the resolved timebase.";
+        GenericWaveformState = captureTimingWarning
+            ? $"2 contiguous cycles · {expectedPoints:N0} points · sample-domain · host timing WARN"
+            : $"2 contiguous cycles · {expectedPoints:N0} points · {Scaling}";
         PhasorState = phasors.Count == 0
             ? "Withheld · no complete analog cycle"
-            : $"{phasors.Count} vectors · contiguous one-cycle DFT";
+            : captureTimingWarning
+                ? $"{phasors.Count} vectors · sample-domain DFT · host timing WARN"
+                : $"{phasors.Count} vectors · contiguous one-cycle DFT";
         _genericWaveformPoints.ReplaceAll(ordered);
         _genericPhasors.ReplaceAll(phasors);
         RefreshFieldMode();
@@ -229,7 +225,7 @@ public sealed partial class SvStreamViewModel
 
         var wrap = ResolveCounterWrap(expectedSamplesPerSecond);
         var latest = latestSampleCount.Value;
-        var ordered = source
+        return source
             .Where(point => point.SampleCount.HasValue)
             .Select(point => new
             {
@@ -243,7 +239,6 @@ public sealed partial class SvStreamViewModel
             .Take(expectedPoints)
             .Select((item, index) => CopyPoint(item.Point, index))
             .ToArray();
-        return ordered;
     }
 
     private static bool IsContiguous(IReadOnlyList<WaveformPoint> points, double expectedSamplesPerSecond)
