@@ -109,10 +109,10 @@ public sealed partial class SvStreamViewModel
         var expectedSamplesPerSecond = timebase.Value.FrequencyHz * timebase.Value.SamplesPerCycle;
         var observedFramesPerSecond = ParseDouble(Fps);
         var nofAsdu = Math.Max(1, ParseInt(NofAsdu));
-        var observedSamplesPerSecond = observedFramesPerSecond.HasValue
+        double? observedSamplesPerSecond = observedFramesPerSecond.HasValue
             ? observedFramesPerSecond.Value * nofAsdu
             : null;
-        var cadenceErrorPercent = observedSamplesPerSecond.HasValue && expectedSamplesPerSecond > 0
+        double? cadenceErrorPercent = observedSamplesPerSecond.HasValue && expectedSamplesPerSecond > 0
             ? Math.Abs(observedSamplesPerSecond.Value - expectedSamplesPerSecond) / expectedSamplesPerSecond * 100.0
             : null;
         var cadenceCompatible = !cadenceErrorPercent.HasValue || cadenceErrorPercent.Value <= CadenceTolerancePercent;
