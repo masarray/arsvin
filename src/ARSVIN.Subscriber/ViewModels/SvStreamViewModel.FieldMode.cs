@@ -95,6 +95,11 @@ public sealed partial class SvStreamViewModel
                 MeasurementFieldDetail = AnalysisTrustDetail;
                 SignalState = "DEGRADED";
             }
+            else if (AnalysisTrustState == "TIMING WARN")
+            {
+                StreamFieldState = "WARN";
+                MeasurementFieldDetail = $"{report.Measurement.Summary} Sample-domain waveform and DFT are available; host arrival timing is not trusted for latency, jitter, or real-time frequency evidence.";
+            }
             else if (AnalysisTrustState == "FILLING")
             {
                 MeasurementFieldState = "UNKNOWN";
@@ -119,11 +124,14 @@ public sealed partial class SvStreamViewModel
                     _evidenceDetails.RemoveAt(index);
             }
 
+            var timingQualifiedStreamSummary = AnalysisTrustState is "DEGRADED" or "TIMING WARN"
+                ? AnalysisTrustDetail
+                : report.Stream.Summary;
             var fieldLines = new[]
             {
                 $"FIELD · CAPTURE · {CaptureFieldState} · {report.Capture.Summary}",
                 $"FIELD · PROTOCOL · {ProtocolFieldState} · {report.Protocol.Summary}",
-                $"FIELD · STREAM · {StreamFieldState} · {(AnalysisTrustState == "DEGRADED" ? AnalysisTrustDetail : report.Stream.Summary)}",
+                $"FIELD · STREAM · {StreamFieldState} · {timingQualifiedStreamSummary}",
                 $"FIELD · CONFIGURATION · {ConfigurationFieldState} · {report.Configuration.Summary}",
                 $"FIELD · MEASUREMENT · {MeasurementFieldState} · {MeasurementFieldDetail}",
                 $"ANALYSIS · {AnalysisTrustState} · {AnalysisTrustDetail}",
