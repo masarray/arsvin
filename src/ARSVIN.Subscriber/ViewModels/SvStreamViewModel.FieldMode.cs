@@ -24,11 +24,12 @@ public sealed partial class SvStreamViewModel
         PropertyChanged += (_, args) =>
         {
             if (args.PropertyName is nameof(Packets) or nameof(Health) or nameof(HealthDetail) or nameof(Issues) or
-                nameof(Bound) or nameof(SclMatch) or nameof(Scaling) or nameof(Timebase) or nameof(MeasurementContext))
+                nameof(Bound) or nameof(SclMatch) or nameof(Scaling) or nameof(Timebase) or nameof(MeasurementContext) or
+                nameof(AnalysisTrustState) or nameof(AnalysisTrustDetail))
                 RefreshFieldMode();
         };
         ((INotifyCollectionChanged)_values).CollectionChanged += (_, _) => RefreshFieldMode();
-        ((INotifyCollectionChanged)_waveformPoints).CollectionChanged += (_, _) => RefreshFieldMode();
+        ((INotifyCollectionChanged)_genericWaveformPoints).CollectionChanged += (_, _) => RefreshFieldMode();
         RefreshFieldMode();
     }
 
@@ -51,14 +52,13 @@ public sealed partial class SvStreamViewModel
         {
             var frames = ParseLong(Packets);
             var issueCounts = ParseIssueCounts(Issues);
-            var representative = ResolveRepresentativeSeries(_waveformPoints);
+            var representative = ResolveRepresentativeSeries(_genericWaveformPoints);
             var samplesPerCycle = ParseSamplesPerCycle(Timebase);
-            var signal = representative.Count >= 16
+            var signal = IsAnalysisTrusted && representative.Count >= 16
                 ? SvSignalStateAnalyzer.Analyze(representative, new SvSignalAnalysisOptions { SamplesPerCycle = samplesPerCycle })
                 : null;
             var comparison = BuildDisplayComparison(SclMatch);
-            var semanticMapping = !string.IsNullOrWhiteSpace(Bound) &&
-                                  !Bound.Contains("Unbound", StringComparison.OrdinalIgnoreCase);
+            var semanticMapping = Bound.StartsWith("SCL:", StringComparison.OrdinalIgnoreCase);
             var engineeringScaling = _values.Any(value => value.HasEngineeringValue &&
                 !string.Equals(value.EngineeringUnit, "count", StringComparison.OrdinalIgnoreCase));
             var validatedScaling = _values.Any(value => value.ScalingConfidence == SvEngineeringScaleConfidence.DeviceValidated);
@@ -73,7 +73,7 @@ public sealed partial class SvStreamViewModel
                 OutOfOrderCount = issueCounts.OutOfOrder,
                 PayloadIssueCount = issueCounts.Payload,
                 ConfigurationComparison = comparison,
-                IsSclBound = Bound.StartsWith("SCL:", StringComparison.OrdinalIgnoreCase),
+                IsSclBound = semanticMapping,
                 HasSemanticMapping = semanticMapping,
                 HasEngineeringScaling = engineeringScaling,
                 IsScalingValidated = validatedScaling,
@@ -87,12 +87,35 @@ public sealed partial class SvStreamViewModel
             MeasurementFieldState = Label(report.Measurement.State);
             MeasurementFieldDetail = report.Measurement.Summary;
             SignalState = signal?.State.ToString().ToUpperInvariant() ?? "UNRESOLVED";
+
+            if (AnalysisTrustState == "DEGRADED")
+            {
+                StreamFieldState = "WARN";
+                MeasurementFieldState = "WARN";
+                MeasurementFieldDetail = AnalysisTrustDetail;
+                SignalState = "DEGRADED";
+            }
+            else if (AnalysisTrustState == "FILLING")
+            {
+                MeasurementFieldState = "UNKNOWN";
+                MeasurementFieldDetail = AnalysisTrustDetail;
+                SignalState = "FILLING";
+            }
+            else if (AnalysisTrustState == "UNKNOWN" && semanticMapping)
+            {
+                MeasurementFieldState = engineeringScaling ? "WARN" : "UNKNOWN";
+                MeasurementFieldDetail = AnalysisTrustDetail;
+                SignalState = "UNRESOLVED";
+            }
+
             FieldSummary = $"CAPTURE {CaptureFieldState} · PROTOCOL {ProtocolFieldState} · STREAM {StreamFieldState} · CONFIG {ConfigurationFieldState} · MEAS {MeasurementFieldState}";
 
             for (var index = _evidenceDetails.Count - 1; index >= 0; index--)
             {
                 var existing = _evidenceDetails[index];
-                if (existing.StartsWith("FIELD ·", StringComparison.Ordinal) || existing.StartsWith("SIGNAL ·", StringComparison.Ordinal))
+                if (existing.StartsWith("FIELD ·", StringComparison.Ordinal) ||
+                    existing.StartsWith("SIGNAL ·", StringComparison.Ordinal) ||
+                    existing.StartsWith("ANALYSIS ·", StringComparison.Ordinal))
                     _evidenceDetails.RemoveAt(index);
             }
 
@@ -100,10 +123,11 @@ public sealed partial class SvStreamViewModel
             {
                 $"FIELD · CAPTURE · {CaptureFieldState} · {report.Capture.Summary}",
                 $"FIELD · PROTOCOL · {ProtocolFieldState} · {report.Protocol.Summary}",
-                $"FIELD · STREAM · {StreamFieldState} · {report.Stream.Summary}",
+                $"FIELD · STREAM · {StreamFieldState} · {(AnalysisTrustState == "DEGRADED" ? AnalysisTrustDetail : report.Stream.Summary)}",
                 $"FIELD · CONFIGURATION · {ConfigurationFieldState} · {report.Configuration.Summary}",
-                $"FIELD · MEASUREMENT · {MeasurementFieldState} · {report.Measurement.Summary}",
-                signal is null ? "SIGNAL · unresolved" : $"SIGNAL · {signal.Summary}"
+                $"FIELD · MEASUREMENT · {MeasurementFieldState} · {MeasurementFieldDetail}",
+                $"ANALYSIS · {AnalysisTrustState} · {AnalysisTrustDetail}",
+                signal is null ? $"SIGNAL · {SignalState}" : $"SIGNAL · {signal.Summary}"
             };
             foreach (var line in fieldLines.Reverse())
                 _evidenceDetails.Insert(0, line);

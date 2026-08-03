@@ -5,10 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="ArSubsv - Sampled Values Subscriber"
-        Width="1460"
-        Height="860"
-        MinWidth="1220"
-        MinHeight="720"
+        Width="1500"
+        Height="900"
+        MinWidth="1280"
+        MinHeight="760"
         Background="{StaticResource ShellBg}"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True"
@@ -18,9 +18,13 @@
         <Style x:Key="HealthTextStyle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{StaticResource Blue}" />
             <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
             <Style.Triggers>
                 <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource Self}}" Value="GOOD">
                     <Setter Property="Foreground" Value="{StaticResource Green}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource Self}}" Value="QUIET">
+                    <Setter Property="Foreground" Value="{StaticResource Blue}" />
                 </DataTrigger>
                 <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource Self}}" Value="WARN">
                     <Setter Property="Foreground" Value="{StaticResource Amber}" />
@@ -31,7 +35,51 @@
                 <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource Self}}" Value="ERROR">
                     <Setter Property="Foreground" Value="{StaticResource Red}" />
                 </DataTrigger>
+                <DataTrigger Binding="{Binding Text, RelativeSource={RelativeSource Self}}" Value="UNKNOWN">
+                    <Setter Property="Foreground" Value="{StaticResource Muted}" />
+                </DataTrigger>
             </Style.Triggers>
+        </Style>
+
+        <Style x:Key="FieldStateStyle" TargetType="TextBlock" BasedOn="{StaticResource HealthTextStyle}">
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+            <Setter Property="FontSize" Value="10.5" />
+        </Style>
+
+        <Style x:Key="HeaderActionButton" TargetType="Button" BasedOn="{StaticResource ToolbarButton}">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="MinWidth" Value="0" />
+            <Setter Property="Padding" Value="7,0" />
+            <Setter Property="Margin" Value="3,0" />
+            <Setter Property="FontSize" Value="11.5" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="FieldAxisCard" TargetType="Border">
+            <Setter Property="Background" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="{StaticResource Line}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="Padding" Value="8,4" />
+            <Setter Property="Margin" Value="3,0" />
+        </Style>
+
+        <Style x:Key="RightAlignedGridText" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextAlignment" Value="Right" />
+            <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+        </Style>
+
+        <Style x:Key="StreamListItemStyle" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="VerticalContentAlignment" Value="Stretch" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
         </Style>
     </Window.Resources>
 
@@ -39,27 +87,19 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="34" />
+            <RowDefinition Height="36" />
         </Grid.RowDefinitions>
 
-        <Border Grid.Row="0" Style="{StaticResource PanelShell}" Padding="12,8">
+        <Border Grid.Row="0" Style="{StaticResource PanelShell}" Padding="12">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="200" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="*" MinWidth="340" />
-                    <ColumnDefinition Width="12" />
-                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="196" />
+                    <ColumnDefinition Width="14" />
+                    <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.RowSpan="2"
-                        Grid.Column="0"
-                        Padding="12,0"
-                        MinHeight="78"
+                <Border Grid.Column="0"
+                        Padding="14,0"
                         Background="#F8FBFF"
                         BorderBrush="#DCE6F3"
                         BorderThickness="1"
@@ -69,68 +109,99 @@
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <TextBlock Text="ArSubsv" Style="{StaticResource PageTitle}" VerticalAlignment="Center" />
                             <Border Margin="8,0,0,0" Padding="7,2" CornerRadius="6" Background="#EAF2FF" VerticalAlignment="Center">
-                                <TextBlock Text="SV" FontSize="10.5" FontWeight="SemiBold" Foreground="#2563EB" />
+                                <TextBlock Text="SV" FontSize="10.5" FontWeight="SemiBold" Foreground="#2563EB" VerticalAlignment="Center" />
                             </Border>
                         </StackPanel>
-                        <TextBlock Text="Evidence-aware subscriber" Style="{StaticResource CaptionText}" Margin="1,2,0,0" />
+                        <TextBlock Text="Field-ready Sampled Values subscriber"
+                                   Style="{StaticResource CaptionText}"
+                                   Margin="1,3,0,0"
+                                   TextWrapping="Wrap" />
                     </StackPanel>
                 </Border>
 
-                <ComboBox Grid.Row="0"
-                          Grid.Column="2"
-                          ItemsSource="{Binding Adapters}"
-                          SelectedItem="{Binding SelectedAdapter}"
-                          DisplayMemberPath="DisplayName"
-                          VerticalAlignment="Center" />
+                <Grid Grid.Column="2">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="38" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="34" />
+                        <RowDefinition Height="8" />
+                        <RowDefinition Height="28" />
+                    </Grid.RowDefinitions>
 
-                <StackPanel Grid.Row="0" Grid.Column="4" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border CornerRadius="8" Background="#F8FBFF" BorderBrush="#DCE6F3" BorderThickness="1" Padding="10,7" Margin="0,0,8,0">
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Health " Foreground="{StaticResource Dim}" FontSize="11" />
-                            <TextBlock Text="{Binding HealthText}" Style="{StaticResource HealthTextStyle}" FontSize="11.5" />
-                        </StackPanel>
-                    </Border>
-                    <Button Style="{StaticResource CaptureToggleButton}" Command="{Binding ToggleCaptureCommand}" Content="{Binding CaptureButtonText}" />
-                </StackPanel>
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="104" />
+                        </Grid.ColumnDefinitions>
 
-                <Grid Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="3" Margin="0,8,0,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                        <ComboBox Grid.Column="0"
+                                  ItemsSource="{Binding Adapters}"
+                                  SelectedItem="{Binding SelectedAdapter}"
+                                  DisplayMemberPath="DisplayName"
+                                  VerticalAlignment="Center"
+                                  VerticalContentAlignment="Center" />
 
-                    <WrapPanel Grid.Column="0" VerticalAlignment="Center">
-                        <Button Style="{StaticResource ToolbarButton}" Command="{Binding OpenSclCommand}" Content="Import SCL" Margin="0,0,6,0" />
-                        <Button Style="{StaticResource ToolbarButton}" Command="{Binding OpenCaptureFileCommand}" Content="Open PCAP" Margin="0,0,6,0" />
-                        <Button Style="{StaticResource ToolbarButton}" Command="{Binding ExportReportCommand}" Content="Export" Margin="0,0,6,0" />
-                        <Button Style="{StaticResource ToolbarButton}" Click="CompareEvidence_Click" Content="Compare" ToolTip="Compare two ARSVIN evidence JSON reports" Margin="0,0,6,0" />
-                        <Button Style="{StaticResource ToolbarButton}" Command="{Binding RefreshAdaptersCommand}" Content="Refresh" Margin="0,0,6,0" />
-                        <Button Style="{StaticResource ToolbarButton}" Command="{Binding ClearCommand}" Content="Clear" Margin="0,0,6,0" />
-                    </WrapPanel>
-
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
-                        <Border Style="{StaticResource MetricPill}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Raw " Foreground="{StaticResource Dim}" FontSize="11" />
-                                <TextBlock Text="{Binding TotalFramesText}" Style="{StaticResource MonoText}" />
+                        <Border Grid.Column="2"
+                                Height="38"
+                                MinWidth="112"
+                                CornerRadius="8"
+                                Background="#F8FBFF"
+                                BorderBrush="#DCE6F3"
+                                BorderThickness="1"
+                                Padding="12,0"
+                                VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <TextBlock Text="Health" Foreground="{StaticResource Dim}" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding HealthText}" Style="{StaticResource HealthTextStyle}" FontSize="11.5" Margin="6,0,0,0" />
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource MetricPill}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="SV " Foreground="{StaticResource Dim}" FontSize="11" />
-                                <TextBlock Text="{Binding SvFramesText}" Style="{StaticResource MonoText}" />
+
+                        <Button Grid.Column="4"
+                                Style="{StaticResource CaptureToggleButton}"
+                                Command="{Binding ToggleCaptureCommand}"
+                                Content="{Binding CaptureButtonText}"
+                                VerticalContentAlignment="Center" />
+                    </Grid>
+
+                    <UniformGrid Grid.Row="2" Columns="10">
+                        <Button Style="{StaticResource HeaderActionButton}" Command="{Binding OpenSclCommand}" Content="Import SCL" />
+                        <Button Style="{StaticResource HeaderActionButton}" Command="{Binding OpenCaptureFileCommand}" Content="Open PCAP" />
+                        <Button Style="{StaticResource HeaderActionButton}" Command="{Binding ExportReportCommand}" Content="Export" />
+                        <Button Style="{StaticResource HeaderActionButton}" Click="CompareEvidence_Click" Content="Compare" ToolTip="Compare two ARSVIN evidence JSON reports" />
+                        <Button Style="{StaticResource HeaderActionButton}" Command="{Binding RefreshAdaptersCommand}" Content="Refresh" />
+                        <Button Style="{StaticResource HeaderActionButton}" Command="{Binding ClearCommand}" Content="Clear" />
+                        <Button Style="{StaticResource HeaderActionButton}" Click="MeasurementContext_Click" Content="CT / VT" ToolTip="Edit CT and VT measurement context for the selected stream" />
+                        <Button Style="{StaticResource HeaderActionButton}" Click="ImportMeasurementContext_Click" Content="Import Ctx" />
+                        <Button Style="{StaticResource HeaderActionButton}" Click="ExportMeasurementContext_Click" Content="Export Ctx" />
+                        <Button Style="{StaticResource HeaderActionButton}" Click="KnownInjection_Click" Content="Validate" ToolTip="Compare the selected engineering phasor with a known injection" />
+                    </UniformGrid>
+
+                    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <Border Style="{StaticResource MetricPill}" Padding="9,4">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Raw" Foreground="{StaticResource Dim}" FontSize="10.5" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding TotalFramesText}" Style="{StaticResource MonoText}" Margin="5,0,0,0" VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource MetricPill}">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="Streams " Foreground="{StaticResource Dim}" FontSize="11" />
-                                <TextBlock Text="{Binding StreamsText}" Style="{StaticResource MonoText}" />
+                        <Border Style="{StaticResource MetricPill}" Padding="9,4">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="SV" Foreground="{StaticResource Dim}" FontSize="10.5" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding SvFramesText}" Style="{StaticResource MonoText}" Margin="5,0,0,0" VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
-                        <Border Style="{StaticResource MetricPill}" Margin="0">
-                            <StackPanel Orientation="Horizontal">
-                                <TextBlock Text="FPS " Foreground="{StaticResource Dim}" FontSize="11" />
-                                <TextBlock Text="{Binding GlobalFpsText}" Style="{StaticResource MonoText}" />
+                        <Border Style="{StaticResource MetricPill}" Padding="9,4">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Streams" Foreground="{StaticResource Dim}" FontSize="10.5" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding StreamsText}" Style="{StaticResource MonoText}" Margin="5,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{StaticResource MetricPill}" Padding="9,4" Margin="0">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <TextBlock Text="Capture" Foreground="{StaticResource Dim}" FontSize="10.5" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding GlobalFpsText}" Style="{StaticResource MonoText}" Margin="5,0,0,0" VerticalAlignment="Center" />
                             </StackPanel>
                         </Border>
                     </StackPanel>
@@ -140,30 +211,43 @@
 
         <Grid Grid.Row="1" Margin="0,12,0,12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="330" MinWidth="280" />
+                <ColumnDefinition Width="300" MinWidth="270" />
                 <ColumnDefinition Width="8" />
-                <ColumnDefinition Width="*" MinWidth="560" />
+                <ColumnDefinition Width="*" MinWidth="590" />
                 <ColumnDefinition Width="8" />
-                <ColumnDefinition Width="320" MinWidth="280" />
+                <ColumnDefinition Width="340" MinWidth="300" />
             </Grid.ColumnDefinitions>
 
             <Border Grid.Column="0" Style="{StaticResource PanelShell}" Padding="0">
                 <Grid>
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="38" />
+                        <RowDefinition Height="42" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
                     <Border Style="{StaticResource PanelHeader}">
-                        <DockPanel LastChildFill="False" VerticalAlignment="Center">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
                             <TextBlock Text="SV Explorer" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
-                            <TextBlock DockPanel.Dock="Right" Text="{Binding SclText}" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center" />
-                        </DockPanel>
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding SclText}"
+                                       Foreground="{StaticResource Muted}"
+                                       FontSize="10.5"
+                                       VerticalAlignment="Center"
+                                       HorizontalAlignment="Right"
+                                       TextAlignment="Right"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="10,0,0,0" />
+                        </Grid>
                     </Border>
 
                     <ListBox Grid.Row="1"
                              ItemsSource="{Binding Streams}"
                              SelectedItem="{Binding SelectedStream}"
+                             ItemContainerStyle="{StaticResource StreamListItemStyle}"
                              BorderThickness="0"
                              Background="Transparent"
                              Padding="8"
@@ -172,7 +256,8 @@
                         <ListBox.ItemTemplate>
                             <DataTemplate>
                                 <Border Margin="0,0,0,8"
-                                        Padding="10,8"
+                                        Padding="11,9"
+                                        MinHeight="64"
                                         CornerRadius="8"
                                         Background="#FFFFFF"
                                         BorderBrush="#D8E2EF"
@@ -180,25 +265,54 @@
                                         ToolTip="{Binding HealthDetail}">
                                     <Grid>
                                         <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="26" />
+                                            <RowDefinition Height="22" />
                                         </Grid.RowDefinitions>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="58" />
+                                            <ColumnDefinition Width="72" />
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Border Padding="8,3" CornerRadius="6" Background="#EAF2FF" BorderBrush="#BFDBFE" BorderThickness="1" Margin="0,0,8,0">
-                                                <TextBlock Text="{Binding SvId}" Foreground="#1D4ED8" FontWeight="SemiBold" FontSize="12" />
-                                            </Border>
-                                            <TextBlock Text="{Binding Health}" Style="{StaticResource HealthTextStyle}" FontSize="11" VerticalAlignment="Center" />
-                                        </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding Fps, StringFormat={}{0} fps}" Foreground="#64748B" FontFamily="Cascadia Mono, Consolas" FontSize="11" VerticalAlignment="Center" />
-                                        <StackPanel Grid.Row="1" Grid.ColumnSpan="2" Orientation="Horizontal" Margin="1,7,0,0">
-                                            <TextBlock Text="{Binding AppId}" Foreground="#64748B" FontFamily="Cascadia Mono, Consolas" FontSize="11" Margin="0,0,12,0" />
-                                            <TextBlock Text="smpCnt " Foreground="#94A3B8" FontSize="11" />
-                                            <TextBlock Text="{Binding SmpCnt}" Foreground="#64748B" FontFamily="Cascadia Mono, Consolas" FontSize="11" />
-                                        </StackPanel>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0"
+                                                   Text="{Binding SvId}"
+                                                   Foreground="#1D4ED8"
+                                                   FontWeight="SemiBold"
+                                                   FontSize="12.5"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Row="0" Grid.Column="1"
+                                                   Text="{Binding Health}"
+                                                   Style="{StaticResource HealthTextStyle}"
+                                                   FontSize="10.5"
+                                                   HorizontalAlignment="Center" />
+                                        <TextBlock Grid.Row="0" Grid.Column="2"
+                                                   Text="{Binding Fps, StringFormat={}{0} fps}"
+                                                   Foreground="#64748B"
+                                                   FontFamily="Cascadia Mono, Consolas"
+                                                   FontSize="10.5"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center" />
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0"
+                                                   Text="{Binding AppId}"
+                                                   Foreground="#64748B"
+                                                   FontFamily="Cascadia Mono, Consolas"
+                                                   FontSize="10.5"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1"
+                                                   Text="smpCnt"
+                                                   Foreground="#94A3B8"
+                                                   FontSize="10"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center" />
+                                        <TextBlock Grid.Row="1" Grid.Column="2"
+                                                   Text="{Binding SmpCnt}"
+                                                   Foreground="#64748B"
+                                                   FontFamily="Cascadia Mono, Consolas"
+                                                   FontSize="10.5"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center" />
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -211,77 +325,91 @@
 
             <Grid Grid.Column="2">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="46" />
-                    <RowDefinition Height="92" />
+                    <RowDefinition Height="66" />
+                    <RowDefinition Height="116" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
 
-                <Border Grid.Row="0" Style="{StaticResource PanelShell}" Padding="12,6" Margin="0,0,0,8">
+                <Border Grid.Row="0" Style="{StaticResource PanelShell}" Padding="12,8" Margin="0,0,0,8">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding SelectedStream.SvId}" FontSize="15" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Text="  ·  " Foreground="{StaticResource Dim}" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding SelectedStream.Bound}" Foreground="{StaticResource Blue}" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding SelectedStream.SvId}"
+                                       FontSize="15"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding SelectedStream.Bound}"
+                                       Foreground="{StaticResource Blue}"
+                                       FontSize="10.8"
+                                       Margin="0,3,0,0"
+                                       TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Sync " Foreground="{StaticResource Dim}" FontSize="11.5" />
-                            <TextBlock Text="{Binding SelectedStream.SmpSynch}" Foreground="{StaticResource Green}" FontFamily="Cascadia Mono, Consolas" FontSize="11.5" Margin="0,0,12,0" />
-                            <TextBlock Text="gap " Foreground="{StaticResource Dim}" FontSize="11.5" />
-                            <TextBlock Text="{Binding SelectedStream.Gap}" Foreground="{StaticResource Muted}" FontFamily="Cascadia Mono, Consolas" FontSize="11.5" />
-                        </StackPanel>
+
+                        <Grid Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Text="{Binding SelectedStream.ContinuityText}" Foreground="{StaticResource Muted}" FontSize="10.5" HorizontalAlignment="Right" />
+                            <TextBlock Grid.Row="1" Text="{Binding SelectedStream.CadenceText}" Foreground="{StaticResource Muted}" FontFamily="Cascadia Mono, Consolas" FontSize="10.5" HorizontalAlignment="Right" Margin="0,2,0,0" />
+                            <TextBlock Grid.Row="2" Text="{Binding SelectedStream.CaptureWindowText}" Foreground="{StaticResource Dim}" FontSize="10.2" HorizontalAlignment="Right" Margin="0,2,0,0" />
+                        </Grid>
                     </Grid>
                 </Border>
 
-                <Border Grid.Row="1" Style="{StaticResource PanelShell}" Padding="10,7" Margin="0,0,0,8">
+                <Border Grid.Row="1" Style="{StaticResource PanelShell}" Padding="10,8" Margin="0,0,0,8">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="1*" />
+                            <RowDefinition Height="1*" />
                         </Grid.RowDefinitions>
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="1.15*" />
-                            <ColumnDefinition Width="1.15*" />
-                            <ColumnDefinition Width="0.9*" />
-                            <ColumnDefinition Width="1.05*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
                         </Grid.ColumnDefinitions>
-                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="2,0,14,7">
-                            <TextBlock Text="PROFILE" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedStream.Profile}" Foreground="{StaticResource Blue}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+
+                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="3,0,14,7" VerticalAlignment="Center">
+                            <TextBlock Text="MAPPING" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedStream.GenericMappingState}" Foreground="{StaticResource Blue}" FontSize="11.2" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="2,0,14,7">
-                            <TextBlock Text="CONFIDENCE" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedStream.Confidence}" Foreground="{StaticResource Muted}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="3,0,14,7" VerticalAlignment="Center">
+                            <TextBlock Text="SEMANTICS" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedStream.GenericSemanticState}" Foreground="{StaticResource Muted}" FontSize="11.2" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="2,0,14,7">
-                            <TextBlock Text="SCL MATCH" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedStream.SclMatch}" Foreground="{StaticResource Muted}" FontSize="11.5" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <StackPanel Grid.Row="0" Grid.Column="2" Margin="3,0,0,7" VerticalAlignment="Center">
+                            <TextBlock Text="CONFIGURATION" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedStream.SclMatch}" Foreground="{StaticResource Muted}" FontSize="11.2" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <StackPanel Grid.Row="0" Grid.Column="3" Margin="2,0,0,7">
-                            <TextBlock Text="WINDOW" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedStream.Window}" Foreground="{StaticResource Muted}" FontSize="11.5" FontFamily="Cascadia Mono, Consolas" TextTrimming="CharacterEllipsis" />
-                        </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Margin="2,0,14,0">
+
+                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="3,0,14,0" VerticalAlignment="Center">
                             <TextBlock Text="SCALING" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedStream.Scaling}" Foreground="{StaticResource Blue}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding SelectedStream.Scaling}" Foreground="{StaticResource Blue}" FontSize="11.2" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
-                        <StackPanel Grid.Row="1" Grid.Column="2" Grid.ColumnSpan="2" Margin="2,0,0,0">
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="3,0,14,0" VerticalAlignment="Center">
                             <TextBlock Text="TIMEBASE" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding SelectedStream.Timebase}" Foreground="{StaticResource Muted}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding SelectedStream.Timebase}" Foreground="{StaticResource Muted}" FontSize="11.2" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="2" Margin="3,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="ANALYSIS WINDOW" Foreground="{StaticResource Dim}" FontSize="9.5" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding SelectedStream.AnalysisWindowText}" Foreground="{StaticResource Muted}" FontFamily="Cascadia Mono, Consolas" FontSize="10.8" TextTrimming="CharacterEllipsis" />
                         </StackPanel>
                     </Grid>
                 </Border>
 
                 <Expander Grid.Row="2" IsExpanded="False" Margin="0,0,0,8">
                     <Expander.Header>
-                        <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="Evidence details" Foreground="{StaticResource Blue}" FontSize="11.5" FontWeight="SemiBold" />
-                            <TextBlock Text=" · " Foreground="{StaticResource Dim}" />
-                            <TextBlock Text="{Binding SelectedStream.ComparisonMode}" Foreground="{StaticResource Muted}" FontSize="11" />
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Evidence details" Foreground="{StaticResource Blue}" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Text=" · " Foreground="{StaticResource Dim}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding SelectedStream.ComparisonMode}" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center" />
                         </StackPanel>
                     </Expander.Header>
                     <Border Margin="0,6,0,0" Padding="10,7" CornerRadius="8" Background="#FBFDFF" BorderBrush="#DCE6F3" BorderThickness="1" MaxHeight="150">
@@ -300,14 +428,73 @@
                 <Border Grid.Row="3" Style="{StaticResource PanelShell}" Padding="10">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="24" />
+                            <RowDefinition Height="30" />
+                            <RowDefinition Height="42" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <DockPanel Grid.Row="0" LastChildFill="False" Margin="2,0,2,6">
-                            <TextBlock Text="Waveform" Style="{StaticResource SectionTitle}" />
-                            <TextBlock DockPanel.Dock="Right" Text="{Binding SelectedStream.WaveformState}" Foreground="{StaticResource Muted}" FontSize="11" />
-                        </DockPanel>
-                        <Border x:Name="ScopeHost" Grid.Row="1" />
+
+                        <Grid Grid.Row="0" Margin="2,0,2,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Waveform" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding SelectedStream.GenericWaveformState}"
+                                       Foreground="{StaticResource Muted}"
+                                       FontSize="10.8"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </Grid>
+
+                        <Border Grid.Row="1"
+                                Margin="0,0,0,7"
+                                Padding="4"
+                                CornerRadius="7"
+                                Background="{StaticResource PanelDeep}"
+                                BorderBrush="{StaticResource Line}"
+                                BorderThickness="1">
+                            <UniformGrid Columns="5">
+                                <Border Style="{StaticResource FieldAxisCard}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="CAPTURE" Foreground="{StaticResource Dim}" FontSize="9.2" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedStream.CaptureFieldState}" Style="{StaticResource FieldStateStyle}" />
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource FieldAxisCard}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="PROTOCOL" Foreground="{StaticResource Dim}" FontSize="9.2" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedStream.ProtocolFieldState}" Style="{StaticResource FieldStateStyle}" />
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource FieldAxisCard}" ToolTip="{Binding SelectedStream.AnalysisTrustDetail}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="STREAM" Foreground="{StaticResource Dim}" FontSize="9.2" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedStream.StreamFieldState}" Style="{StaticResource FieldStateStyle}" />
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource FieldAxisCard}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="CONFIG" Foreground="{StaticResource Dim}" FontSize="9.2" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedStream.ConfigurationFieldState}" Style="{StaticResource FieldStateStyle}" />
+                                    </Grid>
+                                </Border>
+                                <Border Style="{StaticResource FieldAxisCard}" ToolTip="{Binding SelectedStream.MeasurementFieldDetail}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+                                        <TextBlock Text="MEASUREMENT" Foreground="{StaticResource Dim}" FontSize="9.2" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding SelectedStream.MeasurementFieldState}" Style="{StaticResource FieldStateStyle}" />
+                                    </Grid>
+                                </Border>
+                            </UniformGrid>
+                        </Border>
+
+                        <Border x:Name="ScopeHost" Grid.Row="2" />
                     </Grid>
                 </Border>
             </Grid>
@@ -316,21 +503,31 @@
 
             <Grid Grid.Column="4">
                 <Grid.RowDefinitions>
-                    <RowDefinition Height="1.05*" />
+                    <RowDefinition Height="1.02*" />
                     <RowDefinition Height="8" />
-                    <RowDefinition Height="0.95*" />
+                    <RowDefinition Height="0.98*" />
                 </Grid.RowDefinitions>
 
                 <Border Grid.Row="0" Style="{StaticResource PanelShell}" Padding="10">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="24" />
+                            <RowDefinition Height="30" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
-                        <DockPanel Grid.Row="0" LastChildFill="False" Margin="2,0,2,6">
-                            <TextBlock Text="Phasor" Style="{StaticResource SectionTitle}" />
-                            <TextBlock DockPanel.Dock="Right" Text="RMS / angle" Foreground="{StaticResource Muted}" FontSize="11" />
-                        </DockPanel>
+                        <Grid Grid.Row="0" Margin="2,0,2,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Text="Phasor" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1"
+                                       Text="{Binding SelectedStream.PhasorState}"
+                                       Foreground="{StaticResource Muted}"
+                                       FontSize="10.5"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis" />
+                        </Grid>
                         <Border x:Name="PhasorHost" Grid.Row="1" />
                     </Grid>
                 </Border>
@@ -340,36 +537,37 @@
                 <Border Grid.Row="2" Style="{StaticResource PanelShell}" Padding="0">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="38" />
+                            <RowDefinition Height="42" />
                             <RowDefinition Height="*" />
                         </Grid.RowDefinitions>
                         <Border Style="{StaticResource PanelHeader}">
-                            <DockPanel LastChildFill="False" VerticalAlignment="Center">
+                            <Grid>
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
                                 <TextBlock Text="RMS Values" Style="{StaticResource SectionTitle}" VerticalAlignment="Center" />
-                                <TextBlock DockPanel.Dock="Right" Text="Evidence-aware units" Foreground="{StaticResource Muted}" FontSize="11" VerticalAlignment="Center" />
-                            </DockPanel>
+                                <TextBlock Grid.Column="1" Text="Evidence-aware units" Foreground="{StaticResource Muted}" FontSize="10.5" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                            </Grid>
                         </Border>
                         <TabControl Grid.Row="1" Margin="8,6,8,8">
                             <TabItem Header="RMS">
-                                <DataGrid ItemsSource="{Binding SelectedStream.Phasors}" AutoGenerateColumns="False" IsReadOnly="True">
+                                <DataGrid ItemsSource="{Binding SelectedStream.GenericPhasors}" AutoGenerateColumns="False" IsReadOnly="True">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Ch" Binding="{Binding Channel}" Width="46" />
-                                        <DataGridTextColumn Header="Kind" Binding="{Binding Kind}" Width="64" />
-                                        <DataGridTextColumn Header="RMS" Binding="{Binding RmsText}" Width="*" />
-                                        <DataGridTextColumn Header="Peak" Binding="{Binding PeakText}" Width="*" />
-                                        <DataGridTextColumn Header="Angle" Binding="{Binding AngleText}" Width="*" />
+                                        <DataGridTextColumn Header="Ch" Binding="{Binding Channel}" Width="42" />
+                                        <DataGridTextColumn Header="Kind" Binding="{Binding Kind}" Width="62" />
+                                        <DataGridTextColumn Header="RMS" Binding="{Binding RmsText}" Width="*" ElementStyle="{StaticResource RightAlignedGridText}" />
+                                        <DataGridTextColumn Header="Peak" Binding="{Binding PeakText}" Width="*" ElementStyle="{StaticResource RightAlignedGridText}" />
+                                        <DataGridTextColumn Header="Angle" Binding="{Binding AngleText}" Width="70" ElementStyle="{StaticResource RightAlignedGridText}" />
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </TabItem>
                             <TabItem Header="Decoded">
-                                <DataGrid ItemsSource="{Binding SelectedValues}" AutoGenerateColumns="False" IsReadOnly="True">
+                                <DataGrid ItemsSource="{Binding SelectedStream.GenericValues}" AutoGenerateColumns="False" IsReadOnly="True">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="38" />
-                                        <DataGridTextColumn Header="Signal" Binding="{Binding Signal}" Width="100" />
-                                        <DataGridTextColumn Header="Kind" Binding="{Binding Kind}" Width="60" />
+                                        <DataGridTextColumn Header="#" Binding="{Binding Index}" Width="34" />
+                                        <DataGridTextColumn Header="Word / SCL signal" Binding="{Binding Signal}" Width="130" />
+                                        <DataGridTextColumn Header="Representation" Binding="{Binding Kind}" Width="92" />
                                         <DataGridTextColumn Header="Value" Binding="{Binding DisplayValue}" Width="*" />
-                                        <DataGridTextColumn Header="Scale" Binding="{Binding ScalingText}" Width="105" />
-                                        <DataGridTextColumn Header="Raw" Binding="{Binding Raw}" Width="*" />
+                                        <DataGridTextColumn Header="Semantics" Binding="{Binding ScalingText}" Width="115" />
+                                        <DataGridTextColumn Header="Raw bytes" Binding="{Binding Raw}" Width="110" />
                                     </DataGrid.Columns>
                                 </DataGrid>
                             </TabItem>
@@ -379,18 +577,29 @@
             </Grid>
         </Grid>
 
-        <Border Grid.Row="2" Style="{StaticResource PanelShell}" Padding="10,0">
-            <DockPanel LastChildFill="False" VerticalAlignment="Center">
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Duration " Foreground="{StaticResource Dim}" FontSize="11" />
-                    <TextBlock Text="{Binding CaptureDurationText}" Style="{StaticResource MonoText}" Margin="0,0,12,0" />
-                    <TextBlock Text="Issues " Foreground="{StaticResource Dim}" FontSize="11" />
-                    <TextBlock Text="{Binding IssuesText}" Style="{StaticResource MonoText}" Margin="0,0,12,0" />
-                    <TextBlock Text="SCL " Foreground="{StaticResource Dim}" FontSize="11" />
-                    <TextBlock Text="{Binding SclText}" Style="{StaticResource MonoText}" />
+        <Border Grid.Row="2" Style="{StaticResource PanelShell}" Padding="12,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Duration" Foreground="{StaticResource Dim}" FontSize="10.5" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding CaptureDurationText}" Style="{StaticResource MonoText}" Margin="6,0,14,0" VerticalAlignment="Center" />
+                    <TextBlock Text="Issues" Foreground="{StaticResource Dim}" FontSize="10.5" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding IssuesText}" Style="{StaticResource MonoText}" Margin="6,0,14,0" VerticalAlignment="Center" />
+                    <TextBlock Text="SCL" Foreground="{StaticResource Dim}" FontSize="10.5" VerticalAlignment="Center" />
+                    <TextBlock Text="{Binding SclText}" Style="{StaticResource MonoText}" Margin="6,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
-                <TextBlock DockPanel.Dock="Right" Text="{Binding StatusText}" Foreground="{StaticResource Blue}" FontSize="11.5" FontWeight="SemiBold" />
-            </DockPanel>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding StatusText}"
+                           Foreground="{StaticResource Blue}"
+                           FontSize="11"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis" />
+            </Grid>
         </Border>
     </Grid>
 </Window>
