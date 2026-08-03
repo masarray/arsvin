@@ -11,7 +11,7 @@ namespace ARSVIN.Subscriber.Controls;
 public sealed class OscilloscopePlot : FrameworkElement
 {
     private double _cursorFraction = 0.72;
-    private double _voltageScale = 1.0;
+    private double _voltageScale = 100.0;
     private double _currentScale = 1.0;
     private string _voltageUnit = "count";
     private string _currentUnit = "count";
@@ -22,10 +22,20 @@ public sealed class OscilloscopePlot : FrameworkElement
         nameof(Points), typeof(IEnumerable), typeof(OscilloscopePlot),
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender, OnPointsChanged));
 
+    public static readonly DependencyProperty StatusMessageProperty = DependencyProperty.Register(
+        nameof(StatusMessage), typeof(string), typeof(OscilloscopePlot),
+        new FrameworkPropertyMetadata(string.Empty, FrameworkPropertyMetadataOptions.AffectsRender));
+
     public IEnumerable? Points
     {
         get => (IEnumerable?)GetValue(PointsProperty);
         set => SetValue(PointsProperty, value);
+    }
+
+    public string StatusMessage
+    {
+        get => (string)GetValue(StatusMessageProperty);
+        set => SetValue(StatusMessageProperty, value);
     }
 
     public OscilloscopePlot()
@@ -37,8 +47,8 @@ public sealed class OscilloscopePlot : FrameworkElement
     protected override Size MeasureOverride(Size availableSize)
     {
         var width = double.IsInfinity(availableSize.Width) ? 840 : availableSize.Width;
-        var height = double.IsInfinity(availableSize.Height) ? 560 : availableSize.Height;
-        return new Size(Math.Max(520, width), Math.Max(360, height));
+        var height = double.IsInfinity(availableSize.Height) ? 520 : availableSize.Height;
+        return new Size(Math.Max(480, width), Math.Max(320, height));
     }
 
     protected override void OnMouseDown(MouseButtonEventArgs e)
@@ -72,7 +82,14 @@ public sealed class OscilloscopePlot : FrameworkElement
         var points = Points?.OfType<WaveformPoint>().ToArray() ?? Array.Empty<WaveformPoint>();
         if (points.Length < 2)
         {
-            DrawCenteredText(dc, bounds, "Waiting for decoded SV samples", 13, "#64748B");
+            var message = string.IsNullOrWhiteSpace(StatusMessage)
+                ? "Waiting for a trusted contiguous SV window"
+                : StatusMessage;
+            var color = message.Contains("withheld", StringComparison.OrdinalIgnoreCase) ||
+                        message.Contains("degraded", StringComparison.OrdinalIgnoreCase)
+                ? "#B45309"
+                : "#64748B";
+            DrawCenteredWrappedText(dc, bounds, message, 12.5, color);
             return;
         }
 
@@ -81,26 +98,26 @@ public sealed class OscilloscopePlot : FrameworkElement
 
         const double pad = 10;
         const double gap = 12;
-        var laneHeight = Math.Max(130, (bounds.Height - (pad * 2) - gap) / 2.0);
+        var laneHeight = Math.Max(125, (bounds.Height - (pad * 2) - gap) / 2.0);
         var voltageRect = new Rect(pad, pad, bounds.Width - pad * 2, laneHeight);
         var currentRect = new Rect(pad, pad + laneHeight + gap, bounds.Width - pad * 2, laneHeight);
 
         DrawLane(dc, voltageRect, "Voltage", latest.VoltageUnit, points,
             new[]
             {
-                new Trace("Va", p => p.Va, "#EF4444"),
-                new Trace("Vb", p => p.Vb, "#D97706"),
-                new Trace("Vc", p => p.Vc, "#2563EB"),
-                new Trace("Vn", p => p.Vn, "#94A3B8")
+                new Trace("Va", point => point.Va, "#EF4444"),
+                new Trace("Vb", point => point.Vb, "#D97706"),
+                new Trace("Vc", point => point.Vc, "#2563EB"),
+                new Trace("Vn", point => point.Vn, "#94A3B8")
             }, ref _voltageScale);
 
         DrawLane(dc, currentRect, "Current", latest.CurrentUnit, points,
             new[]
             {
-                new Trace("Ia", p => p.Ia, "#EF4444"),
-                new Trace("Ib", p => p.Ib, "#D97706"),
-                new Trace("Ic", p => p.Ic, "#2563EB"),
-                new Trace("In", p => p.In, "#94A3B8")
+                new Trace("Ia", point => point.Ia, "#EF4444"),
+                new Trace("Ib", point => point.Ib, "#D97706"),
+                new Trace("Ic", point => point.Ic, "#2563EB"),
+                new Trace("In", point => point.In, "#94A3B8")
             }, ref _currentScale);
     }
 
@@ -119,22 +136,23 @@ public sealed class OscilloscopePlot : FrameworkElement
         var plot = new Rect(lane.Left + 58, lane.Top + 18, Math.Max(60, lane.Width - 74), Math.Max(40, lane.Height - 36));
         var absoluteValues = traces
             .SelectMany(trace => points.Select(trace.Selector))
-            .Where(value => value.HasValue)
+            .Where(value => value.HasValue && double.IsFinite(value.Value))
             .Select(value => Math.Abs(value!.Value))
+            .OrderBy(value => value)
             .ToArray();
-        var observedMax = absoluteValues.DefaultIfEmpty(0).Max();
+        var observedRobust = Percentile(absoluteValues, 0.99);
         var floor = ResolveScaleFloor(title, unit);
-        var targetScale = Math.Max(floor, observedMax * 1.15);
+        var targetScale = Math.Max(floor, observedRobust * 1.15);
         retainedScale = targetScale >= retainedScale
             ? targetScale
-            : Math.Max(targetScale, retainedScale * 0.92);
+            : Math.Max(targetScale, retainedScale * 0.985);
 
-        var nearZero = observedMax <= floor * 0.2;
+        var nearZero = observedRobust <= floor * 0.1;
         DrawText(dc, title, new Point(lane.Left + 12, lane.Top + 10), 12.5, "#2563EB", FontWeights.SemiBold);
         DrawText(dc, unit, new Point(lane.Left + 12, lane.Bottom - 28), 11, "#64748B", FontWeights.Normal);
         DrawText(dc, $"±{retainedScale:0.###}", new Point(lane.Left + 12, lane.Top + 31), 10.5, "#94A3B8", FontWeights.Normal);
         if (nearZero)
-            DrawText(dc, "near zero", new Point(lane.Left + 12, lane.Top + 48), 9.8, "#94A3B8", FontWeights.Normal);
+            DrawText(dc, "noise floor", new Point(lane.Left + 12, lane.Top + 48), 9.8, "#94A3B8", FontWeights.Normal);
 
         foreach (var trace in traces)
             DrawTrace(dc, plot, points, trace, retainedScale);
@@ -160,7 +178,6 @@ public sealed class OscilloscopePlot : FrameworkElement
             _voltageUnit = voltageUnit;
             _voltageScale = ResolveScaleFloor("Voltage", voltageUnit);
         }
-
         if (!string.Equals(_currentUnit, currentUnit, StringComparison.Ordinal))
         {
             _currentUnit = currentUnit;
@@ -171,10 +188,18 @@ public sealed class OscilloscopePlot : FrameworkElement
     private static double ResolveScaleFloor(string title, string unit)
     {
         if (unit.Equals("V", StringComparison.OrdinalIgnoreCase))
-            return 0.5;
+            return 100.0;
         if (unit.Equals("A", StringComparison.OrdinalIgnoreCase))
-            return 0.02;
-        return title.Equals("Voltage", StringComparison.OrdinalIgnoreCase) ? 100.0 : 10.0;
+            return 1.0;
+        return title.Equals("Voltage", StringComparison.OrdinalIgnoreCase) ? 1000.0 : 100.0;
+    }
+
+    private static double Percentile(IReadOnlyList<double> ordered, double percentile)
+    {
+        if (ordered.Count == 0)
+            return 0;
+        var index = Math.Clamp((int)Math.Ceiling((ordered.Count - 1) * percentile), 0, ordered.Count - 1);
+        return ordered[index];
     }
 
     private static void DrawGrid(DrawingContext dc, Rect lane)
@@ -182,16 +207,15 @@ public sealed class OscilloscopePlot : FrameworkElement
         var plot = new Rect(lane.Left + 58, lane.Top + 18, Math.Max(60, lane.Width - 74), Math.Max(40, lane.Height - 36));
         var minor = Pen("#E8EEF7", 0.85, 2, 6);
         var major = Pen("#D6E0EC", 0.95, 4, 6);
-        for (var i = 0; i <= 8; i++)
+        for (var index = 0; index <= 8; index++)
         {
-            var x = plot.Left + plot.Width * i / 8.0;
-            dc.DrawLine(i % 2 == 0 ? major : minor, new Point(x, plot.Top), new Point(x, plot.Bottom));
+            var x = plot.Left + plot.Width * index / 8.0;
+            dc.DrawLine(index % 2 == 0 ? major : minor, new Point(x, plot.Top), new Point(x, plot.Bottom));
         }
-
-        for (var i = 0; i <= 4; i++)
+        for (var index = 0; index <= 4; index++)
         {
-            var y = plot.Top + plot.Height * i / 4.0;
-            dc.DrawLine(i == 2 ? Pen("#B6C6D8", 1.05) : minor, new Point(plot.Left, y), new Point(plot.Right, y));
+            var y = plot.Top + plot.Height * index / 4.0;
+            dc.DrawLine(index == 2 ? Pen("#B6C6D8", 1.05) : minor, new Point(plot.Left, y), new Point(plot.Right, y));
         }
     }
 
@@ -204,7 +228,7 @@ public sealed class OscilloscopePlot : FrameworkElement
     {
         var usable = points
             .Select((point, index) => (value: trace.Selector(point), index))
-            .Where(item => item.value.HasValue)
+            .Where(item => item.value.HasValue && double.IsFinite(item.value.Value))
             .ToArray();
         if (usable.Length < 2 || scale <= 0)
             return;
@@ -212,21 +236,20 @@ public sealed class OscilloscopePlot : FrameworkElement
         var geometry = new StreamGeometry();
         using (var context = geometry.Open())
         {
-            for (var i = 0; i < usable.Length; i++)
+            for (var index = 0; index < usable.Length; index++)
             {
-                var sourceIndex = usable[i].index;
+                var sourceIndex = usable[index].index;
                 var x = plot.Left + plot.Width * sourceIndex / Math.Max(1, points.Count - 1);
-                var y = plot.Top + plot.Height / 2.0 - (usable[i].value!.Value / scale) * plot.Height * 0.46;
+                var y = plot.Top + plot.Height / 2.0 - (usable[index].value!.Value / scale) * plot.Height * 0.46;
                 y = Math.Clamp(y, plot.Top + 1, plot.Bottom - 1);
-                if (i == 0)
+                if (index == 0)
                     context.BeginFigure(new Point(x, y), false, false);
                 else
                     context.LineTo(new Point(x, y), true, false);
             }
         }
-
         geometry.Freeze();
-        dc.DrawGeometry(null, Pen(trace.Color, 1.8), geometry);
+        dc.DrawGeometry(null, Pen(trace.Color, 1.65), geometry);
     }
 
     private void UpdateCursor(double x)
@@ -245,25 +268,24 @@ public sealed class OscilloscopePlot : FrameworkElement
     {
         if (oldValue is not null)
             oldValue.CollectionChanged -= OnPointsCollectionChanged;
-        if (_pointsNotifier is not null &&
-            !ReferenceEquals(_pointsNotifier, oldValue) &&
-            !ReferenceEquals(_pointsNotifier, newValue))
+        if (_pointsNotifier is not null && !ReferenceEquals(_pointsNotifier, oldValue) && !ReferenceEquals(_pointsNotifier, newValue))
             _pointsNotifier.CollectionChanged -= OnPointsCollectionChanged;
 
         _pointsNotifier = newValue;
         if (_pointsNotifier is not null)
             _pointsNotifier.CollectionChanged += OnPointsCollectionChanged;
-
         InvalidateVisual();
     }
 
     private void OnPointsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         => Dispatcher.InvokeAsync(InvalidateVisual);
 
-    private static void DrawCenteredText(DrawingContext dc, Rect rect, string text, double size, string color)
+    private static void DrawCenteredWrappedText(DrawingContext dc, Rect rect, string text, double size, string color)
     {
         var formatted = MakeText(text, size, color, FontWeights.SemiBold);
-        dc.DrawText(formatted, new Point(rect.Left + (rect.Width - formatted.Width) / 2, rect.Top + (rect.Height - formatted.Height) / 2));
+        formatted.MaxTextWidth = Math.Max(120, rect.Width - 80);
+        formatted.TextAlignment = TextAlignment.Center;
+        dc.DrawText(formatted, new Point(rect.Left + 40, rect.Top + (rect.Height - formatted.Height) / 2));
     }
 
     private static void DrawText(DrawingContext dc, string text, Point point, double size, string color, FontWeight weight)
