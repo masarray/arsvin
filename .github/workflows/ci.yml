@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
       - name: Verify current GPL and commercial-license boundaries
         run: python3 scripts/verify-current-license.py
@@ -57,7 +57,7 @@ jobs:
       ARIEC61850_ROOT: ${{ github.workspace }}\ARIEC61850
     steps:
       - name: Checkout ARSVIN into paired workspace
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: arsvin
 
@@ -71,7 +71,7 @@ jobs:
           "commit=$($pin.Commit)" | Add-Content $env:GITHUB_OUTPUT
 
       - name: Checkout pinned sibling ARIEC61850
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ steps.engine_pin.outputs.repository }}
           ref: ${{ steps.engine_pin.outputs.commit }}
