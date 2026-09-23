@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "repository": "masarray/ARIEC61850",
-  "ref": "main",
-  "commit": "0f8453182957900bc6d91287fb8177c8d9762188",
-  "pairedPullRequest": 45,
-  "updatedAt": "2026-07-27T07:30:00Z",
-  "purpose": "Pinned merged engine revision for paired local, CI, CodeQL, packaging, and release validation."
+  "ref": "agent/sv-field-core-p4",
+  "commit": "bcecea84b50c628ddce699f1ddafa966aa3255f8",
+  "pairedPullRequest": 47,
+  "updatedAt": "2026-07-28T09:30:00Z",
+  "purpose": "Pinned P4 field-core revision for ArSubsv PCAP/PCAPNG, layered health, signal-state, scored SCL binding, known-injection, and support-bundle validation."
 }

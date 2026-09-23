@@ -15,10 +15,20 @@ public sealed class PhasorPlot : FrameworkElement
         nameof(Vectors), typeof(IEnumerable), typeof(PhasorPlot),
         new FrameworkPropertyMetadata(null, FrameworkPropertyMetadataOptions.AffectsRender, OnVectorsChanged));
 
+    public static readonly DependencyProperty EmptyMessageProperty = DependencyProperty.Register(
+        nameof(EmptyMessage), typeof(string), typeof(PhasorPlot),
+        new FrameworkPropertyMetadata(string.Empty, FrameworkPropertyMetadataOptions.AffectsRender));
+
     public IEnumerable? Vectors
     {
         get => (IEnumerable?)GetValue(VectorsProperty);
         set => SetValue(VectorsProperty, value);
+    }
+
+    public string EmptyMessage
+    {
+        get => (string)GetValue(EmptyMessageProperty);
+        set => SetValue(EmptyMessageProperty, value);
     }
 
     protected override Size MeasureOverride(Size availableSize)
@@ -36,7 +46,9 @@ public sealed class PhasorPlot : FrameworkElement
             return;
 
         dc.DrawRoundedRectangle(Brush("#FBFDFF"), Pen("#D8E2EF", 1), rect, 10, 10);
-        var vectors = Vectors?.OfType<PhasorVector>().Where(x => x.Rms > 0).ToArray() ?? Array.Empty<PhasorVector>();
+        var vectors = Vectors?.OfType<PhasorVector>()
+            .Where(vector => vector.IsValid && vector.Rms > 0)
+            .ToArray() ?? Array.Empty<PhasorVector>();
         var plot = new Rect(rect.Left + 12, rect.Top + 12, rect.Width - 24, rect.Height - 24);
         var center = new Point(plot.Left + plot.Width / 2.0, plot.Top + plot.Height / 2.0 + 6);
         var radius = Math.Max(40, Math.Min(plot.Width, plot.Height) / 2.0 - 34);
@@ -46,16 +58,22 @@ public sealed class PhasorPlot : FrameworkElement
 
         if (vectors.Length == 0)
         {
-            DrawCenteredText(dc, rect, "Waiting for decoded samples", 13, "#64748B");
+            var message = string.IsNullOrWhiteSpace(EmptyMessage)
+                ? "Waiting for a trusted contiguous cycle"
+                : EmptyMessage;
+            var color = message.Contains("withheld", StringComparison.OrdinalIgnoreCase)
+                ? "#B45309"
+                : "#64748B";
+            DrawCenteredWrappedText(dc, rect, message, 11.8, color);
             return;
         }
 
-        var voltageMax = vectors.Where(x => x.Kind.Equals("Voltage", StringComparison.OrdinalIgnoreCase)).Select(x => x.Rms).DefaultIfEmpty(0).Max();
-        var currentMax = vectors.Where(x => x.Kind.Equals("Current", StringComparison.OrdinalIgnoreCase)).Select(x => x.Rms).DefaultIfEmpty(0).Max();
-        if (voltageMax <= 0) voltageMax = vectors.Select(x => x.Rms).DefaultIfEmpty(1).Max();
-        if (currentMax <= 0) currentMax = vectors.Select(x => x.Rms).DefaultIfEmpty(1).Max();
+        var voltageMax = vectors.Where(vector => vector.Kind.Equals("Voltage", StringComparison.OrdinalIgnoreCase)).Select(vector => vector.Rms).DefaultIfEmpty(0).Max();
+        var currentMax = vectors.Where(vector => vector.Kind.Equals("Current", StringComparison.OrdinalIgnoreCase)).Select(vector => vector.Rms).DefaultIfEmpty(0).Max();
+        if (voltageMax <= 0) voltageMax = vectors.Select(vector => vector.Rms).DefaultIfEmpty(1).Max();
+        if (currentMax <= 0) currentMax = vectors.Select(vector => vector.Rms).DefaultIfEmpty(1).Max();
 
-        foreach (var vector in vectors.OrderBy(x => x.Channel.StartsWith('V') ? 0 : 1).ThenBy(x => x.Channel))
+        foreach (var vector in vectors.OrderBy(vector => vector.Channel.StartsWith('V') ? 0 : 1).ThenBy(vector => vector.Channel))
             DrawVector(dc, center, radius, vector, voltageMax, currentMax);
     }
 
@@ -68,9 +86,9 @@ public sealed class PhasorPlot : FrameworkElement
         dc.DrawLine(Pen("#B7C6D8", 1.1), new Point(center.X - radius, center.Y), new Point(center.X + radius, center.Y));
         dc.DrawLine(Pen("#B7C6D8", 1.1), new Point(center.X, center.Y - radius), new Point(center.X, center.Y + radius));
         var diagonal = radius / Math.Sqrt(2.0);
-        var diagPen = Pen("#E2E8F0", 0.9, 3, 5);
-        dc.DrawLine(diagPen, new Point(center.X - diagonal, center.Y - diagonal), new Point(center.X + diagonal, center.Y + diagonal));
-        dc.DrawLine(diagPen, new Point(center.X + diagonal, center.Y - diagonal), new Point(center.X - diagonal, center.Y + diagonal));
+        var diagonalPen = Pen("#E2E8F0", 0.9, 3, 5);
+        dc.DrawLine(diagonalPen, new Point(center.X - diagonal, center.Y - diagonal), new Point(center.X + diagonal, center.Y + diagonal));
+        dc.DrawLine(diagonalPen, new Point(center.X + diagonal, center.Y - diagonal), new Point(center.X - diagonal, center.Y + diagonal));
         dc.DrawEllipse(Brush("#2563EB"), null, center, 4.5, 4.5);
         DrawText(dc, "0°", new Point(center.X + radius + 6, center.Y - 10), 10, "#64748B", FontWeights.Normal);
         DrawText(dc, "+90°", new Point(center.X - 16, center.Y - radius - 20), 10, "#64748B", FontWeights.Normal);
@@ -105,16 +123,15 @@ public sealed class PhasorPlot : FrameworkElement
 
         vector.Normalize();
         var normal = new Vector(-vector.Y, vector.X);
-        var p1 = end + (vector * 10) + (normal * 4);
-        var p2 = end + (vector * 10) - (normal * 4);
+        var first = end + (vector * 10) + (normal * 4);
+        var second = end + (vector * 10) - (normal * 4);
         var geometry = new StreamGeometry();
         using (var context = geometry.Open())
         {
             context.BeginFigure(end, true, true);
-            context.LineTo(p1, true, false);
-            context.LineTo(p2, true, false);
+            context.LineTo(first, true, false);
+            context.LineTo(second, true, false);
         }
-
         geometry.Freeze();
         dc.DrawGeometry(Brush(color), null, geometry);
     }
@@ -148,17 +165,18 @@ public sealed class PhasorPlot : FrameworkElement
         _vectorsNotifier = newValue;
         if (_vectorsNotifier is not null)
             _vectorsNotifier.CollectionChanged += OnVectorsCollectionChanged;
-
         InvalidateVisual();
     }
 
     private void OnVectorsCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
         => Dispatcher.InvokeAsync(InvalidateVisual);
 
-    private static void DrawCenteredText(DrawingContext dc, Rect rect, string text, double size, string color)
+    private static void DrawCenteredWrappedText(DrawingContext dc, Rect rect, string text, double size, string color)
     {
-        var ft = MakeText(text, size, color, FontWeights.SemiBold);
-        dc.DrawText(ft, new Point(rect.Left + (rect.Width - ft.Width) / 2, rect.Top + (rect.Height - ft.Height) / 2));
+        var formatted = MakeText(text, size, color, FontWeights.SemiBold);
+        formatted.MaxTextWidth = Math.Max(120, rect.Width - 64);
+        formatted.TextAlignment = TextAlignment.Center;
+        dc.DrawText(formatted, new Point(rect.Left + 32, rect.Top + (rect.Height - formatted.Height) / 2));
     }
 
     private static void DrawText(DrawingContext dc, string text, Point point, double size, string color, FontWeight weight)
@@ -169,9 +187,9 @@ public sealed class PhasorPlot : FrameworkElement
             new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, weight, FontStretches.Normal),
             size, Brush(color), 1.0);
 
-    private static Brush Brush(string color, double opacity = 1.0)
+    private static Brush Brush(string color)
     {
-        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color)) { Opacity = opacity };
+        var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(color));
         brush.Freeze();
         return brush;
     }

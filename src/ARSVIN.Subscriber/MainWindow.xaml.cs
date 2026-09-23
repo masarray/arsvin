@@ -1,9 +1,7 @@
 using System.Collections.Specialized;
 using System.Text.Json;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Data;
-using System.Windows.Media;
 using AR.Iec61850.SampledValues.Measurements;
 using AR.Iec61850.SampledValues.Reporting;
 using ARSVIN.Subscriber.Controls;
@@ -25,11 +23,6 @@ public partial class MainWindow : Window
         DataContext = _viewModel;
         _viewModel.Streams.CollectionChanged += Streams_CollectionChanged;
         AttachLivePlotControls();
-        Loaded += (_, _) =>
-        {
-            AttachMeasurementContextToolbar();
-            AttachGenericExplorerUi();
-        };
     }
 
     private void AttachLivePlotControls()
@@ -39,6 +32,10 @@ public partial class MainWindow : Window
             scope,
             OscilloscopePlot.PointsProperty,
             new Binding("SelectedStream.GenericWaveformPoints"));
+        BindingOperations.SetBinding(
+            scope,
+            OscilloscopePlot.StatusMessageProperty,
+            new Binding("SelectedStream.GenericWaveformState"));
         ScopeHost.Child = scope;
 
         var phasor = new PhasorPlot();
@@ -46,123 +43,11 @@ public partial class MainWindow : Window
             phasor,
             PhasorPlot.VectorsProperty,
             new Binding("SelectedStream.GenericPhasors"));
+        BindingOperations.SetBinding(
+            phasor,
+            PhasorPlot.EmptyMessageProperty,
+            new Binding("SelectedStream.PhasorState"));
         PhasorHost.Child = phasor;
-    }
-
-    private void AttachGenericExplorerUi()
-    {
-        foreach (var text in FindVisualChildren<TextBlock>(this))
-        {
-            if (string.Equals(text.Text, "PROFILE", StringComparison.Ordinal))
-                text.Text = "MAPPING";
-            else if (string.Equals(text.Text, "CONFIDENCE", StringComparison.Ordinal))
-                text.Text = "SEMANTICS";
-
-            var binding = BindingOperations.GetBinding(text, TextBlock.TextProperty);
-            var path = binding?.Path?.Path;
-            if (string.Equals(path, "SelectedStream.Profile", StringComparison.Ordinal))
-            {
-                BindingOperations.SetBinding(
-                    text,
-                    TextBlock.TextProperty,
-                    new Binding("SelectedStream.GenericMappingState"));
-            }
-            else if (string.Equals(path, "SelectedStream.Confidence", StringComparison.Ordinal))
-            {
-                BindingOperations.SetBinding(
-                    text,
-                    TextBlock.TextProperty,
-                    new Binding("SelectedStream.GenericSemanticState"));
-            }
-            else if (string.Equals(path, "SelectedStream.WaveformState", StringComparison.Ordinal))
-            {
-                BindingOperations.SetBinding(
-                    text,
-                    TextBlock.TextProperty,
-                    new Binding("SelectedStream.GenericWaveformState"));
-            }
-        }
-
-        foreach (var grid in FindVisualChildren<DataGrid>(this))
-        {
-            var binding = BindingOperations.GetBinding(grid, ItemsControl.ItemsSourceProperty);
-            var path = binding?.Path?.Path;
-            if (string.Equals(path, "SelectedStream.Phasors", StringComparison.Ordinal))
-            {
-                BindingOperations.SetBinding(
-                    grid,
-                    ItemsControl.ItemsSourceProperty,
-                    new Binding("SelectedStream.GenericPhasors"));
-            }
-            else if (string.Equals(path, "SelectedValues", StringComparison.Ordinal))
-            {
-                BindingOperations.SetBinding(
-                    grid,
-                    ItemsControl.ItemsSourceProperty,
-                    new Binding("SelectedStream.GenericValues"));
-                UpdateGenericDecodedColumns(grid);
-            }
-        }
-    }
-
-    private static void UpdateGenericDecodedColumns(DataGrid grid)
-    {
-        if (grid.Columns.Count < 6)
-            return;
-
-        grid.Columns[1].Header = "Word / SCL signal";
-        grid.Columns[2].Header = "Representation";
-        grid.Columns[3].Header = "Value";
-        grid.Columns[4].Header = "Semantics";
-        grid.Columns[5].Header = "Raw bytes";
-    }
-
-    private void AttachMeasurementContextToolbar()
-    {
-        var toolbar = FindVisualChildren<WrapPanel>(this)
-            .FirstOrDefault(panel => panel.Children.OfType<Button>()
-                .Any(button => string.Equals(button.Content?.ToString(), "Import SCL", StringComparison.Ordinal)));
-        if (toolbar is null || toolbar.Children.OfType<Button>()
-                .Any(button => string.Equals(button.Tag?.ToString(), "measurement-context", StringComparison.Ordinal)))
-            return;
-
-        toolbar.Children.Add(CreateToolbarButton("CT/VT", "measurement-context", MeasurementContext_Click,
-            "Edit primary/secondary CT and VT context for the selected stream."));
-        toolbar.Children.Add(CreateToolbarButton("Ctx Import", "measurement-context-import", ImportMeasurementContext_Click,
-            "Import a versioned ARSVIN measurement-context JSON document."));
-        toolbar.Children.Add(CreateToolbarButton("Ctx Export", "measurement-context-export", ExportMeasurementContext_Click,
-            "Export configured stream measurement contexts as JSON evidence."));
-    }
-
-    private Button CreateToolbarButton(
-        string content,
-        string tag,
-        RoutedEventHandler click,
-        string toolTip)
-    {
-        var button = new Button
-        {
-            Content = content,
-            Tag = tag,
-            ToolTip = toolTip,
-            Margin = new Thickness(0, 0, 6, 0)
-        };
-        button.SetResourceReference(StyleProperty, "ToolbarButton");
-        button.Click += click;
-        return button;
-    }
-
-    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject root)
-        where T : DependencyObject
-    {
-        for (var index = 0; index < VisualTreeHelper.GetChildrenCount(root); index++)
-        {
-            var child = VisualTreeHelper.GetChild(root, index);
-            if (child is T typed)
-                yield return typed;
-            foreach (var descendant in FindVisualChildren<T>(child))
-                yield return descendant;
-        }
     }
 
     private void Streams_CollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)

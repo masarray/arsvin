@@ -37,7 +37,8 @@ if ($NoRestore) {
 }
 
 # ARSVIN tests execute against the pinned sibling ARIEC61850 source of truth.
-# The engine repository owns its full-suite percentage gate. This integration gate checks:
+# The engine repository owns its full-suite percentage gate, including the P4 Field layer.
+# This application integration gate checks:
 #   1. the application-consumed protocol core remains strongly covered; and
 #   2. the absolute amount of exercised production code does not regress when the engine grows.
 $arguments += @(
@@ -99,6 +100,10 @@ function Test-IsProtocolCoreFile {
     if ($path.Contains('/AR.Iec61850/Asn1/')) { return $true }
     if ($path.Contains('/AR.Iec61850/Ethernet/')) { return $true }
     if ($path.Contains('/AR.Iec61850/Transports/')) { return $true }
+
+    # P4 Field contracts are tested by ARIEC61850's own deterministic suite. Excluding them here
+    # prevents application coverage from being diluted merely because the shared engine grows.
+    if ($path.Contains('/AR.Iec61850/SampledValues/Field/')) { return $false }
     if ($path.Contains('/AR.Iec61850/SampledValues/')) { return $true }
 
     if ($path.Contains('/AR.Iec61850/Capture/')) {
@@ -145,9 +150,9 @@ Write-Host "ARIEC61850 instrumented lines: $overallLinesValid"
 Write-Host "ARIEC61850 covered lines exercised by ARSVIN: $overallLinesCovered"
 Write-Host "Minimum covered production lines: $MinimumWholeEngineCoveredLines"
 Write-Host "Informational whole-engine line coverage: $overallLineCoverage%"
-Write-Host "Protocol core files: $($coreFiles.Count)"
-Write-Host "Protocol core lines: $coreLinesValid"
-Write-Host "Protocol core covered lines: $coreLinesCovered"
+Write-Host "Application-consumed protocol core files: $($coreFiles.Count)"
+Write-Host "Application-consumed protocol core lines: $coreLinesValid"
+Write-Host "Application-consumed protocol core covered lines: $coreLinesCovered"
 Write-Host "Minimum protocol-core covered lines: $MinimumProtocolCoreCoveredLines"
 Write-Host "Protocol core line coverage: $coreLineCoverage%"
 Write-Host "Protocol core minimum percentage: $MinimumLineCoverage%"
@@ -157,7 +162,7 @@ if ($env:GITHUB_STEP_SUMMARY) {
     @"
 ## ARSVIN integration coverage against pinned ARIEC61850
 
-The ARIEC61850 repository owns the full-engine percentage gate. This paired gate measures the reusable code actually exercised by ARSVIN Publisher and ArSubsv.
+ARIEC61850 owns the full-engine and P4 Field-layer test gates. This paired gate measures the reusable protocol core exercised directly by ARSVIN Publisher and ArSubsv.
 
 | Metric | Result |
 |---|---:|
@@ -165,7 +170,7 @@ The ARIEC61850 repository owns the full-engine percentage gate. This paired gate
 | Production lines exercised by ARSVIN | **$overallLinesCovered** |
 | Minimum exercised production lines | **$MinimumWholeEngineCoveredLines** |
 | Informational whole-engine line coverage | **$overallLineCoverage%** |
-| Tested protocol-core files | **$($coreFiles.Count)** |
+| Tested application-consumed protocol-core files | **$($coreFiles.Count)** |
 | Protocol-core instrumented lines | **$coreLinesValid** |
 | Protocol-core covered lines | **$coreLinesCovered** |
 | Minimum protocol-core covered lines | **$MinimumProtocolCoreCoveredLines** |
