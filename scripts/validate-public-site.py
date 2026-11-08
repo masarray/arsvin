@@ -115,7 +115,14 @@ def validate(site_root: Path) -> None:
     for pattern in landing_patterns:
         require(re.search(pattern, landing, re.IGNORECASE) is not None, f"Required landing-page content was not found: {pattern}")
 
-    html_pages = sorted(site_root.rglob("*.html"))
+    verification = site_root / "googlec34c43149eef6100.html"
+    require(verification.is_file(), "Google Search Console verification file is missing.")
+    require(
+        read_text(verification).strip() == "google-site-verification: googlec34c43149eef6100.html",
+        "Google Search Console verification file has incorrect contents.",
+    )
+    # GSC verification is a plain-text token with an .html suffix, not an SEO page.
+    html_pages = sorted(page for page in site_root.rglob("*.html") if page != verification)
     require(len(html_pages) >= 6, f"Expected landing page plus multiple documentation pages; found {len(html_pages)} HTML files.")
     canonicals: dict[str, str] = {}
     for page in html_pages:
